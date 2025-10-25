@@ -1,11 +1,11 @@
-# 🖌️ EpiGimp2.0
+# EpiGimp2.0
 
 **EpiGimp2.0** est un éditeur d’images libre et multiplateforme inspiré de GIMP. 
 Développé en **C++20 / Qt 6**, il permet la création, la retouche et la gestion de calques d’images au format **PNG/JPEG** ainsi qu’un format de projet propriétaire **.epg**.
 
 ---
 
-## 📋 Sommaire
+## Sommaire
 - [Présentation](#-présentation)
 - [Fonctionnalités](#-fonctionnalités)
 - [Format `.epg`](#-format-epg)
@@ -61,6 +61,8 @@ Format propriétaire et textuel, encodé en UTF-8, inspiré de `.xcf`.
 ### Contenu typique
 
 a détailler
+
+---
 
 ## Installation
 
