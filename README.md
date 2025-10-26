@@ -25,32 +25,7 @@ Développé en **C++20 / Qt 6**, il permet la création, la retouche et la gesti
 
 ## Fonctionnalités
 
-### Must have
-- **Fichiers**
- - Nouveau / Ouvrir (PNG, JPEG)
- - Enregistrer projet `.epg`
- - Export PNG/JPEG
-- **Calques**
- - Créer / Supprimer / Dupliquer / Réordonner
- - Visibilité / Opacité / Verrouillage
-- **Outils**
- - Pinceau (taille, dureté, couleur)
- - Gomme (transparence)
- - Sélection rectangulaire (add/subtract)
- - Pot de peinture (tolérance)
-- **Historique**
- - Annuler / Rétablir multi-niveaux (≥ 20 actions)
-
-### Should have
-- Pipette (prélever couleur du rendu composite)
-- Texte (calque texte)
-- Zoom / Pan / Checkerboard de transparence
-- Raccourcis clavier (type GIMP)
-
-### Could have
-- Sélection libre (lasso)
-- Export WebP (qualité réglable)
-- Outil courbes
+a complété
 
 ---
 
