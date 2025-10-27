@@ -1,0 +1,54 @@
+---
+Checks: >
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  readability-*,
+  modernize-*,
+  cppcoreguidelines-*,
+  misc-*,
+  portability-*,
+  qt-*,
+  -cppcoreguidelines-owning-memory,        # trop strict pour Qt (utilisation de pointeurs parents)
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-type-vararg,      # autorise printf/logging
+  -cppcoreguidelines-avoid-magic-numbers,  # trop bruyant dans du code UI
+  -readability-magic-numbers,              # idem
+  -cppcoreguidelines-non-private-member-variables-in-classes, # Qt slots/signals
+  -modernize-use-trailing-return-type,     # préférence à la clarté
+  -modernize-use-auto,                     # auto laissé au choix du dev
+  -readability-implicit-bool-conversion,   # Qt a beaucoup de `if (ptr)` légitimes
+  -readability-convert-member-functions-to-static # inutile ici
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*(include|src).*'
+FormatStyle: file
+CheckOptions:
+  - key:             readability-identifier-naming.VariableCase
+    value:           lower_case
+  - key:             readability-identifier-naming.ClassCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.FunctionCase
+    value:           camelBack
+  - key:             readability-identifier-naming.PrivateMemberPrefix
+    value:           m_
+  - key:             readability-identifier-naming.EnumConstantCase
+    value:           UPPER_CASE
+  - key:             modernize-use-nullptr.NullMacros
+    value:           'NULL'
+  - key:             cppcoreguidelines-special-member-functions.AllowMissingMoveFunctions
+    value:           1
+  - key:             performance-unnecessary-value-param.AllowedTypes
+    value:           'QString;QImage;QPixmap'
+  - key:             modernize-use-override.IgnoreDestructors
+    value:           1
+  - key:             readability-function-cognitive-complexity.Threshold
+    value:           25
+  - key:             readability-function-size.StatementThreshold
+    value:           100
+  - key:             bugprone-branch-clone.MinimumCloneComplexity
+    value:           20
+
+
+# Cible du projet
+CompileCommandsDir: build
