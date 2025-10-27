@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # Mettre à jour les GitHub Actions utilisées dans les workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"  # chemin vers les fichiers workflow (/.github/workflows)
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "chore"
+      include: "scope"

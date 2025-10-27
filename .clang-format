@@ -1,0 +1,122 @@
+# ============================================================
+# 🖼️ EpiGimp2.0 — Clang-Format Configuration
+# ============================================================
+# Style de base inspiré de Google avec adaptations Epitech
+# Compatible avec C++17
+# ============================================================
+
+BasedOnStyle: Google
+
+# ============================================================
+# Indentation
+# ============================================================
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ContinuationIndentWidth: 4
+ConstructorInitializerIndentWidth: 4
+
+# ============================================================
+# Limites de longueur
+# ============================================================
+ColumnLimit: 100
+ReflowComments: true
+
+# ============================================================
+# Espacement
+# ============================================================
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 2
+SpacesInAngles: false
+SpacesInCStyleCastParentheses: false
+SpacesInContainerLiterals: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# ============================================================
+# Accolades
+# ============================================================
+BreakBeforeBraces: Allman
+AllowShortBlocksOnASingleLine: Empty
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+
+# ============================================================
+# Alignement
+# ============================================================
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignConsecutiveMacros: true
+AlignEscapedNewlines: Left
+AlignOperands: true
+AlignTrailingComments: true
+
+# ============================================================
+# Retours à la ligne
+# ============================================================
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: false
+AlwaysBreakTemplateDeclarations: Yes
+BinPackArguments: true
+BinPackParameters: true
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: BeforeColon
+BreakInheritanceList: BeforeColon
+BreakStringLiterals: true
+
+# ============================================================
+# Pointeurs et références
+# ============================================================
+PointerAlignment: Left
+ReferenceAlignment: Left
+DerivePointerAlignment: false
+
+# ============================================================
+# Includes
+# ============================================================
+SortIncludes: CaseInsensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  # Qt headers en premier
+  - Regex: '^<Q.*'
+    Priority: 1
+  # Headers système C++
+  - Regex: '^<.*\.h>'
+    Priority: 2
+  # Headers système C++
+  - Regex: '^<.*'
+    Priority: 3
+  # Headers locaux du projet
+  - Regex: '.*'
+    Priority: 4
+
+# ============================================================
+# Divers
+# ============================================================
+CompactNamespaces: false
+Cpp11BracedListStyle: true
+FixNamespaceComments: true
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: None
+SortUsingDeclarations: true
+
+# ============================================================
+# Standards
+# ============================================================
+Standard: c++17
