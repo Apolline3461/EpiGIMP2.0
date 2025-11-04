@@ -1,0 +1,305 @@
+#include "window.hpp"
+#include <QMenuBar>
+#include <QToolBar>
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QImageReader>
+#include <QImageWriter>
+#include <QStandardPaths>
+#include <QDir>
+#include <QFileInfo>
+#include <QStatusBar>
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , m_imageLabel(new QLabel)
+    , m_scrollArea(new QScrollArea)
+    , m_scaleFactor(1.0)
+    , m_fileMenu(nullptr)
+    , m_viewMenu(nullptr)
+{
+    // Configuration du label d'image
+    m_imageLabel->setBackgroundRole(QPalette::Base);
+    m_imageLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+    m_imageLabel->setScaledContents(true);
+    m_imageLabel->setAlignment(Qt::AlignCenter);
+
+    // Configuration de la zone de scroll
+    m_scrollArea->setBackgroundRole(QPalette::Dark);
+    m_scrollArea->setWidget(m_imageLabel);
+    m_scrollArea->setVisible(false);
+    m_scrollArea->setWidgetResizable(false);
+    
+    setCentralWidget(m_scrollArea);
+
+    // Création de l'interface
+    createActions();
+    createMenus();
+
+    // Barre de status
+    statusBar()->showMessage(tr("Prêt"));
+
+    // Configuration de la fenêtre
+    setWindowTitle(tr("EpiGimp 2.0"));
+    resize(1024, 768);
+}
+
+MainWindow::~MainWindow()
+{
+    // Les QObjects sont automatiquement détruits par Qt
+}
+
+void MainWindow::openImage()
+{
+    QString picturesPath = QStandardPaths::writableLocation(
+        QStandardPaths::PicturesLocation);
+    
+    QString fileName = QFileDialog::getOpenFileName(
+        this,
+        tr("Ouvrir une image"),
+        picturesPath,
+        tr("Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp);;Tous les fichiers (*)")
+    );
+
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    QImageReader reader(fileName);
+    reader.setAutoTransform(true);
+    
+    const QImage newImage = reader.read();
+    if (newImage.isNull()) {
+        QMessageBox::critical(
+            this,
+            tr("Erreur"),
+            tr("Impossible de charger l'image %1:\n%2")
+                .arg(QDir::toNativeSeparators(fileName))
+                .arg(reader.errorString())
+        );
+        return;
+    }
+
+    m_currentImage = newImage;
+    m_currentFileName = fileName;
+    
+    updateImageDisplay();
+    m_scrollArea->setVisible(true);
+
+    const QString message = tr("Image chargée: %1 (%2x%3)")
+        .arg(QFileInfo(fileName).fileName())
+        .arg(m_currentImage.width())
+        .arg(m_currentImage.height());
+    
+    statusBar()->showMessage(message);
+    setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
+}
+
+void MainWindow::saveImage()
+{
+    if (m_currentImage.isNull()) {
+        QMessageBox::information(
+            this,
+            tr("Information"),
+            tr("Aucune image à sauvegarder.")
+        );
+        return;
+    }
+
+    QString picturesPath = QStandardPaths::writableLocation(
+        QStandardPaths::PicturesLocation);
+    
+    QString fileName = QFileDialog::getSaveFileName(
+        this,
+        tr("Enregistrer l'image"),
+        picturesPath,
+        tr("PNG (*.png);;JPEG (*.jpg *.jpeg);;BMP (*.bmp);;Tous les fichiers (*)")
+    );
+
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    QImageWriter writer(fileName);
+    if (!writer.write(m_currentImage)) {
+        QMessageBox::critical(
+            this,
+            tr("Erreur"),
+            tr("Impossible de sauvegarder l'image %1:\n%2")
+                .arg(QDir::toNativeSeparators(fileName))
+                .arg(writer.errorString())
+        );
+        return;
+    }
+
+    m_currentFileName = fileName;
+    statusBar()->showMessage(tr("Image sauvegardée: %1").arg(fileName), 3000);
+}
+
+void MainWindow::closeImage()
+{
+    m_currentImage = QImage();
+    m_currentFileName.clear();
+    m_imageLabel->clear();
+    m_scrollArea->setVisible(false);
+    m_scaleFactor = 1.0;
+    
+    setWindowTitle(tr("EpiGimp 2.0"));
+    statusBar()->showMessage(tr("Image fermée"), 2000);
+}
+
+void MainWindow::zoomIn()
+{
+    scaleImage(1.25);
+}
+
+void MainWindow::zoomOut()
+{
+    scaleImage(0.8);
+}
+
+void MainWindow::resetZoom()
+{
+    m_scaleFactor = 1.0;
+    updateImageDisplay();
+}
+
+void MainWindow::updateImageDisplay()
+{
+    if (!m_currentImage.isNull()) {
+        QPixmap pixmap = QPixmap::fromImage(m_currentImage);
+        QSize scaledSize = pixmap.size() * m_scaleFactor;
+        m_imageLabel->setPixmap(pixmap.scaled(
+            scaledSize,
+            Qt::KeepAspectRatio,
+            Qt::SmoothTransformation
+        ));
+        m_imageLabel->adjustSize();
+        
+        statusBar()->showMessage(
+            tr("Zoom: %1%").arg(static_cast<int>(m_scaleFactor * 100)),
+            2000
+        );
+    }
+}
+
+void MainWindow::scaleImage(double factor)
+{
+    if (m_currentImage.isNull()) {
+        return;
+    }
+    
+    m_scaleFactor *= factor;
+    
+    // Limiter le zoom entre 10% et 500%
+    m_scaleFactor = qBound(0.1, m_scaleFactor, 5.0);
+    
+    updateImageDisplay();
+}
+
+void MainWindow::createActions()
+{
+    // Actions Fichier
+    m_openAct = new QAction(tr("&Ouvrir..."), this);
+    m_openAct->setShortcut(QKeySequence::Open);
+    m_openAct->setStatusTip(tr("Ouvrir une image existante"));
+    connect(m_openAct, &QAction::triggered, this, &MainWindow::openImage);
+
+    m_saveAct = new QAction(tr("&Enregistrer sous..."), this);
+    m_saveAct->setShortcut(QKeySequence::SaveAs);
+    m_saveAct->setStatusTip(tr("Enregistrer l'image sous un nouveau nom"));
+    connect(m_saveAct, &QAction::triggered, this, &MainWindow::saveImage);
+
+    m_closeAct = new QAction(tr("&Fermer"), this);
+    m_closeAct->setShortcut(QKeySequence::Close);
+    m_closeAct->setStatusTip(tr("Fermer l'image actuelle"));
+    connect(m_closeAct, &QAction::triggered, this, &MainWindow::closeImage);
+
+    m_exitAct = new QAction(tr("&Quitter"), this);
+    m_exitAct->setShortcut(QKeySequence::Quit);
+    m_exitAct->setStatusTip(tr("Quitter l'application"));
+    connect(m_exitAct, &QAction::triggered, this, &QWidget::close);
+
+    // Actions Vue
+    m_zoomInAct = new QAction(tr("Zoom &Avant"), this);
+    m_zoomInAct->setShortcut(QKeySequence::ZoomIn);
+    m_zoomInAct->setStatusTip(tr("Agrandir l'image"));
+    connect(m_zoomInAct, &QAction::triggered, this, &MainWindow::zoomIn);
+
+    m_zoomOutAct = new QAction(tr("Zoom A&rrière"), this);
+    m_zoomOutAct->setShortcut(QKeySequence::ZoomOut);
+    m_zoomOutAct->setStatusTip(tr("Réduire l'image"));
+    connect(m_zoomOutAct, &QAction::triggered, this, &MainWindow::zoomOut);
+
+    m_resetZoomAct = new QAction(tr("&Taille réelle"), this);
+    m_resetZoomAct->setShortcut(tr("Ctrl+0"));
+    m_resetZoomAct->setStatusTip(tr("Afficher l'image à 100%"));
+    connect(m_resetZoomAct, &QAction::triggered, this, &MainWindow::resetZoom);
+}
+
+void MainWindow::createMenus()
+{
+    // Menu Fichier
+    m_fileMenu = menuBar()->addMenu(tr("&Fichier"));
+    m_fileMenu->addAction(m_openAct);
+    m_fileMenu->addAction(m_saveAct);
+    m_fileMenu->addAction(m_closeAct);
+    m_fileMenu->addSeparator();
+    m_fileMenu->addAction(m_exitAct);
+
+    // Menu Vue
+    m_viewMenu = menuBar()->addMenu(tr("&Vue"));
+    m_viewMenu->addAction(m_zoomInAct);
+    m_viewMenu->addAction(m_zoomOutAct);
+    m_viewMenu->addAction(m_resetZoomAct);
+}
+
+void MainWindow::newImage()
+{
+    // Boîte de dialogue pour les dimensions
+    bool ok;
+    int width = QInputDialog::getInt(
+        this,
+        tr("Nouvelle image"),
+        tr("Largeur (pixels):"),
+        800,    // valeur par défaut
+        1,      // minimum
+        10000,  // maximum
+        1,      // pas
+        &ok
+    );
+    
+    if (!ok) {
+        return;
+    }
+    
+    int height = QInputDialog::getInt(
+        this,
+        tr("Nouvelle image"),
+        tr("Hauteur (pixels):"),
+        600,    // valeur par défaut
+        1,      // minimum
+        10000,  // maximum
+        1,      // pas
+        &ok
+    );
+    
+    if (!ok) {
+        return;
+    }
+    
+    // Créer une image blanche
+    m_currentImage = QImage(width, height, QImage::Format_ARGB32);
+    m_currentImage.fill(Qt::white);
+    m_currentFileName.clear();
+    
+    updateImageDisplay();
+    m_scrollArea->setVisible(true);
+    
+    const QString message = tr("Nouvelle image créée: %1x%2")
+        .arg(width)
+        .arg(height);
+    
+    statusBar()->showMessage(message);
+    setWindowTitle(tr("Sans titre - EpiGimp 2.0"));
+}
