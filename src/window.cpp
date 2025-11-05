@@ -9,6 +9,12 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QStatusBar>
+#include <QDialog>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QSpinBox>
+#include <QDialogButtonBox>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -47,6 +53,70 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     // Les QObjects sont automatiquement détruits par Qt
+}
+
+void MainWindow::newImage()
+{
+    // Créer une boîte de dialogue personnalisée
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Nouvelle image"));
+    
+    QVBoxLayout *mainLayout = new QVBoxLayout(&dialog);
+    
+    // Widget pour la largeur
+    QHBoxLayout *widthLayout = new QHBoxLayout();
+    QLabel *widthLabel = new QLabel(tr("Largeur (px):"));
+    QSpinBox *widthSpinBox = new QSpinBox();
+    widthSpinBox->setRange(1, 10000);
+    widthSpinBox->setValue(800);
+    widthSpinBox->setMinimumWidth(100);
+    widthLayout->addWidget(widthLabel);
+    widthLayout->addWidget(widthSpinBox);
+    widthLayout->addStretch();
+    
+    // Widget pour la hauteur
+    QHBoxLayout *heightLayout = new QHBoxLayout();
+    QLabel *heightLabel = new QLabel(tr("Hauteur (px):"));
+    QSpinBox *heightSpinBox = new QSpinBox();
+    heightSpinBox->setRange(1, 10000);
+    heightSpinBox->setValue(600);
+    heightSpinBox->setMinimumWidth(100);
+    heightLayout->addWidget(heightLabel);
+    heightLayout->addWidget(heightSpinBox);
+    heightLayout->addStretch();
+    
+    // Boutons OK/Annuler
+    QDialogButtonBox *buttonBox = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    connect(buttonBox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttonBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    
+    // Ajouter tous les widgets au layout principal
+    mainLayout->addLayout(widthLayout);
+    mainLayout->addLayout(heightLayout);
+    mainLayout->addSpacing(10);
+    mainLayout->addWidget(buttonBox);
+    
+    // Afficher la boîte de dialogue
+    if (dialog.exec() == QDialog::Accepted) {
+        int width = widthSpinBox->value();
+        int height = heightSpinBox->value();
+        
+        // Créer une image blanche
+        m_currentImage = QImage(width, height, QImage::Format_ARGB32);
+        m_currentImage.fill(Qt::white);
+        m_currentFileName.clear();
+        
+        updateImageDisplay();
+        m_scrollArea->setVisible(true);
+        
+        const QString message = tr("Nouvelle image créée: %1x%2")
+            .arg(width)
+            .arg(height);
+        
+        statusBar()->showMessage(message);
+        setWindowTitle(tr("Sans titre - EpiGimp 2.0"));
+    }
 }
 
 void MainWindow::openImage()
@@ -200,6 +270,11 @@ void MainWindow::scaleImage(double factor)
 void MainWindow::createActions()
 {
     // Actions Fichier
+    m_newAct = new QAction(tr("&Nouveau..."), this);
+    m_newAct->setShortcut(QKeySequence::New);
+    m_newAct->setStatusTip(tr("Créer une nouvelle image"));
+    connect(m_newAct, &QAction::triggered, this, &MainWindow::newImage);
+
     m_openAct = new QAction(tr("&Ouvrir..."), this);
     m_openAct->setShortcut(QKeySequence::Open);
     m_openAct->setStatusTip(tr("Ouvrir une image existante"));
@@ -241,6 +316,7 @@ void MainWindow::createMenus()
 {
     // Menu Fichier
     m_fileMenu = menuBar()->addMenu(tr("&Fichier"));
+    m_fileMenu->addAction(m_newAct);
     m_fileMenu->addAction(m_openAct);
     m_fileMenu->addAction(m_saveAct);
     m_fileMenu->addAction(m_closeAct);
@@ -252,54 +328,4 @@ void MainWindow::createMenus()
     m_viewMenu->addAction(m_zoomInAct);
     m_viewMenu->addAction(m_zoomOutAct);
     m_viewMenu->addAction(m_resetZoomAct);
-}
-
-void MainWindow::newImage()
-{
-    // Boîte de dialogue pour les dimensions
-    bool ok;
-    int width = QInputDialog::getInt(
-        this,
-        tr("Nouvelle image"),
-        tr("Largeur (pixels):"),
-        800,    // valeur par défaut
-        1,      // minimum
-        10000,  // maximum
-        1,      // pas
-        &ok
-    );
-    
-    if (!ok) {
-        return;
-    }
-    
-    int height = QInputDialog::getInt(
-        this,
-        tr("Nouvelle image"),
-        tr("Hauteur (pixels):"),
-        600,    // valeur par défaut
-        1,      // minimum
-        10000,  // maximum
-        1,      // pas
-        &ok
-    );
-    
-    if (!ok) {
-        return;
-    }
-    
-    // Créer une image blanche
-    m_currentImage = QImage(width, height, QImage::Format_ARGB32);
-    m_currentImage.fill(Qt::white);
-    m_currentFileName.clear();
-    
-    updateImageDisplay();
-    m_scrollArea->setVisible(true);
-    
-    const QString message = tr("Nouvelle image créée: %1x%2")
-        .arg(width)
-        .arg(height);
-    
-    statusBar()->showMessage(message);
-    setWindowTitle(tr("Sans titre - EpiGimp 2.0"));
 }
