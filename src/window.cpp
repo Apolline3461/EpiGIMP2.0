@@ -1,15 +1,16 @@
 #include "window.hpp"
-#include "image.hpp"
-#include "epgformat.hpp"
 
-#include <QScrollArea>
-#include <QMenuBar>
-#include <QStatusBar>
-#include <QMessageBox>
-#include <QFileDialog>
-#include <QStandardPaths>
-#include <QFileInfo>
 #include <QDir>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QMenuBar>
+#include <QMessageBox>
+#include <QScrollArea>
+#include <QStandardPaths>
+#include <QStatusBar>
+
+#include "epgformat.hpp"
+#include "image.hpp"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -52,7 +53,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::createActions()
 {
-    // Menu Fichier 
+    // Menu Fichier
     m_newAct = new QAction(tr("&Nouveau..."), this);
     m_newAct->setShortcut(QKeySequence::New);
     m_newAct->setStatusTip(tr("Créer une nouvelle image"));
@@ -173,8 +174,8 @@ void MainWindow::saveAsEpg()
     }
 
     QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
-    QString fileName = QFileDialog::getSaveFileName(
-        this, tr("Enregistrer au format EpiGimp"), picturesPath, tr("EpiGimp (*.epg)"));
+    QString fileName = QFileDialog::getSaveFileName(this, tr("Enregistrer au format EpiGimp"),
+                                                    picturesPath, tr("EpiGimp (*.epg)"));
 
     if (fileName.isEmpty())
         return;
