@@ -1,14 +1,16 @@
 #include "epgformat.hpp"
-#include <QFile>
-#include <QDataStream>
+
 #include <QBuffer>
+#include <QDataStream>
+#include <QFile>
 
 namespace EpgFormat
 {
 bool save(const QString& fileName, const QImage& image)
 {
     QFile file(fileName);
-    if (!file.open(QIODevice::WriteOnly)) return false;
+    if (!file.open(QIODevice::WriteOnly))
+        return false;
 
     QDataStream out(&file);
     out.setVersion(QDataStream::Qt_6_0);
@@ -31,18 +33,21 @@ bool save(const QString& fileName, const QImage& image)
 bool load(const QString& fileName, QImage& outImage)
 {
     QFile file(fileName);
-    if (!file.open(QIODevice::ReadOnly)) return false;
+    if (!file.open(QIODevice::ReadOnly))
+        return false;
 
     QDataStream in(&file);
     in.setVersion(QDataStream::Qt_6_0);
 
     QString header;
     in >> header;
-    if (header != "EPIGIMP") return false;
+    if (header != "EPIGIMP")
+        return false;
 
     qint32 version;
     in >> version;
-    if (version != 1) return false;
+    if (version != 1)
+        return false;
 
     int width, height;
     qint32 format;
@@ -57,4 +62,4 @@ bool load(const QString& fileName, QImage& outImage)
 
     return !outImage.isNull();
 }
-}
+}  // namespace EpgFormat
