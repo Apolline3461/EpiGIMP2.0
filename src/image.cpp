@@ -85,9 +85,9 @@ void ImageActions::openImage(MainWindow* window)
 
     QImageReader reader(fileName);
     reader.setAutoTransform(true);
-    const QImage newImage = reader.read();
+    const QImage image = reader.read();
 
-    if (newImage.isNull())
+    if (image.isNull())
     {
         QMessageBox::critical(window, QObject::tr("Erreur"),
                               QObject::tr("Impossible de charger l'image %1:\n%2")
@@ -96,7 +96,7 @@ void ImageActions::openImage(MainWindow* window)
         return;
     }
 
-    window->m_currentImage = newImage;
+    window->m_currentImage = image;
     window->m_currentFileName = fileName;
 
     window->updateImageDisplay();
