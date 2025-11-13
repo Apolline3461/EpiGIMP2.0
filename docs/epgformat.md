@@ -1,7 +1,7 @@
 # Documentation technique du format `.epg`
 
-**Version du format :** 1.0
-**Date :** 2025-11-11
+**Version du format :** 1.1
+**Date :** 2025-11-13
 **Auteur :** Léandre Godet
 **Statut :** Documentation interne
 
@@ -35,20 +35,19 @@ Un fichier `.epg` est une **archive compressée (ZIP)** contenant :
 ```
 project.epg
 ├── project.json          # Structure principale du projet
-├── preview.png           # [Optionnel] Aperçu rapide du rendu
+├── preview.png           # Aperçu 256×256 du rendu
 └── layers/
     ├── 0001.png
     ├── 0002.png
-    ├── 0003_mask.png     # [Optionnel] Masque de calque
+    ├── 0003.png
     └── ...
 ```
 
 ### 2.1. Conventions de nommage
 
 - **Identifiants de calques** : format `NNNN` (4 chiffres, ex. `0001`, `0042`)
-- **Fichiers de calques** : `NNNN.png` ou `NNNN.tiff`
-- **Masques de calques** : `NNNN_mask.png`
-- **Prévisualisation** : `preview.png` (recommandé 256×256px max)
+- **Fichiers de calques** : `NNNN.png`
+- **Prévisualisation** : `preview.png` (256×256)
 
 ### 2.2. Compression
 
@@ -67,11 +66,11 @@ Le cœur du format `.epg` repose sur un fichier JSON UTF-8 structuré comme suit
   "epg_version": 1,
   "manifest": {
     "entries": [
-        { "path": "project.json", "sha256": "a3f23c3b..." },
-        { "path": "layers/0001.png", "sha256": "0ff3c2..." }
+      { "path": "project.json", "sha256": "a3f23c3b..." },
+      { "path": "layers/0001.png", "sha256": "0ff3c2..." }
     ],
     "file_count": 5,
-    "generated_utc": "2025-11-11T15:00:00Z"
+    "generated_utc": "2025-11-13T15:00:00Z"
   },
   "canvas": {
     "name": "EpiGimp2.0",
@@ -96,9 +95,7 @@ Le cœur du format `.epg` repose sur un fichier JSON UTF-8 structuré comme suit
         "ty": 0,
         "scaleX": 1.0,
         "scaleY": 1.0,
-        "rotation": 0.0,
-        "skewX": 0.0,
-        "skewY": 0.0
+        "rotation": 0.0
       },
       "bounds": {
         "x": 0,
@@ -106,16 +103,7 @@ Le cœur du format `.epg` repose sur un fichier JSON UTF-8 structuré comme suit
         "width": 1920,
         "height": 1080
       },
-      "path": "layers/0001.png",
-      "masks": [
-        {
-          "type": "alpha",
-          "path": "layers/0001_mask.png",
-          "mode": "multiply",
-          "opacity": 1.0
-        }
-      ],
-      "filters": []
+      "path": "layers/0001.png"
     },
     {
       "id": "0002",
@@ -124,15 +112,13 @@ Le cœur du format `.epg` repose sur un fichier JSON UTF-8 structuré comme suit
       "visible": true,
       "locked": false,
       "opacity": 0.85,
-      "blend_mode": "multiply",
+      "blend_mode": "normal",
       "transform": {
         "tx": 120,
         "ty": 450,
         "scaleX": 1.0,
         "scaleY": 1.0,
-        "rotation": -5.0,
-        "skewX": 0.0,
-        "skewY": 0.0
+        "rotation": 0.0
       },
       "bounds": {
         "x": 120,
@@ -141,35 +127,18 @@ Le cœur du format `.epg` repose sur un fichier JSON UTF-8 structuré comme suit
         "height": 80
       },
       "path": "layers/0002.png",
-      "masks": [],
-      "filters": [
-        {
-          "type": "gaussian_blur",
-          "params": { "radius": 2.5 }
-        }
-      ],
       "text_data": {
         "content": "Bonjour le monde",
         "font_family": "Arial",
         "font_size": 48,
-        "font_weight": "bold",
+        "font_weight": "normal",
         "color": { "r": 0, "g": 0, "b": 0, "a": 255 },
         "alignment": "left"
       }
     }
   ],
 
-  "layer_groups": [
-    {
-      "id": "group_001",
-      "name": "Groupe UI",
-      "visible": true,
-      "locked": false,
-      "opacity": 1.0,
-      "blend_mode": "normal",
-      "layer_ids": ["0003", "0004", "0005"]
-    }
-  ],
+  "layer_groups": [],
 
   "io": {
     "pixel_format_storage": "RGBA8_unorm_straight",
@@ -179,23 +148,13 @@ Le cœur du format `.epg` repose sur un fichier JSON UTF-8 structuré comme suit
   },
 
   "metadata": {
-    "created_utc": "2025-11-11T14:30:00Z",
-    "modified_utc": "2025-11-11T15:45:00Z",
+    "created_utc": "2025-11-13T14:30:00Z",
+    "modified_utc": "2025-11-13T15:45:00Z",
     "author": "Jean Dupont",
     "description": "Bannière publicitaire pour campagne Q4",
     "tags": ["marketing", "web", "bannière"],
     "license": "proprietary"
   },
-
-  "guides": [
-    { "orientation": "vertical", "position": 960 },
-    { "orientation": "horizontal", "position": 540 }
-  ],
-
-  "selection": {
-    "active": false,
-    "path": null
-  }
 }
 ```
 
@@ -210,7 +169,17 @@ Le cœur du format `.epg` repose sur un fichier JSON UTF-8 structuré comme suit
 - **Valeur actuelle** : `1`
 - **But** : gestion de la rétrocompatibilité et détection de versions incompatibles
 
-### 4.2. `canvas`
+### 4.2. `manifest`
+
+Manifeste d'intégrité du projet
+
+| Champ         | Type    | Description                          |
+| ------------- | ------- | ------------------------------------ |
+| entries       | array   | Liste des fichiers avec hash SHA-256 |
+| file_count    | integer | Nombre total de fichiers             |
+| generated_utc | string  | Date de génération (ISO 8601)        |
+
+### 4.3. `canvas`
 
 Configuration de la zone de travail.
 
@@ -229,11 +198,11 @@ Configuration de la zone de travail.
 "background": { "r": 255, "g": 255, "b": 255, "a": 0 }
 ```
 
-### 4.3. `layers`
+### 4.4. `layers`
 
 Liste ordonnée des calques (du fond vers le premier plan).
 
-#### 4.3.1. Propriétés communes
+#### 4.4.1. Propriétés communes
 
 | Champ        | Type            | Obligatoire | Description           | Valeurs                                 |
 | ------------ | --------------- | ----------- | --------------------- | --------------------------------------- |
@@ -247,10 +216,8 @@ Liste ordonnée des calques (du fond vers le premier plan).
 | `transform`  | `object`        | ✅          | Transformation 2D     | Voir §4.4.4                             |
 | `bounds`     | `object`        | ✅          | Rectangle englobant   | x, y, width, height                     |
 | `path`       | `string`        | ✅          | Chemin vers l'image   | Relatif à la racine                     |
-| `mask`       | `string`/`null` | ❌          | Chemin vers le masque | Relatif, ou `null`                      |
-| `filters`    | `array`         | ❌          | Liste des effets      | Voir §4.4.5                             |
 
-#### 4.3.2. Propriétés spécifiques aux calques texte
+#### 4.4.2. Propriétés spécifiques aux calques texte
 
 | Champ                   | Type      | Description                                       |
 | ----------------------- | --------- | ------------------------------------------------- |
@@ -261,24 +228,14 @@ Liste ordonnée des calques (du fond vers le premier plan).
 | `text_data.color`       | `object`  | Couleur RGBA                                      |
 | `text_data.alignment`   | `string`  | Alignement (`left`, `center`, `right`, `justify`) |
 
-#### 4.3.3. Modes de fusion supportés
+#### 4.4.3. Modes de fusion supportés
 
 | Mode          | Description            |
 | ------------- | ---------------------- |
 | `normal`      | Superposition standard |
 | `multiply`    | Multiplication         |
-| `screen`      | Superposition écran    |
-| `overlay`     | Incrustation           |
-| `darken`      | Obscurcir              |
-| `lighten`     | Éclaircir              |
-| `color_dodge` | Densité couleur -      |
-| `color_burn`  | Densité couleur +      |
-| `hard_light`  | Lumière crue           |
-| `soft_light`  | Lumière tamisée        |
-| `difference`  | Différence             |
-| `exclusion`   | Exclusion              |
 
-#### 4.3.4. Objet `transform`
+#### 4.4.4. Objet `transform`
 
 ```json
 "transform": {
@@ -294,26 +251,7 @@ Liste ordonnée des calques (du fond vers le premier plan).
 
 **Ordre d'application** : échelle → inclinaison → rotation → translation
 
-#### 4.3.5. Filtres et effets
-
-```json
-"filters": [
-  {
-    "type": "gaussian_blur",
-    "params": { "radius": 5.0 }
-  },
-  {
-    "type": "brightness_contrast",
-    "params": { "brightness": 10, "contrast": 15 }
-  },
-  {
-    "type": "hue_saturation",
-    "params": { "hue": 30, "saturation": 20, "lightness": 0 }
-  }
-]
-```
-
-### 4.4. `layer_groups`
+### 4.5. `layer_groups`
 
 Groupes de calques pour l'organisation hiérarchique.
 
@@ -327,7 +265,7 @@ Groupes de calques pour l'organisation hiérarchique.
 | `blend_mode` | `string`  | Mode de fusion du groupe         |
 | `layer_ids`  | `array`   | Liste des IDs de calques membres |
 
-### 4.5. `io`
+### 4.6. `io`
 
 Configuration des formats de pixels.
 
@@ -338,7 +276,7 @@ Configuration des formats de pixels.
 | `color_depth`          | `integer` | Profondeur de couleur | 8, 16, 32                                       |
 | `compression`          | `string`  | Format de compression | `png`, `tiff`                                   |
 
-### 4.6. `metadata`
+### 4.7. `metadata`
 
 Métadonnées du projet.
 
@@ -350,17 +288,6 @@ Métadonnées du projet.
 | `description`  | `string` | ❌          | Description du projet            |
 | `tags`         | `array`  | ❌          | Mots-clés                        |
 | `license`      | `string` | ❌          | Type de licence                  |
-
-### 4.7. `guides`
-
-Repères de composition.
-
-```json
-"guides": [
-  { "orientation": "vertical", "position": 960 },
-  { "orientation": "horizontal", "position": 540 }
-]
-```
 
 ### 4.8. `selection`
 
@@ -386,50 +313,95 @@ Les implémentations peuvent utiliser toute licence compatible.
 
 ### Annexe A : Cas d'usage et exemples
 
-#### A.1. Projet simple (1 calque)
+#### A.1. Projet minimal (nouveau projet vide)
 
 ```json
 {
   "epg_version": 1,
-  "canvas": { "width": 800, "height": 600, "dpi": 72 },
+  "canvas": {
+    "name": "EpiGimp2.0",
+    "width": 800,
+    "height": 600,
+    "dpi": 72,
+    "color_space": "sRGB",
+    "background": { "r": 255, "g": 255, "b": 255, "a": 0 }
+  },
   "layers": [
     {
       "id": "0001",
-      "name": "Photo",
+      "name": "Calque 1",
       "type": "raster",
-      "path": "layers/0001.png",
+      "visible": true,
+      "locked": false,
       "opacity": 1.0,
-      "blend_mode": "normal"
+      "blend_mode": "normal",
+      "transform": { "tx": 0, "ty": 0, "scaleX": 1.0, "scaleY": 1.0, "rotation": 0.0 },
+      "bounds": { "x": 0, "y": 0, "width": 800, "height": 600 },
+      "path": "layers/0001.png"
     }
-  ]
+  ],
+  "layer_groups": [],
+  "io": {
+    "pixel_format_storage": "RGBA8_unorm_straight",
+    "pixel_format_runtime": "ARGB32_premultiplied",
+    "color_depth": 8,
+    "compression": "png"
+  },
+  "metadata": {
+    "created_utc": "2025-11-13T10:00:00Z",
+    "modified_utc": "2025-11-13T10:00:00Z"
+  },
+  "selection": {
+    "active": false,
+    "type": null,
+    "bounds": null
+  },
 }
 ```
 
-#### A.2. Projet avec effet de texte
+#### A.2. Projet avec calques mixtes (raster + texte)
 
 ```json
 {
+  "epg_version": 1,
+  "canvas": {
+    "width": 1920,
+    "height": 1080,
+    "dpi": 72,
+    "color_space": "sRGB",
+    "background": { "r": 255, "g": 255, "b": 255, "a": 255 }
+  },
   "layers": [
     {
       "id": "0001",
-      "name": "Titre avec ombre",
-      "type": "text",
+      "name": "Photo de fond",
+      "type": "raster",
+      "visible": true,
+      "locked": false,
       "opacity": 1.0,
-      "filters": [
-        {
-          "type": "drop_shadow",
-          "params": {
-            "offset_x": 3,
-            "offset_y": 3,
-            "blur": 5,
-            "color": { "r": 0, "g": 0, "b": 0, "a": 128 }
-          }
-        }
-      ],
+      "blend_mode": "normal",
+      "transform": { "tx": 0, "ty": 0, "scaleX": 1.0, "scaleY": 1.0, "rotation": 0.0 },
+      "bounds": { "x": 0, "y": 0, "width": 1920, "height": 1080 },
+      "path": "layers/0001.png"
+    },
+    {
+      "id": "0002",
+      "name": "Titre",
+      "type": "text",
+      "visible": true,
+      "locked": false,
+      "opacity": 0.9,
+      "blend_mode": "multiply",
+      "transform": { "tx": 100, "ty": 200, "scaleX": 1.0, "scaleY": 1.0, "rotation": 0.0 },
+      "bounds": { "x": 100, "y": 200, "width": 800, "height": 120 },
+      "path": "layers/0002.png",
       "text_data": {
-        "content": "Bienvenue",
-        "font_family": "Helvetica",
-        "font_size": 72
+        "content": "Bienvenue sur EpiGimp",
+        "font_family": "Arial",
+        "font_size": 72,
+        "font_weight": "bold",
+        "color": { "r": 0, "g": 0, "b": 0, "a": 255 },
+        "alignment": "left"
       }
     }
   ]
