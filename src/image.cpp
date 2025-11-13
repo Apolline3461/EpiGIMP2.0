@@ -119,14 +119,16 @@ void ImageActions::saveImage(MainWindow* window)
         return;
     }
 
-    QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+    QString picturesPath =
+        QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + "/untitled.png";
     QString fileName = QFileDialog::getSaveFileName(
         window, QObject::tr("Enregistrer l'image"), picturesPath,
-        QObject::tr("PNG (*.png);;JPEG (*.jpg *.jpeg);;BMP (*.bmp);;Tous les fichiers (*)"));
+        QObject::tr("PNG (*.png);;JPEG (*.jpg *.jpeg);;Tous les fichiers (*)"));
 
     if (fileName.isEmpty())
         return;
-
+    if (!fileName.endsWith(".png", Qt::CaseInsensitive))
+        fileName += ".png";
     QImageWriter writer(fileName);
     if (!writer.write(window->m_currentImage))
     {
