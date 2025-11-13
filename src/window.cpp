@@ -173,12 +173,13 @@ void MainWindow::saveAsEpg()
         return;
     }
 
-    QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+    QString picturesPath =
+        QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + "/untitled.epg";
     QString fileName = QFileDialog::getSaveFileName(this, tr("Enregistrer au format EpiGimp"),
                                                     picturesPath, tr("EpiGimp (*.epg)"));
 
     if (fileName.isEmpty())
-        return;
+        fileName = "untitled.epg";
 
     if (!fileName.endsWith(".epg", Qt::CaseInsensitive))
         fileName += ".epg";
