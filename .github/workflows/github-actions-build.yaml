@@ -1,5 +1,4 @@
-name: 🖼️ Build EpiGimp2.0
-
+name: Build epigimp
 on:
   push:
     branches: [ main, dev ]
@@ -77,16 +76,16 @@ jobs:
       with:
         name: EpiGimp2.0-Linux-${{ matrix.build-type }}
         path: |
-          build/EpiGimp2.0
-          build/*.so
+          build/**/epigimp
+          build/**/*.so
         retention-days: 7
     
     - name: 📤 Upload build artifacts (Windows)
       if: runner.os == 'Windows'
       uses: actions/upload-artifact@v4
       with:
-        name: EpiGimp2.0-Windows-${{ matrix.build-type }}
+        name: epigimp-Windows-${{ matrix.build-type }}
         path: |
-          build/${{ matrix.build-type }}/EpiGimp2.0.exe
-          build/${{ matrix.build-type }}/*.dll
+          build/**/epigimp.exe
+          build/**/*.dll
         retention-days: 7
