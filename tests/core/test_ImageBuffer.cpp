@@ -19,8 +19,6 @@ TEST(ImageBufferTest, SetAndgetPixelOnCorners)
     const uint32_t c1 = 0xFF0000FFu;
     const uint32_t c2 = 0x00FF00FFu;
 
-    buf.fill(0);
-
     buf.setPixel(0, 0, c1);
     buf.setPixel(1, 1, c2);
 

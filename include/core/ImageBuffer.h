@@ -13,9 +13,9 @@ class ImageBuffer
 public:
   ImageBuffer(int width, int height);
 
-  int width() const noexcept;
-  int height() const noexcept;
-  int strideBytes() const noexcept;
+  [[nodiscard]] int width() const noexcept;
+  [[nodiscard]] int height() const noexcept;
+  [[nodiscard]] int strideBytes() const noexcept;
 
   uint8_t* data() noexcept;
   [[nodiscard]] const uint8_t* data() const noexcept;
