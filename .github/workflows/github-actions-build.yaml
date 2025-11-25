@@ -4,6 +4,7 @@ on:
     branches: [ main, dev ]
   pull_request:
     branches: [ main, dev ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -68,7 +69,7 @@ jobs:
     
     - name: 🧪 Run tests (if available)
       run: ctest --test-dir build --output-on-failure -C ${{ matrix.build-type }}
-      continue-on-error: true
+      continue-on-error: false
     
     - name: 📤 Upload build artifacts (Linux)
       if: runner.os == 'Linux'
