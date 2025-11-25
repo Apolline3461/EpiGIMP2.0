@@ -17,7 +17,7 @@ project(EpiGimp2.0
 # ============================================================
 # Configuration C++ (avec flags MSVC)
 # ============================================================
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(MSVC)
@@ -78,6 +78,24 @@ else()
     message(STATUS "nlohmann_json trouvé ✔")
 endif()
 
+# ===
+# stb
+# ===
+
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG master
+    GIT_SHALLOW TRUE
+)
+
+FetchContent_MakeAvailable(stb)
+
+FetchContent_GetProperties(stb)
+if(NOT stb_POPULATED)
+    FetchContent_Populate(stb)
+endif()
+
 # ============================================================
 # Répertoires source
 # ============================================================
@@ -93,7 +111,7 @@ file(GLOB_RECURSE HDR_FILES ${INCLUDE_DIR}/*.hpp ${INCLUDE_DIR}/*.h)
 add_executable(${PROJECT_NAME}
     tests/main.cpp
     src/EpgFile.cpp
-    src/layer.cpp
+    src/stb_impl.cpp
     ${HDR_FILES}
 )
 
@@ -102,6 +120,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${INCLUDE_DIR}
     ${SRC_DIR}
     ${LIBZIP_INCLUDE_DIRS}
+    ${stb_SOURCE_DIR}
 )
 
 # Link

@@ -2,29 +2,18 @@
 #include <memory>
 #include <string>
 
-// Forward declaration
-class ImageBuffer;
+#include "imagebuffer.hpp"
 
-// Fake Layer class for testing purposes
 class Layer
 {
    public:
-    std::string id;
+    const uint64_t id_;  // défini à la construction
     std::string name;
-    bool visible{true};
-    float opacity{1.0f};
+    bool visible = true;
+    bool locked = false;
+    float opacity = 1.f;
+    std::shared_ptr<ImageBuffer> pixels;
 
-    std::unique_ptr<ImageBuffer> image;
-
-    Layer();                                                // constructeur par défaut
-    Layer(std::string ID, std::string Name, int w, int h);  // déclaration seulement
-    ~Layer();
-
-    // Layer contains a `std::unique_ptr`, so copying should be disabled.
-    Layer(const Layer&) = delete;
-    Layer& operator=(const Layer&) = delete;
-
-    // Allow move semantics
-    Layer(Layer&&) = default;
-    Layer& operator=(Layer&&) = default;
+   public:
+    Layer(uint64_t id) : id_(id) {}
 };

@@ -3,11 +3,21 @@
 #include "document.hpp"
 
 int main() {
-    Document doc(800, 600);
-
-    doc.createLayer("Background", 800, 600);
-    doc.createLayer("Brush Stroke", 800, 600);
-    std::cout << "Document créé avec " << doc.layerCount() << " calques.\n";
+    Document doc;
+    ImageBuffer img;
+    img.width = 100;
+    img.height = 100;
+    img.stride = img.width * 4;
+    img.rgba.resize(img.stride * img.height, 255); // blanc opaque
+    
+    Layer layer1(0);
+    Layer layer2(1);
+    layer1.name = "Background";
+    layer2.name = "Foreground";
+    layer1.pixels = std::make_shared<ImageBuffer>(img);
+    layer2.pixels = std::make_shared<ImageBuffer>(img);
+    doc.layers.push_back(std::make_shared<Layer>(layer1));
+    doc.layers.push_back(std::make_shared<Layer>(layer2));
     ZipEpgStorage storage;
 
     try {
@@ -23,6 +33,5 @@ int main() {
         return 1;
     }
 
-    std::cout << "Document chargé ! Nombre de calques : " << res.document->layerCount() << "\n";
     return 0;
 }

@@ -7,7 +7,6 @@
 #include <utility>
 #include <vector>
 
-// Forward declarations
 class Document;
 class ImageBuffer;
 
@@ -89,14 +88,6 @@ class ZipEpgStorage
         std::vector<std::string> layer_ids;  // IDs des calques membres
     };
 
-    // Structure pour la sélection active
-    struct Selection
-    {
-        bool active{false};
-        std::string type;  // rect, ellipse, path, etc.
-        std::optional<Bounds> bounds;
-        std::string path;  // Chemin vers fichier SVG si sélection path
-    };
 
     // Structure pour la configuration I/O
     struct IOConfig
@@ -147,7 +138,6 @@ class ZipEpgStorage
         std::vector<LayerGroup> layer_groups;
         IOConfig io;
         Metadata metadata;
-        Selection selection;
     };
 
     ZipEpgStorage() = default;
@@ -173,7 +163,6 @@ class ZipEpgStorage
     Canvas parseCanvas(const void* jsonObject) const;
     IOConfig parseIOConfig(const void* jsonObject) const;
     Metadata parseMetadata(const void* jsonObject) const;
-    Selection parseSelection(const void* jsonObject) const;
 
     // Sérialisation vers JSON
     void* serializeTransform(const Transform& t) const;
@@ -185,7 +174,6 @@ class ZipEpgStorage
     void* serializeCanvas(const Canvas& canvas) const;
     void* serializeIOConfig(const IOConfig& io) const;
     void* serializeMetadata(const Metadata& meta) const;
-    void* serializeSelection(const Selection& sel) const;
 
     // Méthodes utilitaires pour la manipulation du ZIP
     std::string readFileFromZip(void* zipHandle, const std::string& filename) const;
