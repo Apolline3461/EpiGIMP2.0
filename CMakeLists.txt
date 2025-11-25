@@ -1,90 +1,135 @@
 # ============================================================
-# 🖼️ EpiGimp2.0 — CMake Configuration
+# 🖼️ EpiGimp2.0 — CMake Configuration (BOOSTED EDITION)
 # ============================================================
 # Auteur : Apolline Fontaine & Léandre Godet
-# Version : 1.0
-# Cible : C++17 / Qt6
-# Compatibilité : Linux / Windows
+# Version : 1.1
+# C++17 / Qt6 / Cross-platform / vcpkg compatible
 # ============================================================
 
 cmake_minimum_required(VERSION 3.20)
 
 project(EpiGimp2.0
-    VERSION 1.0
+    VERSION 1.1
     DESCRIPTION "Projet Epitech : clone simplifié de GIMP en C++/Qt6"
     LANGUAGES CXX
 )
 
 # ============================================================
-# Configuration du standard C++
+# Configuration C++ (avec flags MSVC)
 # ============================================================
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(MSVC)
+    add_compile_options(
+        /W3
+        /permissive-
+        /Zc:preprocessor
+        /EHsc
+        /utf-8
+    )
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
 # ============================================================
-# Configuration Qt6
+# Qt6
 # ============================================================
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# Recherche des packages Qt6
-find_package(Qt6 REQUIRED COMPONENTS
-    Core
-    Gui
-    Widgets
-    Svg
-)
-set(QuaZipQt6_DIR "/usr/local/lib/cmake/QuaZip-Qt6-1.5")
-find_package(QuaZip-Qt6 REQUIRED)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
 
 # ============================================================
-# Configuration des répertoires
+# vcpkg auto-support
+# (vcpkg integrates automatically via toolchain, no more needed)
+# ============================================================
+
+# ============================================================
+# libzip (pkg-config or vcpkg)
+# ============================================================
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBZIP REQUIRED libzip)
+
+# ============================================================
+# OpenSSL
+# ============================================================
+find_package(OpenSSL REQUIRED)
+
+# ============================================================
+# nlohmann/json — AUTO INSTALL if missing
+# ============================================================
+include(FetchContent)
+
+message(STATUS "Recherche de nlohmann/json…")
+
+find_package(nlohmann_json QUIET)
+
+if(NOT nlohmann_json_FOUND)
+    message(STATUS "nlohmann_json introuvable — téléchargement automatique")
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.3
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+else()
+    message(STATUS "nlohmann_json trouvé ✔")
+endif()
+
+# ============================================================
+# Répertoires source
 # ============================================================
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
 set(INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 
-# Récupération des fichiers sources
-# file(GLOB_RECURSE SRC_FILES ${SRC_DIR}/*.cpp)
-
 file(GLOB_RECURSE HDR_FILES ${INCLUDE_DIR}/*.hpp ${INCLUDE_DIR}/*.h)
 
 # ============================================================
-# Création de l'exécutable
+# Cible principale
 # ============================================================
-add_executable(EpiGimp2.0
-#    ${SRC_FILES}
+
+add_executable(${PROJECT_NAME}
     tests/main.cpp
     src/epgformat.cpp
     ${HDR_FILES}
-    ${QuaZipQt6_INCLUDE_DIRS}
 )
 
-# Configuration des répertoires d'inclusion
-target_include_directories(EpiGimp2.0 PRIVATE
+# Includes
+target_include_directories(${PROJECT_NAME} PRIVATE
     ${INCLUDE_DIR}
     ${SRC_DIR}
+    ${LIBZIP_INCLUDE_DIRS}
 )
 
-# Liaison avec les bibliothèques Qt6
-target_link_libraries(EpiGimp2.0 PRIVATE
+# Link
+target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
     Qt6::Svg
-    QuaZipQt6::QuaZipQt6
+    ${LIBZIP_LIBRARIES}
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    nlohmann_json::nlohmann_json
+)
+
+# Linux/macOS: répertoire libs pkgconfig
+target_link_directories(${PROJECT_NAME} PRIVATE
+    ${LIBZIP_LIBRARY_DIRS}
 )
 
 # ============================================================
-# Configuration spécifique Windows
+# Windows : masque la console
 # ============================================================
 if(WIN32)
-    set_target_properties(EpiGimp2.0 PROPERTIES
-        WIN32_EXECUTABLE ON
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        WIN32_EXECUTABLE YES
     )
 endif()
 
 # ============================================================
-# 🎯 Cibles de lint
+# Lint
 # ============================================================
 include(${CMAKE_SOURCE_DIR}/lint.cmake)
