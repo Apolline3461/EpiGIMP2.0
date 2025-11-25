@@ -35,7 +35,24 @@ const uint8_t* ImageBuffer::data() const noexcept
 {
     return rgbaPixels_.data();
 }
-void ImageBuffer::fill(uint32_t rgba) {}
+
+void ImageBuffer::fill(uint32_t rgba)
+{
+    const auto r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
+    const auto g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
+    const auto b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
+    const auto a = static_cast<uint8_t>(rgba & 0xFF);
+
+    for (int y = 0; y < height_; ++y) {
+        for (int x = 0; x < width_; ++x) {
+            const int offset = y * stride_ + x * 4;
+            rgbaPixels_[offset + 0] = r;
+            rgbaPixels_[offset + 1] = g;
+            rgbaPixels_[offset + 2] = b;
+            rgbaPixels_[offset + 3] = a;
+        }
+    }
+}
 
 uint32_t ImageBuffer::getPixel(const int x, const int y) const
 {
