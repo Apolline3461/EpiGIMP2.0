@@ -92,7 +92,7 @@ file(GLOB_RECURSE HDR_FILES ${INCLUDE_DIR}/*.hpp ${INCLUDE_DIR}/*.h)
 
 add_executable(${PROJECT_NAME}
     tests/main.cpp
-    src/EpgFormat.cpp
+    src/EpgFile.cpp
     src/layer.cpp
     ${HDR_FILES}
 )

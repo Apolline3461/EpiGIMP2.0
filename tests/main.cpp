@@ -1,5 +1,5 @@
 #include <iostream>
-#include "ZipEpgStorage.hpp"
+#include "EpgFile.hpp"
 #include "document.hpp"
 
 int main() {
@@ -7,7 +7,7 @@ int main() {
 
     doc.createLayer("Background", 800, 600);
     doc.createLayer("Brush Stroke", 800, 600);
-
+    std::cout << "Document créé avec " << doc.layerCount() << " calques.\n";
     ZipEpgStorage storage;
 
     try {

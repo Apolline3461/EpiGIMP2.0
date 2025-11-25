@@ -10,7 +10,7 @@
 
 #include "document.hpp"
 #include "imagebuffer.hpp"
-#include "ZipEpgStorage.hpp"
+#include "EpgFile.hpp"
 
 using json = nlohmann::json;
 
@@ -105,7 +105,7 @@ bool ZipEpgStorage::verifySHA256(const void* data, size_t size, const std::strin
 // ============================================================================
 
 ZipEpgStorage::Manifest ZipEpgStorage::parseManifest(const std::string& jsonText,
-                                                     std::vector<std::string>& warnings) const
+                                                     std::vector<std::string>&) const
 {
     json j = json::parse(jsonText);
 
@@ -285,6 +285,7 @@ void ZipEpgStorage::save(const Document& doc, const std::string& path)
     j["layers"] = json::array();
     for (auto& L : m.layers)
     {
+        std::cout << "layer" << L.id << std::endl;
         j["layers"].push_back(*reinterpret_cast<json*>(serializeLayer(L)));
     }
 
