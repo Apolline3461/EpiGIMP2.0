@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <cassert>
 
 class ImageBuffer
 {

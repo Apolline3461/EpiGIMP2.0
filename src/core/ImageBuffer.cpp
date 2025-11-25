@@ -3,9 +3,12 @@
 //
 
 #include "../../include/core/ImageBuffer.h"
+
 ImageBuffer::ImageBuffer(const int width, const int height) : width_(width), height_(height)
 {
+    assert(width_ >0 && height_ > 0);
     stride_ = width_ * 4;
+    rgbaPixels_.resize(width_ * height_);
 }
 
 int ImageBuffer::width() const noexcept
