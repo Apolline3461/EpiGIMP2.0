@@ -35,6 +35,8 @@ find_package(Qt6 REQUIRED COMPONENTS
     Widgets
     Svg
 )
+set(QuaZipQt6_DIR "/usr/local/lib/cmake/QuaZip-Qt6-1.5")
+find_package(QuaZip-Qt6 REQUIRED)
 
 # ============================================================
 # Configuration des répertoires
@@ -43,15 +45,19 @@ set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
 set(INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 
 # Récupération des fichiers sources
-file(GLOB_RECURSE SRC_FILES ${SRC_DIR}/*.cpp)
+# file(GLOB_RECURSE SRC_FILES ${SRC_DIR}/*.cpp)
+
 file(GLOB_RECURSE HDR_FILES ${INCLUDE_DIR}/*.hpp ${INCLUDE_DIR}/*.h)
 
 # ============================================================
 # Création de l'exécutable
 # ============================================================
 add_executable(EpiGimp2.0
-    ${SRC_FILES}
+#    ${SRC_FILES}
+    tests/main.cpp
+    src/epgformat.cpp
     ${HDR_FILES}
+    ${QuaZipQt6_INCLUDE_DIRS}
 )
 
 # Configuration des répertoires d'inclusion
@@ -66,6 +72,7 @@ target_link_libraries(EpiGimp2.0 PRIVATE
     Qt6::Gui
     Qt6::Widgets
     Qt6::Svg
+    QuaZipQt6::QuaZipQt6
 )
 
 # ============================================================
