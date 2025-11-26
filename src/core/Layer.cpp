@@ -19,7 +19,10 @@ const std::string& Layer::name() const noexcept
 {
     return name_;
 }
-void Layer::setName(std::string name) {}
+void Layer::setName(std::string name)
+{
+    name_ = move(name);
+}
 
 bool Layer::visible() const noexcept
 {
