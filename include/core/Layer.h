@@ -12,35 +12,36 @@ class ImageBuffer;
 
 using namespace std;
 
-class Layer {
-public:
-  Layer(uint64_t id, string name, shared_ptr<ImageBuffer> image, bool visible = true, bool locked = false, float opacity = 1.0f);
+class Layer
+{
+   public:
+    Layer(uint64_t id, string name, shared_ptr<ImageBuffer> image, bool visible = true,
+          bool locked = false, float opacity = 1.0f);
 
-  [[nodiscard]] std::uint64_t id() const noexcept;
+    [[nodiscard]] std::uint64_t id() const noexcept;
 
-  [[nodiscard]] const std::string& name() const noexcept;
-  void setName(string name);
+    [[nodiscard]] const std::string& name() const noexcept;
+    void setName(string name);
 
-  [[nodiscard]] bool visible() const noexcept;
-  void setVisible(bool visible);
+    [[nodiscard]] bool visible() const noexcept;
+    void setVisible(bool visible);
 
-  [[nodiscard]] bool locked() const noexcept;
-  void setLocked(bool locked);
+    [[nodiscard]] bool locked() const noexcept;
+    void setLocked(bool locked);
 
-  [[nodiscard]] bool isEditable() const noexcept;
+    [[nodiscard]] bool isEditable() const noexcept;
 
-  [[nodiscard]] float opacity() const noexcept;
-  void setOpacity(float opacity);
+    [[nodiscard]] float opacity() const noexcept;
+    void setOpacity(float opacity);
 
-  [[nodiscard]] const shared_ptr<ImageBuffer>& image() const noexcept;
-  void setImageBuffer(shared_ptr<ImageBuffer> image);
+    [[nodiscard]] const shared_ptr<ImageBuffer>& image() const noexcept;
+    void setImageBuffer(shared_ptr<ImageBuffer> image);
 
-private:
-  const uint64_t id_;
-  string name_;
-  bool visible_{true};
-  bool locked_{false};
-  float opacity_{1.0f};
-  shared_ptr<ImageBuffer> image_;
+   private:
+    const uint64_t id_;
+    string name_;
+    bool visible_{true};
+    bool locked_{false};
+    float opacity_{1.0f};
+    shared_ptr<ImageBuffer> image_;
 };
-

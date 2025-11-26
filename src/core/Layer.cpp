@@ -7,9 +7,15 @@
 #include <cassert>
 #include <utility>
 
-Layer::Layer(const uint64_t id, string name, shared_ptr<ImageBuffer> image, bool visible, bool locked,
-             float opacity)
-    : id_{id}, name_{move(name)}, visible_{visible}, locked_{locked}, opacity_{opacity}, image_{move(image)} {
+Layer::Layer(const uint64_t id, string name, shared_ptr<ImageBuffer> image, bool visible,
+             bool locked, float opacity)
+    : id_{id},
+      name_{move(name)},
+      visible_{visible},
+      locked_{locked},
+      opacity_{opacity},
+      image_{move(image)}
+{
 }
 std::uint64_t Layer::id() const noexcept
 {
