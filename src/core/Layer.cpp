@@ -29,18 +29,24 @@ bool Layer::visible() const noexcept
     return visible_;
 }
 
-void Layer::setVisible(bool visible) {}
+void Layer::setVisible(const bool visible)
+{
+    visible_ = visible;
+}
 
 bool Layer::locked() const noexcept
 {
     return locked_;
 }
 
-void Layer::setLocked(bool locked) {}
+void Layer::setLocked(const bool locked)
+{
+    locked_ = locked;
+}
 
 bool Layer::isEditable() const noexcept
 {
-    return true;
+    return !locked_;
 }
 
 float Layer::opacity() const noexcept
