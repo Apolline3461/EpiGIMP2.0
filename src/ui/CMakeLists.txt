@@ -2,15 +2,13 @@
 
 set(UI_SOURCES
         main.cpp
-        #MainWindow.cpp
-        #CanvasWidget.cpp
-        #LayersPanel.cpp
+        window.cpp
+        image.cpp
 )
 
 set(UI_HEADERS
-        #${EPIGIMP_ROOT_INCLUDE_DIR}/ui/MainWindow.h
-        #${EPIGIMP_ROOT_INCLUDE_DIR}/ui/CanvasWidget.h
-        #${EPIGIMP_ROOT_INCLUDE_DIR}/ui/LayersPanel.h
+        ${EPIGIMP_ROOT_INCLUDE_DIR}/ui/window.hpp
+        ${EPIGIMP_ROOT_INCLUDE_DIR}/ui/image.hpp
 )
 
 add_executable(epigimp

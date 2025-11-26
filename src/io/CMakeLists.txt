@@ -20,4 +20,10 @@ target_include_directories(epigimp_io
 target_link_libraries(epigimp_io
         PUBLIC
         epigimp_core
+
+        # TODO: Remove Qt dependency from epigimp_io.
+        # epgformat.cpp must be refactored to use pure core types (no QImage/QFile),
+        # Qt-specific code should live in the UI/app layer only.
+        Qt6::Core
+        Qt6::Gui
 )
