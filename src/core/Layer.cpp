@@ -13,7 +13,7 @@ Layer::Layer(const uint64_t id, string name, shared_ptr<ImageBuffer> image, bool
 }
 std::uint64_t Layer::id() const noexcept
 {
-    return 0;
+    return id_;
 }
 const std::string& Layer::name() const noexcept
 {
@@ -23,14 +23,14 @@ void Layer::setName(std::string name) {}
 
 bool Layer::visible() const noexcept
 {
-    return false;
+    return visible_;
 }
 
 void Layer::setVisible(bool visible) {}
 
 bool Layer::locked() const noexcept
 {
-    return true;
+    return locked_;
 }
 
 void Layer::setLocked(bool locked) {}
@@ -42,7 +42,7 @@ bool Layer::isEditable() const noexcept
 
 float Layer::opacity() const noexcept
 {
-    return 0;
+    return opacity_;
 }
 void Layer::setOpacity(float opacity) {}
 
