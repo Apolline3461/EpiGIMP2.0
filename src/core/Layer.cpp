@@ -53,7 +53,15 @@ float Layer::opacity() const noexcept
 {
     return opacity_;
 }
-void Layer::setOpacity(float opacity) {}
+void Layer::setOpacity(const float opacity)
+{
+    if (opacity < 0.f)
+        opacity_ = 0;
+    else if (opacity > 1.f)
+        opacity_ = 1.f;
+    else
+        opacity_ = opacity;
+}
 
 const shared_ptr<ImageBuffer>& Layer::image() const noexcept
 {
