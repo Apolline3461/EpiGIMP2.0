@@ -141,7 +141,7 @@ TEST(LayerTest, ImageSharedPtrIsKeptAndCanBeShared)
     EXPECT_EQ(l1.image(), l2.image());
 
     auto otherImage = make_shared<ImageBuffer>(4, 4);
-    l1.setPixels(otherImage);
+    l1.setImageBuffer(otherImage);
 
     EXPECT_EQ(l1.image(), otherImage);
     EXPECT_EQ(l2.image(), image);

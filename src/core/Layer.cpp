@@ -68,4 +68,7 @@ const shared_ptr<ImageBuffer>& Layer::image() const noexcept
     return image_;
 }
 
-void Layer::setPixels(std::shared_ptr<ImageBuffer> image) {}
+void Layer::setImageBuffer(std::shared_ptr<ImageBuffer> image)
+{
+    image_ = move(image);
+}

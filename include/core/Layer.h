@@ -33,7 +33,7 @@ public:
   void setOpacity(float opacity);
 
   [[nodiscard]] const shared_ptr<ImageBuffer>& image() const noexcept;
-  void setPixels(shared_ptr<ImageBuffer> image);
+  void setImageBuffer(shared_ptr<ImageBuffer> image);
 
 private:
   const uint64_t id_;
