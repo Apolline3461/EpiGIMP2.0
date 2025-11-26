@@ -4,12 +4,11 @@
 
 #pragma once
 
+#include <cassert>
 #include <cstdint>
 #include <vector>
-#include <cassert>
 
-class ImageBuffer
-{
+class ImageBuffer {
 public:
   ImageBuffer(int width, int height);
 
