@@ -58,7 +58,7 @@ mkdir build && cd build
 
 cmake ..
 make
-./EpiGimp
+./bin/EpiGimp
 ```
 
 ## Raccourcis principaux
