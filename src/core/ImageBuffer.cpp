@@ -2,7 +2,7 @@
 // Created by apolline on 17/11/2025.
 //
 
-#include "../../include/core/ImageBuffer.h"
+#include "core/ImageBuffer.h"
 
 ImageBuffer::ImageBuffer(const int width, const int height) : width_(width), height_(height)
 {

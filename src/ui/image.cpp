@@ -1,4 +1,4 @@
-#include "../../include/ui/image.hpp"
+#include "ui/image.hpp"
 
 #include <QDialog>
 #include <QDialogButtonBox>

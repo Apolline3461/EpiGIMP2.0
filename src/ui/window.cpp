@@ -1,4 +1,4 @@
-#include "../../include/ui/window.hpp"
+#include "ui/window.hpp"
 
 #include <QDir>
 #include <QFileDialog>
