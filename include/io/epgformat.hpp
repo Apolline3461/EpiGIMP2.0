@@ -1,9 +1,10 @@
 #pragma once
-#include <QImage>
-#include <QString>
+
+#include <string>
+#include "core/ImageBuffer.h"
 
 namespace EpgFormat
 {
-bool save(const QString& fileName, const QImage& image);
-bool load(const QString& fileName, QImage& outImage);
+bool save(const std::string& fileName, const ImageBuffer& image);
+bool load(const std::string& fileName, ImageBuffer& outImage);
 }  // namespace EpgFormat

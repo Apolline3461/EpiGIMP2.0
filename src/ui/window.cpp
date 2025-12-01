@@ -9,8 +9,11 @@
 #include <QStandardPaths>
 #include <QStatusBar>
 
-#include "../../include/io/epgformat.hpp"
-#include "../../include/ui/image.hpp"
+#include <string>
+
+#include "core/ImageBuffer.h"
+#include "io/epgformat.hpp"
+#include "ui/image.hpp"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -184,7 +187,29 @@ void MainWindow::saveAsEpg()
     if (!fileName.endsWith(".epg", Qt::CaseInsensitive))
         fileName += ".epg";
 
-    if (!EpgFormat::save(fileName, m_currentImage))
+    // convert QImage -> ImageBuffer and call core IO
+    ImageBuffer buf = [&]()
+    {
+        ImageBuffer b(m_currentImage.width(), m_currentImage.height());
+        for (int y = 0; y < m_currentImage.height(); ++y)
+        {
+            for (int x = 0; x < m_currentImage.width(); ++x)
+            {
+                const QRgb p = m_currentImage.pixel(x, y);
+                const uint8_t r = qRed(p);
+                const uint8_t g = qGreen(p);
+                const uint8_t bch = qBlue(p);
+                const uint8_t a = qAlpha(p);
+                const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
+                                      (static_cast<uint32_t>(g) << 16) |
+                                      (static_cast<uint32_t>(bch) << 8) | static_cast<uint32_t>(a);
+                b.setPixel(x, y, rgba);
+            }
+        }
+        return b;
+    }();
+
+    if (!EpgFormat::save(fileName.toStdString(), buf))
     {
         QMessageBox::critical(this, tr("Erreur"),
                               tr("Impossible de sauvegarder le fichier EPG %1.")
@@ -206,7 +231,8 @@ void MainWindow::openEpg()
     if (fileName.isEmpty())
         return;
 
-    if (!EpgFormat::load(fileName, m_currentImage))
+    ImageBuffer buf(1, 1);
+    if (!EpgFormat::load(fileName.toStdString(), buf))
     {
         QMessageBox::critical(
             this, tr("Erreur"),
@@ -214,7 +240,22 @@ void MainWindow::openEpg()
                 .arg(QDir::toNativeSeparators(fileName)));
         return;
     }
+    // convert ImageBuffer -> QImage
+    QImage img(buf.width(), buf.height(), QImage::Format_ARGB32);
+    for (int y = 0; y < buf.height(); ++y)
+    {
+        for (int x = 0; x < buf.width(); ++x)
+        {
+            const uint32_t rgba = buf.getPixel(x, y);
+            const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
+            const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
+            const uint8_t bch = static_cast<uint8_t>((rgba >> 8) & 0xFF);
+            const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
+            img.setPixel(x, y, qRgba(r, g, bch, a));
+        }
+    }
 
+    m_currentImage = img;
     m_currentFileName = fileName;
     updateImageDisplay();
     m_scrollArea->setVisible(true);
