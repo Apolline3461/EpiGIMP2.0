@@ -1,4 +1,4 @@
-#include "io/epgformat.hpp"
+#include "io/EpgFormat.hpp"
 
 #include <cstdint>
 #include <cstring>
@@ -6,7 +6,7 @@
 #include <vector>
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-// stb image headers (provided by project external deps)
+
 extern "C"
 {
 #include <stb_image.h>

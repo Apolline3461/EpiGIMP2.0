@@ -12,7 +12,7 @@
 #include <string>
 
 #include "core/ImageBuffer.h"
-#include "io/epgformat.hpp"
+#include "io/EpgFormat.hpp"
 #include "ui/image.hpp"
 
 MainWindow::MainWindow(QWidget* parent)

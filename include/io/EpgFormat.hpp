@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+
 #include "core/ImageBuffer.h"
 
 namespace EpgFormat
