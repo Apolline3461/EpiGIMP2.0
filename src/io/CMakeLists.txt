@@ -2,6 +2,21 @@ file(GLOB IO_HEADERS
         ${EPIGIMP_ROOT_INCLUDE_DIR}/io/*.h
         ${EPIGIMP_ROOT_INCLUDE_DIR}/io/*.hpp
 )
+include(FetchContent)
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG master
+    GIT_SHALLOW TRUE
+)
+
+FetchContent_MakeAvailable(stb)
+
+FetchContent_GetProperties(stb)
+if(NOT stb_POPULATED)
+    FetchContent_Populate(stb)
+endif()
+
 
 file(GLOB IO_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
@@ -15,15 +30,11 @@ add_library(epigimp_io STATIC
 target_include_directories(epigimp_io
         PUBLIC
         ${EPIGIMP_ROOT_INCLUDE_DIR}
+        ${stb_SOURCE_DIR}
 )
 
 target_link_libraries(epigimp_io
         PUBLIC
         epigimp_core
-
-        # TODO: Remove Qt dependency from epigimp_io.
-        # epgformat.cpp must be refactored to use pure core types (no QImage/QFile),
-        # Qt-specific code should live in the UI/app layer only.
-        Qt6::Core
-        Qt6::Gui
+        # removed ${stb_SOURCE_DIR} here: stb is header-only and should not be linked as a directory
 )
