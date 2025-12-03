@@ -515,11 +515,11 @@ void ZipEpgStorage::saveLayerToZip(void* handle, const ImageBuffer& img,
     writeFileToZip(handle, path, pngData.data(), pngData.size());
 }
 
-void ZipEpgStorage::generatePreview(const Document& doc, void* handle) const
+void ZipEpgStorage::generatePreview(const Document& doc, void* zipHandle) const
 {
     if (doc.layers.empty())
         return;
-
+    (void)zipHandle;
     const int previewMax = 256;
 
     int pW = std::min(previewMax, doc.width);
@@ -532,15 +532,125 @@ void ZipEpgStorage::generatePreview(const Document& doc, void* handle) const
     int w = std::max(1, int(doc.width * scale));
     int h = std::max(1, int(doc.height * scale));
 
-    std::vector<unsigned char> preview(w * h * 4, 255);
+    // Create preview buffer with transparent background (RGBA)
+    std::vector<unsigned char> preview(static_cast<size_t>(w) * static_cast<size_t>(h) * 4u, 0);
 
-    // (Tu pourras améliorer la compositing plus tard)
+    // Composite each visible layer (bottom -> top) scaled to preview size
+    for (const auto& layerPtr : doc.layers)
+    {
+        if (!layerPtr->visible || !layerPtr->pixels)
+            continue;
 
+        const ImageBuffer& img = *layerPtr->pixels;
+        const float layerOpacity = layerPtr->opacity;
+
+        for (int py = 0; py < h; ++py)
+        {
+            int srcY = std::min(img.height - 1, std::max(0, static_cast<int>(py / scale)));
+            for (int px = 0; px < w; ++px)
+            {
+                int srcX = std::min(img.width - 1, std::max(0, static_cast<int>(px / scale)));
+
+                const int dstIdx = (py * w + px) * 4;
+                const int srcIdx = srcY * img.stride + srcX * 4;
+
+                // Source pixel components
+                const unsigned char sr = img.rgba[srcIdx + 0];
+                const unsigned char sg = img.rgba[srcIdx + 1];
+                const unsigned char sb = img.rgba[srcIdx + 2];
+                const unsigned char sa = img.rgba[srcIdx + 3];
+
+                // Calculate effective source alpha
+                const float srcAlphaNorm = (sa / 255.0f) * layerOpacity;
+
+                if (srcAlphaNorm <= 0.0001f)
+                    continue;
+
+                // Destination alpha
+                const float dstAlphaNorm = preview[dstIdx + 3] / 255.0f;
+
+                // Porter-Duff "over" compositing
+                const float outAlpha = srcAlphaNorm + dstAlphaNorm * (1.0f - srcAlphaNorm);
+
+                if (outAlpha > 0.0001f)
+                {
+                    // Blend RGB channels
+                    for (int c = 0; c < 3; ++c)
+                    {
+                        const float srcVal = (c == 0 ? sr : (c == 1 ? sg : sb));
+                        const float dstVal = static_cast<float>(preview[dstIdx + c]);
+
+                        const float numerator =
+                            srcVal * srcAlphaNorm + dstVal * dstAlphaNorm * (1.0f - srcAlphaNorm);
+                        const float outVal = numerator / outAlpha;
+
+                        preview[dstIdx + c] = static_cast<unsigned char>(
+                            std::round(std::min(255.0f, std::max(0.0f, outVal))));
+                    }
+
+                    // Set output alpha
+                    preview[dstIdx + 3] =
+                        static_cast<unsigned char>(std::round(std::min(1.0f, outAlpha) * 255.0f));
+                }
+            }
+        }
+    }
+
+    // Encode PNG into a persistent vector
     std::vector<unsigned char> pngData;
-    stbi_write_png_to_func(pngWriteCallback, &pngData, w, h, 4, preview.data(), w * 4);
 
-    if (!pngData.empty())
-        writeFileToZip(handle, "preview.png", pngData.data(), pngData.size());
+    // Utiliser stbi_write_png_to_func pour encoder en mémoire
+    int result = stbi_write_png_to_func(pngWriteCallback, &pngData, w, h, 4, preview.data(), w * 4);
+
+    if (result == 0 || pngData.empty())
+    {
+        std::cerr << "generatePreview: échec de l'encodage PNG" << std::endl;
+        return;
+    }
+
+    // Verify PNG signature BEFORE writing to ZIP
+    static const unsigned char pngSig[8] = {137, 80, 78, 71, 13, 10, 26, 10};
+
+    if (pngData.size() < 8)
+    {
+        std::cerr << "generatePreview: PNG trop petit (" << std::to_string(pngData.size())
+                  << " bytes)" << std::endl;
+        return;
+    }
+
+    bool signatureValid = true;
+    for (int i = 0; i < 8; ++i)
+    {
+        if (pngData[i] != pngSig[i])
+        {
+            signatureValid = false;
+            break;
+        }
+    }
+
+    if (!signatureValid)
+    {
+        std::ostringstream oss;
+        oss << "generatePreview: signature PNG invalide: ";
+        oss << std::hex << std::setfill('0');
+        for (int i = 0; i < 8; ++i)
+            oss << std::setw(2) << static_cast<int>(pngData[i]) << " ";
+        std::cerr << oss.str() << std::endl;
+        return;
+    }
+
+    // Write to ZIP with validated data
+    try
+    {
+        writeFileToZip(zipHandle, "preview.png", pngData.data(), pngData.size());
+        std::cout << "Preview généré avec succès: " << std::to_string(w) << "x" << std::to_string(h)
+                  << " (" << std::to_string(pngData.size()) << " bytes)" << std::endl;
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "Échec d'écriture du preview dans le ZIP: " << std::string(e.what())
+                  << std::endl;
+    }
 }
 
 // ----------------- OPEN --------------------------------------------------
@@ -549,9 +659,63 @@ OpenResult ZipEpgStorage::open(const std::string& path)
 {
     int err = 0;
     zip_t* zip = zip_open(path.c_str(), ZIP_RDONLY, &err);
+
+    // Si zip_open échoue, tenter d'identifier le fichier et fournir un message utile.
     if (!zip)
     {
-        return {false, "Impossible d'ouvrir le ZIP (code: " + std::to_string(err) + ")", nullptr};
+        // Lire les premiers octets du fichier pour identifier s'il s'agit d'une archive ZIP
+        std::ifstream ifs(path, std::ios::binary);
+        if (!ifs)
+            return {false, "Impossible d'ouvrir le fichier: " + path, nullptr};
+
+        std::string content((std::istreambuf_iterator<char>(ifs)),
+                            std::istreambuf_iterator<char>());
+
+        // Vérifier signature 'PK\x03\x04' (local file header) — c'est un ZIP
+        if (content.size() >= 4 && content[0] == 'P' && content[1] == 'K' &&
+            static_cast<unsigned char>(content[2]) == 3 &&
+            static_cast<unsigned char>(content[3]) == 4)
+        {
+            return {
+                false,
+                "Impossible d'ouvrir le ZIP (libzip a échoué, code: " + std::to_string(err) + ")",
+                nullptr};
+        }
+
+        // Si ce n'est pas un ZIP, tenter de parser le fichier comme JSON (format projet seul)
+        try
+        {
+            std::vector<std::string> warnings;
+            Manifest manifest = parseManifest(content, warnings);
+            validateManifest(manifest);
+
+            // Si le manifest contient des calques, on ne peut pas les charger sans archive
+            if (!manifest.layers.empty())
+            {
+                return {
+                    false,
+                    "Le fichier semble contenir un manifest JSON mais n'est pas une archive ZIP: "
+                    "les calques ne peuvent pas être chargés.",
+                    nullptr};
+            }
+
+            // Créer un Document minimal à partir du manifest (sans calques)
+            OpenResult res;
+            res.success = true;
+            res.document = std::make_unique<Document>();
+            res.document->width = manifest.canvas.width;
+            res.document->height = manifest.canvas.height;
+            res.document->dpi = static_cast<float>(manifest.canvas.dpi);
+
+            for (auto& w : warnings)
+                std::cout << "Warning: " << w << std::endl;
+
+            return res;
+        }
+        catch (const std::exception& e)
+        {
+            return {false, std::string("Fichier .epg non reconnu: ") + e.what(), nullptr};
+        }
     }
 
     OpenResult res;
@@ -580,7 +744,6 @@ OpenResult ZipEpgStorage::open(const std::string& path)
 
 // ----------------- SAVE --------------------------------------------------
 
-
 void ZipEpgStorage::save(const Document& doc, const std::string& path)
 {
     int err = 0;
@@ -602,7 +765,7 @@ void ZipEpgStorage::save(const Document& doc, const std::string& path)
         for (size_t i = 0; i < m.layers.size(); ++i)
         {
             const auto& L = m.layers[i];
-            
+
             if (i >= doc.layers.size())
                 throw std::runtime_error(
                     "Incohérence: nombre de calques différent entre Document et Manifest");
@@ -612,27 +775,24 @@ void ZipEpgStorage::save(const Document& doc, const std::string& path)
                 throw std::runtime_error("Layer " + layerPtr->name + " n'a pas de pixels");
 
             const ImageBuffer& img = *layerPtr->pixels;
-            
+
             // S'assurer que stride est correct
             int stride = img.stride;
             if (stride == 0)
                 stride = img.width * 4;
 
-            std::cout << "Encoding layer " << layerPtr->name 
-                      << " (" << img.width << "x" << img.height << ")" << std::endl;
+            std::cout << "Encoding layer " << layerPtr->name << " (" << img.width << "x"
+                      << img.height << ")" << std::endl;
 
             // Créer un nouveau buffer et l'ajouter au vecteur pour le garder en vie
             pngBuffers.emplace_back();
             std::vector<unsigned char>& buffer = pngBuffers.back();
-            
-            int success = stbi_write_png_to_func(
-                pngWriteCallback, 
-                &buffer, 
-                static_cast<int>(img.width),
-                static_cast<int>(img.height),
-                4,  // RGBA
-                img.rgba.data(), 
-                stride);
+
+            int success =
+                stbi_write_png_to_func(pngWriteCallback, &buffer, static_cast<int>(img.width),
+                                       static_cast<int>(img.height),
+                                       4,  // RGBA
+                                       img.rgba.data(), stride);
 
             if (!success || buffer.empty())
                 throw std::runtime_error("Impossible d'encoder le PNG pour le layer " + L.path);
@@ -640,8 +800,8 @@ void ZipEpgStorage::save(const Document& doc, const std::string& path)
             std::cout << "PNG encoded, size: " << buffer.size() << " bytes" << std::endl;
 
             // Vérifier signature PNG
-            if (buffer.size() < 8 || 
-                buffer[0] != 137 || buffer[1] != 80 || buffer[2] != 78 || buffer[3] != 71)
+            if (buffer.size() < 8 || buffer[0] != 137 || buffer[1] != 80 || buffer[2] != 78 ||
+                buffer[3] != 71)
             {
                 throw std::runtime_error("Signature PNG invalide pour " + layerPtr->name);
             }
@@ -700,8 +860,7 @@ void ZipEpgStorage::save(const Document& doc, const std::string& path)
             je["sha256"] = e.second;
             jManifest["entries"].push_back(je);
         }
-        jManifest["file_count"] =
-            static_cast<int>(1 + manifestEntries.size());
+        jManifest["file_count"] = static_cast<int>(1 + manifestEntries.size());
         jManifest["generated_utc"] = getCurrentTimestampUTC();
         j["manifest"] = jManifest;
 
@@ -714,7 +873,7 @@ void ZipEpgStorage::save(const Document& doc, const std::string& path)
 
         // IMPORTANT: Fermer le ZIP maintenant que tous les buffers sont encore valides
         zip_close(zip);
-        
+
         // Les pngBuffers seront détruits après zip_close, c'est OK
     }
     catch (...)
@@ -723,7 +882,6 @@ void ZipEpgStorage::save(const Document& doc, const std::string& path)
         throw;
     }
 }
-
 
 // ----------------- EXPORT PNG --------------------------------------------
 
