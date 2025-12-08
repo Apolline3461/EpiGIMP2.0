@@ -2,16 +2,6 @@ file(GLOB IO_HEADERS
         ${EPIGIMP_ROOT_INCLUDE_DIR}/io/*.h
         ${EPIGIMP_ROOT_INCLUDE_DIR}/io/*.hpp
 )
-include(FetchContent)
-FetchContent_Declare(
-    stb
-    GIT_REPOSITORY https://github.com/nothings/stb.git
-    GIT_TAG master
-    GIT_SHALLOW TRUE
-)
-
-FetchContent_MakeAvailable(stb)
-
 file(GLOB IO_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
 )
