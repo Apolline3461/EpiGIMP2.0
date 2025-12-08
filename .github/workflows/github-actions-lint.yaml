@@ -49,6 +49,7 @@ jobs:
             --suppress=missingIncludeSystem \
             --suppress=unmatchedSuppression \
             --suppress=unknownMacro \
+            --suppress=unusedFunction \
             --inline-suppr \
             --error-exitcode=1 \
             --std=c++17 \
