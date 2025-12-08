@@ -12,12 +12,6 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(stb)
 
-FetchContent_GetProperties(stb)
-if(NOT stb_POPULATED)
-    FetchContent_Populate(stb)
-endif()
-
-
 file(GLOB IO_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
 )
@@ -36,5 +30,4 @@ target_include_directories(epigimp_io
 target_link_libraries(epigimp_io
         PUBLIC
         epigimp_core
-        # removed ${stb_SOURCE_DIR} here: stb is header-only and should not be linked as a directory
 )
