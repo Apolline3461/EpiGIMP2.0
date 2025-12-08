@@ -1,4 +1,4 @@
-#include "window.hpp"
+#include "ui/window.hpp"
 
 #include <QDir>
 #include <QFileDialog>
@@ -9,8 +9,8 @@
 #include <QStandardPaths>
 #include <QStatusBar>
 
-#include "epgformat.hpp"
-#include "image.hpp"
+#include "../../include/io/epgformat.hpp"
+#include "../../include/ui/image.hpp"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
