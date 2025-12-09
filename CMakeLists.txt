@@ -38,6 +38,21 @@ find_package(Qt6 REQUIRED COMPONENTS
 )
 
 # ============================================================
+# Dépendances externes (FetchContent)
+# ============================================================
+
+include(FetchContent)
+
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG f1c79c02822848a9bed4315b12c8c8f3761e1296
+    GIT_SHALLOW TRUE
+)
+
+FetchContent_MakeAvailable(stb)
+
+# ============================================================
 # Configuration par couche
 # ============================================================
 set(EPIGIMP_ROOT_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
