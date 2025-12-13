@@ -1,9 +1,10 @@
 # ============================================================
-# 🖼️ EpiGimp2.0 — CMake Configuration (BOOSTED EDITION)
+# EpiGimp2.0 — CMake Configuration
 # ============================================================
 # Auteur : Apolline Fontaine & Léandre Godet
 # Version : 1.1
-# C++17 / Qt6 / Cross-platform / vcpkg compatible
+# Cible : C++20 / Qt6
+# Compatibilité : Linux / Windows
 # ============================================================
 
 cmake_minimum_required(VERSION 3.20)
@@ -13,6 +14,8 @@ project(EpiGimp2.0
     DESCRIPTION "Projet Epitech : clone simplifié de GIMP en C++/Qt6"
     LANGUAGES CXX
 )
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # ============================================================
 # Configuration C++ (avec flags MSVC)
@@ -42,30 +45,12 @@ set(CMAKE_AUTOUIC ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
 
 # ============================================================
-# vcpkg auto-support
-# (vcpkg integrates automatically via toolchain, no more needed)
-# ============================================================
-
-# ============================================================
-# libzip (pkg-config or vcpkg)
-# ============================================================
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBZIP REQUIRED libzip)
-
-# ============================================================
-# OpenSSL
-# ============================================================
-find_package(OpenSSL REQUIRED)
-
-# ============================================================
-# nlohmann/json — AUTO INSTALL if missing
+# FetchContent (nlohmann_json, stb)
 # ============================================================
 include(FetchContent)
 
 message(STATUS "Recherche de nlohmann/json…")
-
 find_package(nlohmann_json QUIET)
-
 if(NOT nlohmann_json_FOUND)
     message(STATUS "nlohmann_json introuvable — téléchargement automatique")
     FetchContent_Declare(
@@ -78,78 +63,42 @@ else()
     message(STATUS "nlohmann_json trouvé ✔")
 endif()
 
-# ===
-# stb
-# ===
-
 FetchContent_Declare(
     stb
     GIT_REPOSITORY https://github.com/nothings/stb.git
-    GIT_TAG master
+    GIT_TAG f1c79c02822848a9bed4315b12c8c8f3761e1296
     GIT_SHALLOW TRUE
 )
-
 FetchContent_MakeAvailable(stb)
 
-FetchContent_GetProperties(stb)
-if(NOT stb_POPULATED)
-    FetchContent_Populate(stb)
-endif()
+# ============================================================
+# libzip (via pkg-config) and OpenSSL
+# ============================================================
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBZIP REQUIRED libzip)
+find_package(OpenSSL REQUIRED)
 
 # ============================================================
-# Répertoires source
+# Répertoires source / structure du projet
 # ============================================================
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
 set(INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
+set(EPIGIMP_ROOT_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 
-file(GLOB_RECURSE HDR_FILES ${INCLUDE_DIR}/*.hpp ${INCLUDE_DIR}/*.h)
+# Ajouter les sous-répertoires (chaque module définit ses cibles)
+add_subdirectory(src/core)
+add_subdirectory(src/io)
+add_subdirectory(src/app)
+add_subdirectory(src/render)
+add_subdirectory(src/ui)
 
-# ============================================================
-# Cible principale
-# ============================================================
-
-add_executable(${PROJECT_NAME}
-    tests/main.cpp
-    src/EpgFile.cpp
-    src/stb_impl.cpp
-    ${HDR_FILES}
-)
-
-# Includes
-target_include_directories(${PROJECT_NAME} PRIVATE
-    ${INCLUDE_DIR}
-    ${SRC_DIR}
-    ${LIBZIP_INCLUDE_DIRS}
-    ${stb_SOURCE_DIR}
-)
-
-# Link
-target_link_libraries(${PROJECT_NAME} PRIVATE
-    Qt6::Core
-    Qt6::Gui
-    Qt6::Widgets
-    Qt6::Svg
-    ${LIBZIP_LIBRARIES}
-    OpenSSL::SSL
-    OpenSSL::Crypto
-    nlohmann_json::nlohmann_json
-)
-
-# Linux/macOS: répertoire libs pkgconfig
-target_link_directories(${PROJECT_NAME} PRIVATE
-    ${LIBZIP_LIBRARY_DIRS}
-)
-
-# ============================================================
-# Windows : masque la console
-# ============================================================
-if(WIN32)
-    set_target_properties(${PROJECT_NAME} PROPERTIES
-        WIN32_EXECUTABLE YES
-    )
+# Tests
+option(BUILD_TESTING "Build unit tests" ON)
+if(BUILD_TESTING)
+    include(CTest)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
 
-# ============================================================
 # Lint
-# ============================================================
 include(${CMAKE_SOURCE_DIR}/lint.cmake)

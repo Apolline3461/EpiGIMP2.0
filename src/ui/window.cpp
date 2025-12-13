@@ -1,4 +1,4 @@
-#include "window.hpp"
+#include "ui/window.hpp"
 
 #include <QDir>
 #include <QFileDialog>
@@ -9,8 +9,12 @@
 #include <QStandardPaths>
 #include <QStatusBar>
 
-#include "epgformat.hpp"
-#include "image.hpp"
+#include <string>
+
+#include "core/ImageBuffer.h"
+#include "core/Layer.h"
+#include "io/EpgFormat.hpp"
+#include "ui/image.hpp"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -173,10 +177,9 @@ void MainWindow::saveAsEpg()
         return;
     }
 
-    QString picturesPath =
-        QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + "/untitled.epg";
+    QString currentPath = QDir::currentPath() + "/untitled.epg";
     QString fileName = QFileDialog::getSaveFileName(this, tr("Enregistrer au format EpiGimp"),
-                                                    picturesPath, tr("EpiGimp (*.epg)"));
+                                                    currentPath, tr("EpiGimp (*.epg)"));
 
     if (fileName.isEmpty())
         fileName = "untitled.epg";
@@ -184,11 +187,45 @@ void MainWindow::saveAsEpg()
     if (!fileName.endsWith(".epg", Qt::CaseInsensitive))
         fileName += ".epg";
 
-    if (!EpgFormat::save(fileName, m_currentImage))
+    // convert QImage -> ImageBuffer
+    ImageBuffer buf(m_currentImage.width(), m_currentImage.height());
+    for (int y = 0; y < m_currentImage.height(); ++y)
+    {
+        for (int x = 0; x < m_currentImage.width(); ++x)
+        {
+            const QRgb p = m_currentImage.pixel(x, y);
+            const uint8_t r = qRed(p);
+            const uint8_t g = qGreen(p);
+            const uint8_t bch = qBlue(p);
+            const uint8_t a = qAlpha(p);
+            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
+                                  (static_cast<uint32_t>(g) << 16) |
+                                  (static_cast<uint32_t>(bch) << 8) | static_cast<uint32_t>(a);
+            buf.setPixel(x, y, rgba);
+        }
+    }
+
+    // Build a Document with a single layer and save using ZipEpgStorage
+    Document doc;
+    doc.width = buf.width();
+    doc.height = buf.height();
+
+    try
+    {
+        auto imgPtr = std::make_shared<ImageBuffer>(buf);
+        auto layer =
+            std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
+        doc.layers.push_back(layer);
+
+        ZipEpgStorage storage;
+        storage.save(doc, fileName.toStdString());
+    }
+    catch (const std::exception& e)
     {
         QMessageBox::critical(this, tr("Erreur"),
-                              tr("Impossible de sauvegarder le fichier EPG %1.")
-                                  .arg(QDir::toNativeSeparators(fileName)));
+                              tr("Impossible de sauvegarder le fichier EPG %1.\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(QString::fromLocal8Bit(e.what())));
         return;
     }
 
@@ -198,23 +235,50 @@ void MainWindow::saveAsEpg()
 
 void MainWindow::openEpg()
 {
-    QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+    QString currentPath = QDir::currentPath();
     QString fileName =
-        QFileDialog::getOpenFileName(this, tr("Ouvrir un fichier EpiGimp"), picturesPath,
+        QFileDialog::getOpenFileName(this, tr("Ouvrir un fichier EpiGimp"), currentPath,
                                      tr("EpiGimp (*.epg);;Tous les fichiers (*)"));
 
     if (fileName.isEmpty())
         return;
 
-    if (!EpgFormat::load(fileName, m_currentImage))
+    ZipEpgStorage storage;
+    OpenResult res = storage.open(fileName.toStdString());
+    if (!res.success || !res.document)
     {
-        QMessageBox::critical(
-            this, tr("Erreur"),
-            tr("Impossible de charger le fichier EPG %1\nLe fichier est peut-être corrompu.")
-                .arg(QDir::toNativeSeparators(fileName)));
+        QString err = QString::fromLocal8Bit(res.errorMessage.empty() ? "Erreur inconnue"
+                                                                      : res.errorMessage.c_str());
+        QMessageBox::critical(this, tr("Erreur"),
+                              tr("Impossible de charger le fichier EPG %1\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(err));
         return;
     }
 
+    const auto& doc = *res.document;
+    if (doc.layers.empty() || !doc.layers[0]->image())
+    {
+        QMessageBox::critical(this, tr("Erreur"), tr("Le document ne contient pas d'image."));
+        return;
+    }
+
+    const ImageBuffer& ib = *doc.layers[0]->image();
+    QImage img(ib.width(), ib.height(), QImage::Format_ARGB32);
+    for (int y = 0; y < ib.height(); ++y)
+    {
+        for (int x = 0; x < ib.width(); ++x)
+        {
+            const uint32_t rgba = ib.getPixel(x, y);
+            const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
+            const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
+            const uint8_t bch = static_cast<uint8_t>((rgba >> 8) & 0xFF);
+            const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
+            img.setPixel(x, y, qRgba(r, g, bch, a));
+        }
+    }
+
+    m_currentImage = img;
     m_currentFileName = fileName;
     updateImageDisplay();
     m_scrollArea->setVisible(true);
