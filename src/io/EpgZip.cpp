@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <ios>
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -20,7 +21,6 @@
 #include "core/Layer.h"
 #include "io/EpgFormat.hpp"
 #include "io/Logger.hpp"
-#include "nlohmann/json_fwd.hpp"
 
 using json = nlohmann::json;
 
@@ -455,7 +455,7 @@ void ZipEpgStorage::writePreviewToZip(zip_t* zipHandle,
         std::ostringstream oss;
         oss << "generatePreview: signature PNG invalide: ";
         oss << std::hex << std::setfill('0');
-        for (int i = 0; i < 8 && i < static_cast<int>(pngData.size()); ++i)
+        for (int i = 0; i < 8; ++i)
             oss << std::setw(2) << static_cast<int>(pngData[i]) << " ";
         epg::log_warn(oss.str());
         return;
