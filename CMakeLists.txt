@@ -74,9 +74,19 @@ FetchContent_MakeAvailable(stb)
 # ============================================================
 # libzip (via pkg-config) and OpenSSL
 # If libzip is not present on the system, fetch & build it
+# Make PkgConfig optional so configuration does not fail on
+# Windows CI runners where `pkg-config` is often absent.
 # ============================================================
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBZIP QUIET libzip)
+# Try to find pkg-config, but don't fail the configuration if it's missing.
+find_package(PkgConfig QUIET)
+if(PKG_CONFIG_EXECUTABLE)
+    pkg_check_modules(LIBZIP QUIET libzip)
+else()
+    message(STATUS "PkgConfig introuvable — saut de pkg_check_modules (Windows/CI).")
+    # Ensure LIBZIP_FOUND is defined so subsequent logic can decide to fetch/build libzip
+    set(LIBZIP_FOUND OFF)
+endif()
+
 if(NOT LIBZIP_FOUND)
     message(STATUS "libzip introuvable — FetchContent build automatique de libzip")
     # Build libzip from source so the project can configure on CI / minimal systems
