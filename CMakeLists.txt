@@ -73,9 +73,26 @@ FetchContent_MakeAvailable(stb)
 
 # ============================================================
 # libzip (via pkg-config) and OpenSSL
+# If libzip is not present on the system, fetch & build it
 # ============================================================
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBZIP REQUIRED libzip)
+pkg_check_modules(LIBZIP QUIET libzip)
+if(NOT LIBZIP_FOUND)
+    message(STATUS "libzip introuvable — FetchContent build automatique de libzip")
+    # Build libzip from source so the project can configure on CI / minimal systems
+    FetchContent_Declare(
+        libzip
+        GIT_REPOSITORY https://github.com/nih-at/libzip.git
+        GIT_TAG v1.11.4
+        GIT_SHALLOW TRUE
+    )
+    # Prefer shared libs if available
+    set(BUILD_SHARED_LIBS ON CACHE BOOL "Build shared libs" FORCE)
+    FetchContent_MakeAvailable(libzip)
+else()
+    message(STATUS "libzip trouvé via pkg-config ✔")
+endif()
+
 find_package(OpenSSL REQUIRED)
 
 # ============================================================
