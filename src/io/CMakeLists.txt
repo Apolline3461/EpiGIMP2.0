@@ -20,4 +20,7 @@ target_include_directories(epigimp_io
 target_link_libraries(epigimp_io
         PUBLIC
         epigimp_core
+        nlohmann_json::nlohmann_json
+        zip
+        crypto
 )
