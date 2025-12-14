@@ -89,6 +89,36 @@ endif()
 
 if(NOT LIBZIP_FOUND)
     message(STATUS "libzip introuvable — FetchContent build automatique de libzip")
+    # Ensure ZLIB is available for libzip: find or fetch it before building libzip
+    find_package(ZLIB QUIET)
+    if(NOT ZLIB_FOUND)
+        message(STATUS "ZLIB introuvable — FetchContent build automatique de zlib")
+        FetchContent_Declare(
+            zlib
+            GIT_REPOSITORY https://github.com/madler/zlib.git
+            GIT_TAG v1.2.13
+            GIT_SHALLOW TRUE
+        )
+        FetchContent_MakeAvailable(zlib)
+        # If the zlib CMake export created a target, expose include/lib variables
+        if(TARGET ZLIB::ZLIB)
+            get_target_property(_z_include ZLIB::ZLIB INTERFACE_INCLUDE_DIRECTORIES)
+            if(_z_include)
+                list(GET _z_include 0 _z_inc0)
+                set(ZLIB_INCLUDE_DIR ${_z_inc0} CACHE PATH "zlib include dir" FORCE)
+            endif()
+            get_target_property(_z_loc ZLIB::ZLIB IMPORTED_LOCATION_RELEASE)
+            if(NOT _z_loc)
+                get_target_property(_z_loc ZLIB::ZLIB IMPORTED_LOCATION)
+            endif()
+            if(_z_loc)
+                set(ZLIB_LIBRARY ${_z_loc} CACHE FILEPATH "zlib library" FORCE)
+            endif()
+            set(ZLIB_FOUND ON CACHE BOOL "zlib found" FORCE)
+        endif()
+    else()
+        message(STATUS "ZLIB trouvé sur le système ✔")
+    endif()
     # Build libzip from source so the project can configure on CI / minimal systems
     FetchContent_Declare(
         libzip
