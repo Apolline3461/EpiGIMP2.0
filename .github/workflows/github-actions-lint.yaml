@@ -35,6 +35,8 @@ jobs:
             mode="full"
           fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "Selected lint mode: $mode"
+          echo "Event: ${{ github.event_name }} | Branch: ${{ github.ref_name }}"
 
           rm -f format_files.bin cpp_files.bin
           : > format_files.bin

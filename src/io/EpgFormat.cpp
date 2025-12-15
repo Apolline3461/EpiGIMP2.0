@@ -105,10 +105,10 @@ bool save(const std::string& fileName, const ImageBuffer& image)
     if (!ofs)
         return false;
 
-    const int32_t w = static_cast<int32_t>(image.width());
-    const int32_t h = static_cast<int32_t>(image.height());
-    const int32_t c = 4;
-    const int32_t dataSize = static_cast<int32_t>(pngData.size());
+    const auto w = static_cast<int32_t>(image.width());
+    const auto h = static_cast<int32_t>(image.height());
+    const auto c = 4;
+    const auto dataSize = static_cast<int32_t>(pngData.size());
 
     if (!writeHeader(ofs, w, h, c, dataSize))
         return false;
