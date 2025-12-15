@@ -55,8 +55,14 @@ jobs:
             libxcb-xinerama0 \
             libxcb-cursor0 \
             libssl-dev \
-            libzip-dev \
             zlib1g-dev
+          # Install libzip and its tools (fix broken package)
+          sudo apt-get install -y libzip-dev libzip4 zip-tools || true
+          # If still broken, remove the broken cmake config
+          if [ ! -f /usr/bin/zipcmp ]; then
+            sudo rm -f /usr/lib/x86_64-linux-gnu/cmake/libzip/libzip-*.cmake || true
+            echo "Removed broken libzip cmake config, will build from source"
+          fi
 
       - name: 🔨 Configure MSVC (Windows)
         if: runner.os == 'Windows'
