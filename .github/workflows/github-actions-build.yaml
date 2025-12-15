@@ -21,9 +21,9 @@ jobs:
           - os: windows-latest
             qt-arch: "win64_msvc2019_64"
             cmake-generator: "Visual Studio 17 2022"
-
+    
     runs-on: ${{ matrix.os }}
-
+    
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -52,27 +52,27 @@ jobs:
             libxcb-keysyms1 \
             libxcb-render-util0 \
             libxcb-xinerama0 \
-            libxcb-cursor0
+            libxcb-cursor0 \
+            libssl-dev \
+            libzip-dev \
+            zlib1g-dev
 
       - name: 🔨 Configure MSVC (Windows)
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: 📦 Install pkg-config (Windows)
+      - name: 📦 Setup vcpkg (Windows)
         if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          choco install pkgconfiglite -y
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
 
-      - name: 📦 Install vcpkg and required libs (Windows)
+      - name: 📦 Install vcpkg dependencies (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          git clone https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP\vcpkg"
-          Push-Location "$env:RUNNER_TEMP\vcpkg"
-          .\bootstrap-vcpkg.bat
-          .\vcpkg.exe install libzip:x64-windows zlib:x64-windows openssl:x64-windows
-          Pop-Location
+          vcpkg install libzip:x64-windows zlib:x64-windows openssl:x64-windows
+          vcpkg integrate install
 
       - name: 📁 Create build directory
         run: mkdir build
@@ -85,8 +85,17 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $toolchain = "$env:RUNNER_TEMP\vcpkg\scripts\buildsystems\vcpkg.cmake"
-          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -G "${{ matrix.cmake-generator }}" -A x64 -DVCPKG_TARGET_TRIPLET=x64-windows -DCMAKE_TOOLCHAIN_FILE="$toolchain"
+          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+          if (-not $vcpkgRoot) {
+            $vcpkgRoot = "C:\vcpkg"
+          }
+          $toolchain = "$vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
+          cmake -B build `
+            -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} `
+            -G "${{ matrix.cmake-generator }}" `
+            -A x64 `
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DCMAKE_TOOLCHAIN_FILE="$toolchain"
 
       - name: 🏗️ Build EpiGimp2.0
         run: cmake --build build --config ${{ matrix.build-type }} --parallel
