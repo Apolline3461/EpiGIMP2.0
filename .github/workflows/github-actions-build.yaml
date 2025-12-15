@@ -1,9 +1,9 @@
 name: Build epigimp
 on:
   push:
-    branches: [ main, dev ]
+    branches: [main, dev]
   pull_request:
-    branches: [ main, dev ]
+    branches: [main, dev]
   workflow_dispatch:
 
 jobs:
@@ -16,95 +16,101 @@ jobs:
         build-type: [Release]
         include:
           - os: ubuntu-latest
-            qt-arch: 'gcc_64'
-            cmake-generator: 'Unix Makefiles'
+            qt-arch: "gcc_64"
+            cmake-generator: "Unix Makefiles"
           - os: windows-latest
-            qt-arch: 'win64_msvc2019_64'
-            cmake-generator: 'Visual Studio 17 2022'
-    
+            qt-arch: "win64_msvc2019_64"
+            cmake-generator: "Visual Studio 17 2022"
+
     runs-on: ${{ matrix.os }}
-    
+
     steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    
-    - name: 🔧 Install Qt6
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '6.5.0'
-        arch: ${{ matrix.qt-arch }}
-        cache: true
-    
-    - name: 📦 Install dependencies (Ubuntu)
-      if: runner.os == 'Linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          build-essential \
-          cmake \
-          libgl1-mesa-dev \
-          libglu1-mesa-dev \
-          libxkbcommon-x11-0 \
-          libxcb-icccm4 \
-          libxcb-image0 \
-          libxcb-keysyms1 \
-          libxcb-render-util0 \
-          libxcb-xinerama0 \
-          libxcb-cursor0
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-    - name: 🔨 Configure MSVC (Windows)
-      if: runner.os == 'Windows'
-      uses: ilammy/msvc-dev-cmd@v1
+      - name: 🔧 Install Qt6
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: "6.5.0"
+          arch: ${{ matrix.qt-arch }}
+          cache: true
 
-    - name: 📦 Install vcpkg and required libs (Windows)
-      if: runner.os == 'Windows'
-      shell: pwsh
-      run: |
-        git clone https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP\vcpkg"
-        Push-Location "$env:RUNNER_TEMP\vcpkg"
-        .\bootstrap-vcpkg.bat
-        .\vcpkg.exe install libzip:x64-windows zlib:x64-windows openssl:x64-windows
-        Pop-Location
-    
-    - name: 📁 Create build directory
-      run: mkdir build
-    
-    - name: ⚙️ Configure CMake (Linux)
-      if: runner.os == 'Linux'
-      run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -G "${{ matrix.cmake-generator }}"
+      - name: 📦 Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev \
+            libxkbcommon-x11-0 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-render-util0 \
+            libxcb-xinerama0 \
+            libxcb-cursor0
 
-    - name: ⚙️ Configure CMake (Windows)
-      if: runner.os == 'Windows'
-      shell: pwsh
-      run: |
-        $toolchain = "$env:RUNNER_TEMP\vcpkg\scripts\buildsystems\vcpkg.cmake"
-        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -G "${{ matrix.cmake-generator }}" -DCMAKE_TOOLCHAIN_FILE="$toolchain"
-    
-    - name: 🏗️ Build EpiGimp2.0
-      run: cmake --build build --config ${{ matrix.build-type }} --parallel
-    
-    - name: 🧪 Run tests (if available)
-      run: ctest --test-dir build --output-on-failure -C ${{ matrix.build-type }}
-      continue-on-error: false
-    
-    - name: 📤 Upload build artifacts (Linux)
-      if: runner.os == 'Linux'
-      uses: actions/upload-artifact@v4
-      with:
-        name: EpiGimp2.0-Linux-${{ matrix.build-type }}
-        path: |
-          build/**/epigimp
-          build/**/*.so
-        retention-days: 7
-    
-    - name: 📤 Upload build artifacts (Windows)
-      if: runner.os == 'Windows'
-      uses: actions/upload-artifact@v4
-      with:
-        name: epigimp-Windows-${{ matrix.build-type }}
-        path: |
-          build/**/epigimp.exe
-          build/**/*.dll
-        retention-days: 7
+      - name: 🔨 Configure MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: 📦 Install pkg-config (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install pkgconfiglite -y
+
+      - name: 📦 Install vcpkg and required libs (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "$env:RUNNER_TEMP\vcpkg"
+          Push-Location "$env:RUNNER_TEMP\vcpkg"
+          .\bootstrap-vcpkg.bat
+          .\vcpkg.exe install libzip:x64-windows zlib:x64-windows openssl:x64-windows
+          Pop-Location
+
+      - name: 📁 Create build directory
+        run: mkdir build
+
+      - name: ⚙️ Configure CMake (Linux)
+        if: runner.os == 'Linux'
+        run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -G "${{ matrix.cmake-generator }}"
+
+      - name: ⚙️ Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $toolchain = "$env:RUNNER_TEMP\vcpkg\scripts\buildsystems\vcpkg.cmake"
+          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -G "${{ matrix.cmake-generator }}" -DCMAKE_TOOLCHAIN_FILE="$toolchain"
+
+      - name: 🏗️ Build EpiGimp2.0
+        run: cmake --build build --config ${{ matrix.build-type }} --parallel
+
+      - name: 🧪 Run tests (if available)
+        run: ctest --test-dir build --output-on-failure -C ${{ matrix.build-type }}
+        continue-on-error: false
+
+      - name: 📤 Upload build artifacts (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: EpiGimp2.0-Linux-${{ matrix.build-type }}
+          path: |
+            build/**/epigimp
+            build/**/*.so
+          retention-days: 7
+
+      - name: 📤 Upload build artifacts (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: epigimp-Windows-${{ matrix.build-type }}
+          path: |
+            build/**/epigimp.exe
+            build/**/*.dll
+          retention-days: 7
