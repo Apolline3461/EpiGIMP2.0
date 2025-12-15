@@ -74,7 +74,8 @@ jobs:
         if: runner.os == 'Windows'
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: 5f8a1c3e9f3b4f2b5e9e3d8b8a9b1c6b3e6a0d7c
+          vcpkgGitCommitId: HEAD
+          runVcpkgInstall: false
 
       - name: 📦 Install vcpkg dependencies
         if: runner.os == 'Windows'
