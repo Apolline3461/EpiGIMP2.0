@@ -72,8 +72,13 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          vcpkg install libzip:x64-windows openssl:x64-windows zlib:x64-windows
+          # Install dependencies in order (zlib first, then openssl, then libzip)
+          vcpkg install zlib:x64-windows
+          vcpkg install openssl:x64-windows
+          vcpkg install libzip:x64-windows
           vcpkg integrate install
+          # Verify installations
+          vcpkg list
 
       - name: 📁 Create build directory
         run: mkdir build
