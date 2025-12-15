@@ -1,5 +1,4 @@
 name: 🔍 Code Quality & Linting
-
 on:
   push:
     branches: [ main, dev ]
@@ -10,101 +9,106 @@ jobs:
   clang-format:
     name: 📝 Check Code Formatting
     runs-on: ubuntu-latest
-    
     steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
-    
-    - name: 🔧 Install clang-format
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y clang-format
-    
-    - name: 🔍 Check C++ formatting
-      run: |
-        echo "Checking code formatting with clang-format..."
-        find src include -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -print0 | \
-        xargs -0 clang-format --dry-run --Werror --style=file
-        if [ $? -eq 0 ]; then
-          echo "✅ All files are properly formatted!"
-        else
-          echo "❌ Some files need formatting. Run: clang-format -i \$(find src include -name '*.cpp' -o -name '*.hpp' -o -name '*.h')"
-          exit 1
-        fi
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+      
+      - name: 🔍 Check C++ formatting
+        run: |
+          echo "Checking code formatting with clang-format..."
+          find src include -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -print0 | \
+            xargs -0 clang-format --dry-run --Werror --style=file
+          if [ $? -eq 0 ]; then
+            echo "✅ All files are properly formatted!"
+          else
+            echo "❌ Some files need formatting. Run: clang-format -i \$(find src include -name '*.cpp' -o -name '*.hpp' -o -name '*.h')"
+            exit 1
+          fi
 
   cppcheck:
     name: 🐛 Static Analysis (cppcheck)
     runs-on: ubuntu-latest
-    
     steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
-    
-    - name: 🔧 Install cppcheck
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cppcheck
-    
-    - name: 🔍 Run cppcheck
-      run: |
-        cppcheck \
-          --enable=all \
-          --suppress=missingIncludeSystem \
-          --suppress=unmatchedSuppression \
-          --inline-suppr \
-          --error-exitcode=1 \
-          --std=c++17 \
-          -I include \
-          src/
-        echo "✅ No critical issues found!"
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+      
+      - name: 🔍 Run cppcheck
+        run: |
+          cppcheck \
+            --enable=all \
+            --suppress=missingIncludeSystem \
+            --suppress=unmatchedSuppression \
+            --suppress=unknownMacro \
+            --suppress=unusedFunction \
+            --inline-suppr \
+            --error-exitcode=1 \
+            --std=c++17 \
+            -I include \
+            -D Q_OBJECT= \
+            -D slots= \
+            -D signals=public \
+            -D Q_SLOTS= \
+            -D Q_SIGNALS=public \
+            -D Q_EMIT= \
+            -D QOBJECT_H= \
+            src/
+          echo "✅ No critical issues found!"
 
   clang-tidy:
     name: 🔬 Clang-Tidy Analysis
     runs-on: ubuntu-latest
-    
     steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
-    
-    - name: 🔧 Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y clang-tidy cmake ninja-build
-    
-    - name: 🔧 Install Qt6
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '6.5.0'
-        cache: true
-    
-    - name: ⚙️ Configure CMake for clang-tidy
-      run: |
-        cmake -B build \
-          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-          -DCMAKE_BUILD_TYPE=Debug
-    
-    - name: 🔍 Run clang-tidy
-      run: |
-        find src -name "*.cpp" | xargs clang-tidy \
-          -p build \
-          --warnings-as-errors=* \
-          --checks='-*,readability-*,modernize-*,performance-*,bugprone-*'
-        echo "✅ Clang-tidy passed!"
-      continue-on-error: true
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy cmake ninja-build
+      
+      - name: 🔧 Install Qt6
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.5.0'
+          cache: true
+      
+      - name: ⚙️ Configure CMake for clang-tidy
+        run: |
+          cmake -B build \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_BUILD_TYPE=Debug
+      
+      - name: 🔍 Run clang-tidy
+        run: |
+          find src -name "*.cpp" | xargs clang-tidy \
+            -p build \
+            --warnings-as-errors=* \
+            --checks='-*,readability-*,modernize-*,performance-*,bugprone-*'
+          echo "✅ Clang-tidy passed!"
+        continue-on-error: true
 
   line-endings:
     name: 📄 Check Line Endings
     runs-on: ubuntu-latest
-    
     steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v4
-    
-    - name: 🔍 Check for CRLF line endings
-      run: |
-        if find src include -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -exec file {} \; | grep CRLF; then
-          echo "❌ Files with CRLF line endings found! Please use LF endings."
-          exit 1
-        else
-          echo "✅ All files use correct LF line endings!"
-        fi
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: 🔍 Check for CRLF line endings
+        run: |
+          if find src include -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -exec file {} \; | grep CRLF; then
+            echo "❌ Files with CRLF line endings found! Please use LF endings."
+            exit 1
+          else
+            echo "✅ All files use correct LF line endings!"
+          fi

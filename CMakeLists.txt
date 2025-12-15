@@ -1,9 +1,9 @@
 # ============================================================
-# 🖼️ EpiGimp2.0 — CMake Configuration
+# EpiGimp2.0 — CMake Configuration
 # ============================================================
 # Auteur : Apolline Fontaine & Léandre Godet
 # Version : 1.0
-# Cible : C++17 / Qt6
+# Cible : C++20 / Qt6
 # Compatibilité : Linux / Windows
 # ============================================================
 
@@ -15,10 +15,12 @@ project(EpiGimp2.0
     LANGUAGES CXX
 )
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
 # ============================================================
 # Configuration du standard C++
 # ============================================================
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ============================================================
@@ -28,7 +30,6 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# Recherche des packages Qt6
 find_package(Qt6 REQUIRED COMPONENTS
     Core
     Gui
@@ -37,47 +38,43 @@ find_package(Qt6 REQUIRED COMPONENTS
 )
 
 # ============================================================
-# Configuration des répertoires
+# Dépendances externes (FetchContent)
 # ============================================================
-set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
-set(INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 
-# Récupération des fichiers sources
-file(GLOB_RECURSE SRC_FILES ${SRC_DIR}/*.cpp)
-file(GLOB_RECURSE HDR_FILES ${INCLUDE_DIR}/*.hpp ${INCLUDE_DIR}/*.h)
+include(FetchContent)
 
-# ============================================================
-# Création de l'exécutable
-# ============================================================
-add_executable(EpiGimp2.0
-    ${SRC_FILES}
-    ${HDR_FILES}
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG f1c79c02822848a9bed4315b12c8c8f3761e1296
+    GIT_SHALLOW TRUE
 )
 
-# Configuration des répertoires d'inclusion
-target_include_directories(EpiGimp2.0 PRIVATE
-    ${INCLUDE_DIR}
-    ${SRC_DIR}
-)
-
-# Liaison avec les bibliothèques Qt6
-target_link_libraries(EpiGimp2.0 PRIVATE
-    Qt6::Core
-    Qt6::Gui
-    Qt6::Widgets
-    Qt6::Svg
-)
+FetchContent_MakeAvailable(stb)
 
 # ============================================================
-# Configuration spécifique Windows
+# Configuration par couche
 # ============================================================
-if(WIN32)
-    set_target_properties(EpiGimp2.0 PROPERTIES
-        WIN32_EXECUTABLE ON
-    )
+set(EPIGIMP_ROOT_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
+
+add_subdirectory(src/core)
+add_subdirectory(src/io)
+add_subdirectory(src/app)
+add_subdirectory(src/render)
+add_subdirectory(src/ui) # Ici qu'on crée l'exe
+
+# ============================================================
+# Tests
+# ============================================================
+option(BUILD_TESTING "Build unit tests" ON)
+
+if(BUILD_TESTING)
+    include(CTest)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
 
 # ============================================================
-# 🎯 Cibles de lint
+# Cibles de lint
 # ============================================================
 include(${CMAKE_SOURCE_DIR}/lint.cmake)
