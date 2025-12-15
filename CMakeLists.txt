@@ -78,6 +78,12 @@ if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
 
+option(ENABLE_COVERAGE "Enable coverage flags" OFF)
+if(ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-O0 -g --coverage)
+    add_link_options(--coverage)
+endif()
+
 # ============================================================
 # Cibles de lint
 # ============================================================
