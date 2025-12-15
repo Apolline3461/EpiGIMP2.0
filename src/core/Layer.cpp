@@ -62,7 +62,7 @@ float Layer::opacity() const noexcept
 void Layer::setOpacity(const float opacity)
 {
     if (opacity < 0.f)
-        opacity_ = 0;
+        opacity_ = 0.f;
     else if (opacity > 1.f)
         opacity_ = 1.f;
     else
