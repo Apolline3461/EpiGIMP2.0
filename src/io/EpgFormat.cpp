@@ -15,12 +15,12 @@ extern "C"
 
 namespace EpgFormat
 {
-static const char MAGIC[] = "EPIGIMP";
+static constexpr char MAGIC[] = "EPIGIMP";
 
 static void png_write_callback(void* context, void* data, int size)
 {
     auto* vec = static_cast<std::vector<uint8_t>*>(context);
-    const uint8_t* bytes = static_cast<const uint8_t*>(data);
+    const auto* bytes = static_cast<const uint8_t*>(data);
     vec->insert(vec->end(), bytes, bytes + size);
 }
 
@@ -79,7 +79,7 @@ static bool encodePngToMemory(const ImageBuffer& image, std::vector<uint8_t>& ou
 {
     const int width = image.width();
     const int height = image.height();
-    const int comp = 4;  // RGBA
+    constexpr int comp = 4;  // RGBA
     out.clear();
     stbi_write_png_to_func(png_write_callback, &out, width, height, comp, image.data(),
                            width * comp);
@@ -105,10 +105,10 @@ bool save(const std::string& fileName, const ImageBuffer& image)
     if (!ofs)
         return false;
 
-    const int32_t w = static_cast<int32_t>(image.width());
-    const int32_t h = static_cast<int32_t>(image.height());
-    const int32_t c = 4;
-    const int32_t dataSize = static_cast<int32_t>(pngData.size());
+    const auto w = static_cast<int32_t>(image.width());
+    const auto h = static_cast<int32_t>(image.height());
+    constexpr auto c = 4;
+    const auto dataSize = static_cast<int32_t>(pngData.size());
 
     if (!writeHeader(ofs, w, h, c, dataSize))
         return false;
@@ -136,7 +136,14 @@ bool load(const std::string& fileName, ImageBuffer& outImage)
 
     if (version != 1)
         return false;
-    if (dataSize <= 0)
+    if (w <= 0 || h <= 0 || w > MAX_DIM || h > MAX_DIM)
+        return false;
+    if (c != 4)
+        return false;
+    if (int64_t pixelCount = static_cast<int64_t>(w) * static_cast<int64_t>(h);
+        pixelCount <= 0 || pixelCount > MAX_PIXELS)
+        return false;
+    if (dataSize <= 0 || dataSize > (MAX_PIXELS * 4))
         return false;
 
     std::vector<uint8_t> pngData(static_cast<size_t>(dataSize));
