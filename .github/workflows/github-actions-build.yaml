@@ -71,14 +71,14 @@ jobs:
       # ------------------------------------------------------------
       # Windows: vcpkg
       # ------------------------------------------------------------
-      - name: 📦 Setup vcpkg
+      - name: 📦 Clone and bootstrap vcpkg
         if: runner.os == 'Windows'
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: b3dd708d38df5c856fe1c18dc0d59ab771f93921
-          vcpkgDirectory: ${{ runner.temp }}/vcpkg
-          runVcpkgInstall: false
-          useVcpkgSubmodule: false
+        shell: pwsh
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          cd vcpkg
+          git checkout b3dd708d38df5c856fe1c18dc0d59ab771f93921
+          .\bootstrap-vcpkg.bat
 
       - name: 📦 Install vcpkg dependencies
         if: runner.os == 'Windows'
