@@ -85,7 +85,16 @@ jobs:
             --plugin qt \
             --output appimage
 
-          mv *.AppImage epigimp-linux-x86_64.AppImage
+          mkdir -p tools
+          curl -L -o tools/linuxdeploy.AppImage ...
+          curl -L -o tools/linuxdeploy-plugin-qt.AppImage ...
+          chmod +x tools/*.AppImage
+          
+          tools/linuxdeploy.AppImage ... --output appimage
+          ls -la
+          out="$(ls -1 *.AppImage | head -n 1)"
+          mv "$out" epigimp-linux-x86_64.AppImage
+
         shell: bash
 
       # ---------- Windows: ZIP portable ----------
