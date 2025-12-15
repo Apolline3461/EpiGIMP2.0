@@ -1,114 +1,169 @@
 name: 🔍 Code Quality & Linting
 on:
   push:
-    branches: [ main, dev ]
+    branches: ["**"]
   pull_request:
     branches: [ main, dev ]
+  workflow_dispatch:
+
+concurrency:
+  group: lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  clang-format:
-    name: 📝 Check Code Formatting
-    runs-on: ubuntu-latest
+  lint:
+    runs-on: ubuntu-24.03.3
+
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-      
-      - name: 🔧 Install clang-format
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Compute scope (changed vs full)
+        id: scope
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-format
-      
-      - name: 🔍 Check C++ formatting
-        run: |
-          echo "Checking code formatting with clang-format..."
-          find src include -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -print0 | \
-            xargs -0 clang-format --dry-run --Werror --style=file
-          if [ $? -eq 0 ]; then
-            echo "✅ All files are properly formatted!"
+          set -euo pipefail
+
+          mode="changed"
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.ref_name }}" == "main" ]]; then
+            mode="full"
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
+          rm -f format_files.bin cpp_files.bin
+          : > format_files.bin
+          : > cpp_files.bin
+
+          add_format() { printf '%s\0' "$1" >> format_files.bin; }
+          add_cpp()    { printf '%s\0' "$1" >> cpp_files.bin; }
+
+          if [[ "$mode" == "full" ]]; then
+            while IFS= read -r -d '' f; do add_format "$f"; done < <(
+              find src include -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -print0
+            )
+            while IFS= read -r -d '' f; do add_cpp "$f"; done < <(
+              find src -type f -name "*.cpp" -print0
+            )
           else
-            echo "❌ Some files need formatting. Run: clang-format -i \$(find src include -name '*.cpp' -o -name '*.hpp' -o -name '*.h')"
-            exit 1
+            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+              base="${{ github.event.pull_request.base.sha }}"
+              head="${{ github.sha }}"
+            else
+              base="${{ github.event.before }}"
+              head="${{ github.sha }}"
+            fi
+
+            if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+              base="$(git rev-parse HEAD~1)"
+            fi
+
+            while IFS= read -r -d '' f; do
+              [[ -f "$f" ]] || continue
+              case "$f" in
+                src/*|include/*)
+                  case "$f" in
+                    *.cpp|*.hpp|*.h) add_format "$f" ;;
+                  esac
+                  if [[ "$f" == src/* && "$f" == *.cpp ]]; then
+                    add_cpp "$f"
+                  fi
+                ;;
+              esac
+            done < <(git diff --name-only -z "$base" "$head" -- src include || true)
           fi
 
-  cppcheck:
-    name: 🐛 Static Analysis (cppcheck)
-    runs-on: ubuntu-latest
-    steps:
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: 🔧 Install cppcheck
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cppcheck
-      
-      - name: 🔍 Run cppcheck
-        run: |
-          cppcheck \
-            --enable=all \
-            --suppress=missingIncludeSystem \
-            --suppress=unmatchedSuppression \
-            --suppress=unknownMacro \
-            --suppress=unusedFunction \
-            --inline-suppr \
-            --error-exitcode=1 \
-            --std=c++17 \
-            -I include \
-            -D Q_OBJECT= \
-            -D slots= \
-            -D signals=public \
-            -D Q_SLOTS= \
-            -D Q_SIGNALS=public \
-            -D Q_EMIT= \
-            -D QOBJECT_H= \
-            src/
-          echo "✅ No critical issues found!"
+          if [[ -s format_files.bin ]]; then echo "has_format=true" >> "$GITHUB_OUTPUT"; else echo "has_format=false" >> "$GITHUB_OUTPUT"; fi
+          if [[ -s cpp_files.bin ]]; then echo "has_cpp=true" >> "$GITHUB_OUTPUT"; else echo "has_cpp=false" >> "$GITHUB_OUTPUT"; fi
 
-  clang-tidy:
-    name: 🔬 Clang-Tidy Analysis
-    runs-on: ubuntu-latest
-    steps:
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: 🔧 Install dependencies
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-tidy cmake ninja-build
-      
-      - name: 🔧 Install Qt6
+          sudo apt-get install -y clang-format clang-tidy cppcheck cmake ninja-build
+
+      - name: Install Qt6
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
         uses: jurplel/install-qt-action@v3
         with:
           version: '6.5.0'
           cache: true
-      
-      - name: ⚙️ Configure CMake for clang-tidy
-        run: |
-          cmake -B build \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -DCMAKE_BUILD_TYPE=Debug
-      
-      - name: 🔍 Run clang-tidy
-        run: |
-          find src -name "*.cpp" | xargs clang-tidy \
-            -p build \
-            --warnings-as-errors=* \
-            --checks='-*,readability-*,modernize-*,performance-*,bugprone-*'
-          echo "✅ Clang-tidy passed!"
-        continue-on-error: true
 
-  line-endings:
-    name: 📄 Check Line Endings
-    runs-on: ubuntu-latest
-    steps:
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: 🔍 Check for CRLF line endings
+      - name: Configure (compile_commands.json)
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
         run: |
-          if find src include -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -exec file {} \; | grep CRLF; then
-            echo "❌ Files with CRLF line endings found! Please use LF endings."
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Build (Qt moc/uic)
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
+        run: cmake --build build --parallel
+
+      - name: clang-format (check)
+        if: ${{ steps.scope.outputs.has_format == 'true' }}
+        run: |
+          set -euo pipefail
+          xargs -0 clang-format --dry-run --Werror --style=file < format_files.bin
+
+      - name: Line endings (LF only)
+        if: ${{ steps.scope.outputs.has_format == 'true' }}
+        run: |
+          set -euo pipefail
+          if xargs -0 file < format_files.bin | grep -q CRLF; then
+            echo "❌ CRLF detected. Please convert to LF."
             exit 1
-          else
-            echo "✅ All files use correct LF line endings!"
           fi
+
+      - name: clang-tidy GATE (blocking)
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
+        run: |
+          set -euo pipefail
+          xargs -0 clang-tidy -p build \
+            -checks='clang-analyzer-*,bugprone-*,performance-*' \
+            -warnings-as-errors='clang-analyzer-*,bugprone-*,performance-*' \
+            -header-filter='.*/(src|include)/.*' < cpp_files.bin
+
+      - name: Cppcheck (from compile database, filtered)
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r -d '' f; do
+            args+=( "--file-filter=$f" )
+          done < cpp_files.bin
+
+          cppcheck \
+            --enable=all \
+            --inline-suppr \
+            --error-exitcode=1 \
+            --project=build/compile_commands.json \
+            --cppcheck-build-dir=cppcheck-cache \
+            "${args[@]}"
+
+      - name: clang-tidy advisory (export fixes)
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p tidy-fixes
+
+          while IFS= read -r -d '' f; do
+            out="tidy-fixes/$(echo "$f" | tr '/.' '__').yaml"
+            clang-tidy -p build "$f" \
+              -checks='modernize-*,readability-*,cppcoreguidelines-*,misc-*,portability-*' \
+              -header-filter='.*/(src|include)/.*' \
+              --export-fixes="$out" || true
+          done < cpp_files.bin
+
+      - name: Upload clang-tidy fixes
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-fixes-${{ github.ref_name }}-${{ github.sha }}
+          path: tidy-fixes/
+          retention-days: 7
