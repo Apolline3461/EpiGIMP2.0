@@ -96,7 +96,15 @@ find_package(OpenSSL REQUIRED)
 # ------------------------------------------------------------
 # libzip
 # ------------------------------------------------------------
-find_package(libzip CONFIG QUIET)
+if(EXISTS "/usr/bin/zipmerge")
+    find_package(libzip CONFIG QUIET)
+else()
+    # If the system libzip config references a zipmerge executable that doesn't exist
+    # CMake will error out when importing targets. Prefer FetchContent fallback
+    # in that case.
+    message(STATUS "zipmerge introuvable — ignorer le package libzip installé, utilisation de FetchContent")
+    set(libzip_FOUND FALSE)
+endif()
 
 if(NOT libzip_FOUND)
     message(STATUS "libzip introuvable via packages — FetchContent en dernier recours")
