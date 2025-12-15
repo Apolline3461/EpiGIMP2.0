@@ -19,14 +19,6 @@ std::string getCurrentTimestampUTC();
 std::string formatLayerId(size_t index);
 std::unique_ptr<ImageBuffer> decodePngToImageBuffer(const std::vector<unsigned char>& pngData);
 
-namespace EpgFormat
-{
-// Legacy helper for simple legacy tests: attempt to load a very small/simple EPG
-// format header. Returns true on success, false on failure. Implemented in
-// src/io/EpgFormat.cpp.
-bool load(const std::string& path, ImageBuffer& out);
-}  // namespace EpgFormat
-
 class ZipEpgStorage
 {
    public:

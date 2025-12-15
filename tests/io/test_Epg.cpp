@@ -452,36 +452,36 @@ TEST(EpgHelpers, WriteAndLoadManifestAndLayers)
     std::filesystem::remove(path, ec);
 }
 
-TEST(EpgFormatTest, LoadExcessiveDataSize)
-{
-    namespace fs = std::filesystem;
-    const fs::path tmp = fs::temp_directory_path() / "epg_excessive.epg";
+// TEST(EpgFormatTest, LoadExcessiveDataSize)
+// {
+//     namespace fs = std::filesystem;
+//     const fs::path tmp = fs::temp_directory_path() / "epg_excessive.epg";
 
-    // craft a header with an excessively large dataSize (>100MB) to trigger DoS protection
-    {
-        std::ofstream ofs(tmp, std::ios::binary);
-        // MAGIC
-        ofs.write("EPIGIMP", 7);
-        // version
-        int32_t version = 1;
-        ofs.write(reinterpret_cast<const char*>(&version), sizeof(version));
-        // w,h,c
-        int32_t w = 100, h = 100, c = 4;
-        ofs.write(reinterpret_cast<const char*>(&w), sizeof(w));
-        ofs.write(reinterpret_cast<const char*>(&h), sizeof(h));
-        ofs.write(reinterpret_cast<const char*>(&c), sizeof(c));
-        // excessive data size (200 MB) - exceeds MAX_DATA_SIZE (100 MB) limit and should be
-        // rejected
-        int32_t dataSize = 200 * 1024 * 1024;
-        ofs.write(reinterpret_cast<const char*>(&dataSize), sizeof(dataSize));
-        // write some dummy data (doesn't matter, should fail before reading)
-        const char dummy[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-        ofs.write(dummy, sizeof(dummy));
-    }
+//     // craft a header with an excessively large dataSize (>100MB) to trigger DoS protection
+//     {
+//         std::ofstream ofs(tmp, std::ios::binary);
+//         // MAGIC
+//         ofs.write("EPIGIMP", 7);
+//         // version
+//         int32_t version = 1;
+//         ofs.write(reinterpret_cast<const char*>(&version), sizeof(version));
+//         // w,h,c
+//         int32_t w = 100, h = 100, c = 4;
+//         ofs.write(reinterpret_cast<const char*>(&w), sizeof(w));
+//         ofs.write(reinterpret_cast<const char*>(&h), sizeof(h));
+//         ofs.write(reinterpret_cast<const char*>(&c), sizeof(c));
+//         // excessive data size (200 MB) - exceeds MAX_DATA_SIZE (100 MB) limit and should be
+//         // rejected
+//         int32_t dataSize = 200 * 1024 * 1024;
+//         ofs.write(reinterpret_cast<const char*>(&dataSize), sizeof(dataSize));
+//         // write some dummy data (doesn't matter, should fail before reading)
+//         const char dummy[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+//         ofs.write(dummy, sizeof(dummy));
+//     }
 
-    ImageBuffer dst(1, 1);
-    EXPECT_FALSE(EpgFormat::load(tmp.string(), dst));
+//     ImageBuffer dst(1, 1);
+//     EXPECT_FALSE(EpgFormat::load(tmp.string(), dst));
 
-    std::error_code ec;
-    fs::remove(tmp, ec);
-}
+//     std::error_code ec;
+//     fs::remove(tmp, ec);
+// }
