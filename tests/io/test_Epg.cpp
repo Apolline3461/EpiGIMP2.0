@@ -160,7 +160,8 @@ TEST(EpgFormatTest, LoadExcessiveDataSize)
         ofs.write(reinterpret_cast<const char*>(&w), sizeof(w));
         ofs.write(reinterpret_cast<const char*>(&h), sizeof(h));
         ofs.write(reinterpret_cast<const char*>(&c), sizeof(c));
-        // excessive data size (200 MB) - should be rejected
+        // excessive data size (200 MB) - exceeds MAX_DATA_SIZE (100 MB) limit and should be
+        // rejected
         int32_t dataSize = 200 * 1024 * 1024;
         ofs.write(reinterpret_cast<const char*>(&dataSize), sizeof(dataSize));
         // write some dummy data (doesn't matter, should fail before reading)
