@@ -16,6 +16,7 @@ extern "C"
 namespace EpgFormat
 {
 static const char MAGIC[] = "EPIGIMP";
+static constexpr int32_t MAX_DATA_SIZE = 100 * 1024 * 1024;  // 100 MB limit to prevent DoS
 
 static void png_write_callback(void* context, void* data, int size)
 {
@@ -136,7 +137,7 @@ bool load(const std::string& fileName, ImageBuffer& outImage)
 
     if (version != 1)
         return false;
-    if (dataSize <= 0)
+    if (dataSize <= 0 || dataSize > MAX_DATA_SIZE)
         return false;
 
     std::vector<uint8_t> pngData(static_cast<size_t>(dataSize));
