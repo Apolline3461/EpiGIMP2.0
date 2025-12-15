@@ -74,13 +74,15 @@ jobs:
         if: runner.os == 'Windows'
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: a42af01b72c28a8e1d7b48107b33e4f286a55ef6
+          vcpkgGitCommitId: 5f8a1c3e9f3b4f2b5e9e3d8b8a9b1c6b3e6a0d7c
 
       - name: 📦 Install vcpkg dependencies
         if: runner.os == 'Windows'
         run: |
           vcpkg install zlib libzip openssl --triplet x64-windows
         shell: pwsh
+        env:
+          VCPKG_FORCE_SYSTEM_BINARIES: 1
 
       # ------------------------------------------------------------
       # Configure CMake
