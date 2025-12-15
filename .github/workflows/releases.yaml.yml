@@ -62,40 +62,36 @@ jobs:
       # ---------- Linux: AppImage ----------
       - name: Build AppImage (Linux)
         if: runner.os == 'Linux'
+        shell: bash
         run: |
           set -euo pipefail
+          set -x
+          
+          rm -rf AppDir
           mkdir -p AppDir/usr/bin
+          
           cp build/bin/epigimp AppDir/usr/bin/epigimp
 
-          # desktop + icon (obligatoires pour une AppImage propre)
           cp packaging/linux/epigimp.desktop AppDir/epigimp.desktop
           cp packaging/linux/epigimp.png AppDir/epigimp.png
 
-          # linuxdeploy + plugin Qt (Qt5/Qt6)
-          curl -L -o linuxdeploy.AppImage \
-            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          curl -L -o linuxdeploy-plugin-qt.AppImage \
-            https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          curl -L --retry 5 --retry-all-errors --retry-delay 2 -o linuxdeploy.AppImage \
+          https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          curl -L --retry 5 --retry-all-errors --retry-delay 2 -o linuxdeploy-plugin-qt.AppImage \
+          https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy.AppImage linuxdeploy-plugin-qt.AppImage
-
+    
           ./linuxdeploy.AppImage \
             --appdir AppDir \
             -d AppDir/epigimp.desktop \
             -i AppDir/epigimp.png \
             --plugin qt \
             --output appimage
-
-          mkdir -p tools
-          curl -L -o tools/linuxdeploy.AppImage ...
-          curl -L -o tools/linuxdeploy-plugin-qt.AppImage ...
-          chmod +x tools/*.AppImage
           
-          tools/linuxdeploy.AppImage ... --output appimage
-          ls -la
-          out="$(ls -1 *.AppImage | head -n 1)"
-          mv "$out" epigimp-linux-x86_64.AppImage
-
-        shell: bash
+          out="$(ls -1 EpiGimp2.0-*.AppImage 2>/dev/null | head -n 1)"
+          test -n "$out"
+          mv -v "$out" epigimp-linux-x86_64.AppImage
+          ls -la epigimp-linux-x86_64.AppImage
 
       # ---------- Windows: ZIP portable ----------
       - name: Package Windows ZIP (windeployqt)
