@@ -74,6 +74,27 @@ jobs:
         with:
           vcpkgGitCommitId: "a42af01b72c28a8e1d7b48107b33e4f286a55ef6"
 
+      - name: 📦 Show vcpkg info (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Try common locations set by the action
+          $vcpkgRoot = $env:VCPKG_ROOT
+          if (-not $vcpkgRoot) { $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT }
+          if (-not $vcpkgRoot) { $vcpkgRoot = "C:\vcpkg" }
+          Write-Host "Detected vcpkg root: $vcpkgRoot"
+          $toolchain = Join-Path $vcpkgRoot "scripts\buildsystems\vcpkg.cmake"
+          if (Test-Path $toolchain) { Write-Host "Found toolchain: $toolchain" } else { Write-Host "Toolchain not found at $toolchain" }
+          Write-Host "Listing vcpkg root contents:";
+          Get-ChildItem -Force $vcpkgRoot -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
+          Write-Host "Where is vcpkg on PATH:";
+          where.exe vcpkg 2>$null | ForEach-Object { Write-Host $_ }
+          Write-Host "vcpkg list (if available):";
+          try { vcpkg list } catch { Write-Host "vcpkg not available in PATH" }
+          # Export to subsequent steps
+          Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=$vcpkgRoot"
+          Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_INSTALLATION_ROOT=$vcpkgRoot"
+
       - name: 📦 Install vcpkg dependencies (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
