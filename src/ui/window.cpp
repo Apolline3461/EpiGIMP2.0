@@ -195,11 +195,11 @@ void MainWindow::saveAsEpg()
                 const QRgb p = m_currentImage.pixel(x, y);
                 const uint8_t r = qRed(p);
                 const uint8_t g = qGreen(p);
-                const uint8_t b = qBlue(p);
+                const uint8_t bch = qBlue(p);
                 const uint8_t a = qAlpha(p);
                 const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
                                       (static_cast<uint32_t>(g) << 16) |
-                                      (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
+                                      (static_cast<uint32_t>(bch) << 8) | static_cast<uint32_t>(a);
                 b.setPixel(x, y, rgba);
             }
         }
