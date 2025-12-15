@@ -22,6 +22,5 @@ target_link_libraries(epigimp_io
         epigimp_core
         nlohmann_json::nlohmann_json
         zip
-        OpenSSL::SSL
-        OpenSSL::crypto
+        crypto
 )
