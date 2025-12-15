@@ -94,22 +94,37 @@ jobs:
           ls -la epigimp-linux-x86_64.AppImage
 
       # ---------- Windows: ZIP portable ----------
-      - name: Package Windows ZIP (windeployqt)
+      - name: Package Windows (zip)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
+          $ErrorActionPreference = "Stop"
+          Set-Location $env:GITHUB_WORKSPACE
 
-          $exe = Get-ChildItem -Recurse build -Filter epigimp.exe | Select-Object -First 1
-          if (-not $exe) { throw "epigimp.exe not found" }
+          $dist = Join-Path $env:GITHUB_WORKSPACE "dist"
+          if (Test-Path $dist) { Remove-Item $dist -Recurse -Force }
+          New-Item -ItemType Directory -Path $dist | Out-Null
 
-          Copy-Item $exe.FullName dist\epigimp.exe
+          $exe = Get-ChildItem -Path "build" -Recurse -Filter "epigimp.exe" | Select-Object -First 1
+          if (-not $exe) { throw "epigimp.exe not found under build/." }
 
-          # windeployqt copie DLL/Plugins Qt nécessaires
-          $windeploy = Join-Path $env:Qt6_DIR "bin\windeployqt.exe"
-          & $windeploy --release --compiler-runtime dist\epigimp.exe
+          Copy-Item $exe.FullName (Join-Path $dist "epigimp.exe") -Force
 
-          Compress-Archive -Path dist\* -DestinationPath epigimp-windows-x64.zip -Force
+          $windeploy = (Get-Command windeployqt.exe -ErrorAction SilentlyContinue).Source
+          if (-not $windeploy) { throw "windeployqt.exe not found in PATH" }
+
+          $qtRoot = $env:QT_ROOT_DIR
+          $translationDir = if ($qtRoot) { Join-Path $qtRoot "translations" } else { "" }
+          $hasTranslations = $translationDir -and (Test-Path (Join-Path $translationDir "qt_ar.qm"))
+
+          if ($hasTranslations) {
+            & $windeploy --release --compiler-runtime --dir $dist --translationdir $translationDir (Join-Path $dist "epigimp.exe")
+          } else {
+            & $windeploy --release --compiler-runtime --dir $dist --no-translations (Join-Path $dist "epigimp.exe")
+          }
+
+          Compress-Archive -Path (Join-Path $dist "*") -DestinationPath "epigimp-windows-x86_64.zip" -Force
+      
 
       - name: Upload assets to GitHub Release
         uses: softprops/action-gh-release@v2
