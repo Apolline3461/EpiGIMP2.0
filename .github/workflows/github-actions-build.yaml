@@ -104,7 +104,7 @@ jobs:
           $toolchain = Join-Path $vcpkgRoot "scripts\buildsystems\vcpkg.cmake"
           if (-not (Test-Path $toolchain)) {
             Write-Host "vcpkg toolchain not found at $toolchain"
-            Write-Host "Contents of $vcpkgRoot:" 
+            Write-Host "Contents of ${vcpkgRoot}:" 
             Get-ChildItem -Force $vcpkgRoot -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
             throw "vcpkg toolchain not found; ensure vcpkg is installed or update VCPKG_ROOT"
           }
