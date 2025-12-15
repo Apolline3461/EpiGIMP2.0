@@ -1,11 +1,7 @@
 #include "ui/image.hpp"
 
-#include <QDialog>
-#include <QDialogButtonBox>
-#include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QHBoxLayout>
 #include <QImageReader>
 #include <QImageWriter>
 #include <QLabel>
@@ -121,21 +117,44 @@ void ImageActions::saveImage(MainWindow* window)
 
     QString picturesPath =
         QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + "/untitled.png";
-    QString fileName = QFileDialog::getSaveFileName(
-        window, QObject::tr("Enregistrer l'image"), picturesPath,
-        QObject::tr("PNG (*.png);;JPEG (*.jpg *.jpeg);;Tous les fichiers (*)"));
+
+    QFileDialog dialog(window, QObject::tr("Enregistrer l'image"), picturesPath);
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    dialog.setNameFilters({QObject::tr("PNG (*.png)"), QObject::tr("JPEG (*.jpg *.jpeg)"), QObject::tr("Tous les fichiers (*)")});
+    dialog.selectNameFilter(QObject::tr("PNG (*.png)"));
+    if (!dialog.exec())
+        return;
+    QString fileName = dialog.selectedFiles().value(0);
+    QString selectedFilter = dialog.selectedNameFilter();
+    QString format;
 
     if (fileName.isEmpty())
         return;
-    if (!fileName.endsWith(".png", Qt::CaseInsensitive))
-        fileName += ".png";
-    QImageWriter writer(fileName);
+
+    if (selectedFilter.contains("PNG", Qt::CaseInsensitive)) {
+        format = "png";
+        if (!fileName.endsWith(".png", Qt::CaseInsensitive))
+            fileName += ".png";
+    } else if (selectedFilter.contains("JPEG", Qt::CaseInsensitive)) {
+        format = "jpg";
+        if (!fileName.endsWith(".jpg", Qt::CaseInsensitive) && !fileName.endsWith(".jpeg", Qt::CaseInsensitive))
+            fileName += ".jpg";
+    } else {
+        // fallback: try to guess from extension, default to png
+        if (fileName.endsWith(".jpg", Qt::CaseInsensitive) || fileName.endsWith(".jpeg", Qt::CaseInsensitive)) {
+            format = "jpg";
+        } else {
+            format = "png";
+            if (!fileName.endsWith(".png", Qt::CaseInsensitive))
+                fileName += ".png";
+        }
+    }
+    QImageWriter writer(fileName, format.toUtf8());
     if (!writer.write(window->m_currentImage))
     {
         QMessageBox::critical(window, QObject::tr("Erreur"),
                               QObject::tr("Impossible de sauvegarder l'image %1:\n%2")
-                                  .arg(QDir::toNativeSeparators(fileName))
-                                  .arg(writer.errorString()));
+                                  .arg(QDir::toNativeSeparators(fileName), writer.errorString()));
         return;
     }
 
