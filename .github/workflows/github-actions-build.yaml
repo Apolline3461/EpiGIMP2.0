@@ -1,43 +1,45 @@
-name: Build epigimp
+name: Build EpiGimp2.0
+
 on:
   push:
-    branches: [main, dev]
+    branches: [ main, dev ]
   pull_request:
-    branches: [main, dev]
+    branches: [ main, dev ]
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
         build-type: [Release]
-        include:
-          - os: ubuntu-latest
-            qt-arch: "gcc_64"
-            cmake-generator: "Unix Makefiles"
-          - os: windows-latest
-            qt-arch: "win64_msvc2019_64"
-            cmake-generator: "Visual Studio 17 2022"
-
-    runs-on: ${{ matrix.os }}
 
     steps:
+      # ------------------------------------------------------------
+      # Checkout
+      # ------------------------------------------------------------
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: 🔧 Install Qt6
+      # ------------------------------------------------------------
+      # Qt 6
+      # ------------------------------------------------------------
+      - name: 🔧 Install Qt 6
         uses: jurplel/install-qt-action@v3
         with:
           version: "6.5.0"
-          arch: ${{ matrix.qt-arch }}
           cache: true
 
-      - name: 📦 Install dependencies (Ubuntu)
+      # ------------------------------------------------------------
+      # Linux dependencies
+      # ------------------------------------------------------------
+      - name: 📦 Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
@@ -55,143 +57,80 @@ jobs:
             libxcb-xinerama0 \
             libxcb-cursor0 \
             libssl-dev \
-            zlib1g-dev
-          # Install libzip and its tools (fix broken package)
-          sudo apt-get install -y libzip-dev libzip4 zip-tools || true
-          # If still broken, remove the broken cmake config
-          if [ ! -f /usr/bin/zipcmp ]; then
-            sudo rm -f /usr/lib/x86_64-linux-gnu/cmake/libzip/libzip-*.cmake || true
-            echo "Removed broken libzip cmake config, will build from source"
-          fi
+            zlib1g-dev \
+            libzip-dev
 
-      - name: 🔨 Configure MSVC (Windows)
+      # ------------------------------------------------------------
+      # Windows: MSVC
+      # ------------------------------------------------------------
+      - name: 🔨 Setup MSVC
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: 📦 Setup vcpkg (Windows)
+      # ------------------------------------------------------------
+      # Windows: vcpkg
+      # ------------------------------------------------------------
+      - name: 📦 Setup vcpkg
         if: runner.os == 'Windows'
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: "a42af01b72c28a8e1d7b48107b33e4f286a55ef6"
+          vcpkgGitCommitId: a42af01b72c28a8e1d7b48107b33e4f286a55ef6
 
-      - name: 📦 Show vcpkg info (Windows)
+      - name: 📦 Install vcpkg dependencies
         if: runner.os == 'Windows'
-        shell: pwsh
         run: |
-          # Try common locations set by the action
-          $vcpkgRoot = $env:VCPKG_ROOT
-          if (-not $vcpkgRoot) { $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT }
-          if (-not $vcpkgRoot) { $vcpkgRoot = "C:\vcpkg" }
-          Write-Host "Detected vcpkg root: $vcpkgRoot"
-          $toolchain = Join-Path $vcpkgRoot "scripts\buildsystems\vcpkg.cmake"
-          if (Test-Path $toolchain) { Write-Host "Found toolchain: $toolchain" } else { Write-Host "Toolchain not found at $toolchain" }
-          Write-Host "Listing vcpkg root contents:";
-          Get-ChildItem -Force $vcpkgRoot -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
-          Write-Host "Where is vcpkg on PATH:";
-          where.exe vcpkg 2>$null | ForEach-Object { Write-Host $_ }
-          Write-Host "vcpkg list (if available):";
-          try { vcpkg list } catch { Write-Host "vcpkg not available in PATH" }
-          # Export to subsequent steps
-          Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=$vcpkgRoot"
-          Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_INSTALLATION_ROOT=$vcpkgRoot"
-
-      - name: 📦 Install vcpkg dependencies (Windows)
-        if: runner.os == 'Windows'
+          vcpkg install zlib libzip openssl --triplet x64-windows
         shell: pwsh
-        run: |
-          # Install dependencies in order (zlib first, then openssl, then libzip)
-          # Ensure vcpkg uses the x64-windows triplet and install with dependencies
-          vcpkg install zlib:x64-windows --recurse
-          vcpkg install openssl:x64-windows --recurse
-          vcpkg install libzip:x64-windows --recurse
-          vcpkg integrate install
-          # Verify installations
-          vcpkg list
-          # Export VCPKG paths for subsequent steps (if set by action)
-          if ($env:VCPKG_INSTALLATION_ROOT) { Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT"; Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_INSTALLATION_ROOT=$env:VCPKG_INSTALLATION_ROOT" } else { Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=C:\vcpkg"; Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_INSTALLATION_ROOT=C:\vcpkg" }
 
-      - name: 📁 Create build directory
-        run: mkdir build
-
-      - name: ⚙️ Configure CMake (Linux)
+      # ------------------------------------------------------------
+      # Configure CMake
+      # ------------------------------------------------------------
+      - name: ⚙️ Configure (Linux)
         if: runner.os == 'Linux'
-        run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -G "${{ matrix.cmake-generator }}"
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build-type }}
 
-      - name: ⚙️ Configure CMake (Windows)
+      - name: ⚙️ Configure (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          # Detect vcpkg installation root from common environment variables
-          $vcpkgRoot = $env:VCPKG_ROOT
-          if (-not $vcpkgRoot) { $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT }
-          if (-not $vcpkgRoot) { $vcpkgRoot = "C:\vcpkg" }
-          $toolchain = Join-Path $vcpkgRoot "scripts\buildsystems\vcpkg.cmake"
-          if (-not (Test-Path $toolchain)) {
-            Write-Host "vcpkg toolchain not found at $toolchain"
-            Write-Host "Contents of ${vcpkgRoot}:" 
-            Get-ChildItem -Force $vcpkgRoot -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
-            throw "vcpkg toolchain not found; ensure vcpkg is installed or update VCPKG_ROOT"
-          }
-          Write-Host "Using vcpkg toolchain: $toolchain"
-          # Try to detect installed triplet contents and pass explicit ZLIB variables if present
-          $triplet = "x64-windows"
-          $installedDir = Join-Path $vcpkgRoot "installed\$triplet"
-          Write-Host "Checking vcpkg installed dir: $installedDir"
-          if (Test-Path $installedDir) {
-            Write-Host "Installed files (top-level):"
-            Get-ChildItem -Force $installedDir -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
-          }
-          $zlibInclude = Join-Path $installedDir "include"
-          $zlibLibDir = Join-Path $installedDir "lib"
-          $zlibLib = $null
-          if (Test-Path $zlibLibDir) {
-            $zlibLib = Get-ChildItem -Path $zlibLibDir -Filter "zlib*.lib" -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object { $_.FullName }
-          }
-          $cmakeArgs = @(
-            "-B", "build",
-            "-DCMAKE_BUILD_TYPE=${{ matrix.build-type }}",
-            "-G", "${{ matrix.cmake-generator }}",
-            "-A", "x64",
-            "-DVCPKG_TARGET_TRIPLET=$triplet",
-            "-DCMAKE_TOOLCHAIN_FILE=$toolchain"
-          )
-          if (Test-Path $zlibInclude) {
-            Write-Host "Found zlib include: $zlibInclude"
-            $cmakeArgs += "-DZLIB_INCLUDE_DIR=$zlibInclude"
-          }
-          if ($zlibLib) {
-            Write-Host "Found zlib lib: $zlibLib"
-            $cmakeArgs += "-DZLIB_LIBRARY=$zlibLib"
-          }
-          if (Test-Path $installedDir) {
-            $cmakeArgs += "-DZLIB_ROOT=$installedDir"
-          }
-          Write-Host "Running cmake with args: $cmakeArgs"
-          cmake @cmakeArgs
+          cmake -S . -B build `
+            -G "Visual Studio 17 2022" `
+            -A x64 `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DCMAKE_BUILD_TYPE=${{ matrix.build-type }}
 
-      - name: 🏗️ Build EpiGimp2.0
+      # ------------------------------------------------------------
+      # Build
+      # ------------------------------------------------------------
+      - name: 🏗️ Build
         run: cmake --build build --config ${{ matrix.build-type }} --parallel
 
-      - name: 🧪 Run tests (if available)
-        run: ctest --test-dir build --output-on-failure -C ${{ matrix.build-type }}
-        continue-on-error: false
+      # ------------------------------------------------------------
+      # Tests
+      # ------------------------------------------------------------
+      - name: 🧪 Run tests
+        run: ctest --test-dir build -C ${{ matrix.build-type }} --output-on-failure
 
-      - name: 📤 Upload build artifacts (Linux)
+      # ------------------------------------------------------------
+      # Artifacts
+      # ------------------------------------------------------------
+      - name: 📤 Upload artifacts (Linux)
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
-          name: EpiGimp2.0-Linux-${{ matrix.build-type }}
+          name: epigimp-linux
           path: |
-            build/**/epigimp
-            build/**/*.so
+            build/bin/**
           retention-days: 7
 
-      - name: 📤 Upload build artifacts (Windows)
+      - name: 📤 Upload artifacts (Windows)
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: epigimp-Windows-${{ matrix.build-type }}
+          name: epigimp-windows
           path: |
-            build/**/epigimp.exe
-            build/**/*.dll
+            build/bin/**
           retention-days: 7
