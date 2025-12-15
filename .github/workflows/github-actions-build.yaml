@@ -21,9 +21,9 @@ jobs:
           - os: windows-latest
             qt-arch: "win64_msvc2019_64"
             cmake-generator: "Visual Studio 17 2022"
-    
+
     runs-on: ${{ matrix.os }}
-    
+
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -72,7 +72,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
+          vcpkgGitCommitId: "a42af01b72c28a8e1d7b48107b33e4f286a55ef6"
 
       - name: 📦 Install vcpkg dependencies (Windows)
         if: runner.os == 'Windows'
@@ -97,11 +97,17 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
-          if (-not $vcpkgRoot) {
-            $vcpkgRoot = "C:\vcpkg"
+          # Detect vcpkg installation root from common environment variables
+          $vcpkgRoot = $env:VCPKG_ROOT
+          if (-not $vcpkgRoot) { $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT }
+          if (-not $vcpkgRoot) { $vcpkgRoot = "C:\vcpkg" }
+          $toolchain = Join-Path $vcpkgRoot "scripts\buildsystems\vcpkg.cmake"
+          if (-not (Test-Path $toolchain)) {
+            Write-Host "vcpkg toolchain not found at $toolchain"
+            Write-Host "Contents of $vcpkgRoot:" 
+            Get-ChildItem -Force $vcpkgRoot -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
+            throw "vcpkg toolchain not found; ensure vcpkg is installed or update VCPKG_ROOT"
           }
-          $toolchain = "$vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
           Write-Host "Using vcpkg toolchain: $toolchain"
           cmake -B build `
             -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} `
