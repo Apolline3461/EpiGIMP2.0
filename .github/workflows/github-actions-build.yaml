@@ -100,12 +100,15 @@ jobs:
         shell: pwsh
         run: |
           # Install dependencies in order (zlib first, then openssl, then libzip)
-          vcpkg install zlib:x64-windows
-          vcpkg install openssl:x64-windows
-          vcpkg install libzip:x64-windows
+          # Ensure vcpkg uses the x64-windows triplet and install with dependencies
+          vcpkg install zlib:x64-windows --recurse
+          vcpkg install openssl:x64-windows --recurse
+          vcpkg install libzip:x64-windows --recurse
           vcpkg integrate install
           # Verify installations
           vcpkg list
+          # Export VCPKG paths for subsequent steps (if set by action)
+          if ($env:VCPKG_INSTALLATION_ROOT) { Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT"; Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_INSTALLATION_ROOT=$env:VCPKG_INSTALLATION_ROOT" } else { Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=C:\vcpkg"; Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_INSTALLATION_ROOT=C:\vcpkg" }
 
       - name: 📁 Create build directory
         run: mkdir build
