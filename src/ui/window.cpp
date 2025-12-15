@@ -49,8 +49,6 @@ MainWindow::MainWindow(QWidget* parent)
     resize(1024, 768);
 }
 
-MainWindow::~MainWindow() {}
-
 void MainWindow::createActions()
 {
     // Menu Fichier
