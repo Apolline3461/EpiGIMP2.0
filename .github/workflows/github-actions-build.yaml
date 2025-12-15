@@ -86,7 +86,7 @@ jobs:
         shell: pwsh
         run: |
           $toolchain = "$env:RUNNER_TEMP\vcpkg\scripts\buildsystems\vcpkg.cmake"
-          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -G "${{ matrix.cmake-generator }}" -DCMAKE_TOOLCHAIN_FILE="$toolchain"
+          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} -G "${{ matrix.cmake-generator }}" -A x64 -DVCPKG_TARGET_TRIPLET=x64-windows -DCMAKE_TOOLCHAIN_FILE="$toolchain"
 
       - name: 🏗️ Build EpiGimp2.0
         run: cmake --build build --config ${{ matrix.build-type }} --parallel
