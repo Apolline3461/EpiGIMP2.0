@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=EpiGimp2.0
+Exec=epigimp
+Icon=epigimp
+Categories=Graphics;
+Terminal=false

@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+        include:
+          - os: ubuntu-22.04
+            qt-arch: gcc_64
+          - os: windows-latest
+            qt-arch: win64_msvc2019_64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake patchelf curl \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-render-util0 libxcb-xinerama0 libxcb-cursor0
+
+      - name: Configure MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install Qt6
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: "6.5.0"
+          arch: ${{ matrix.qt-arch }}
+          cache: true
+
+      - name: Configure
+        run: >
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+        shell: bash
+
+      # ---------- Linux: AppImage ----------
+      - name: Build AppImage (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          mkdir -p AppDir/usr/bin
+          cp build/bin/epigimp AppDir/usr/bin/epigimp
+
+          # desktop + icon (obligatoires pour une AppImage propre)
+          cp packaging/linux/epigimp.desktop AppDir/epigimp.desktop
+          cp packaging/linux/epigimp.png AppDir/epigimp.png
+
+          # linuxdeploy + plugin Qt (Qt5/Qt6)
+          curl -L -o linuxdeploy.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          curl -L -o linuxdeploy-plugin-qt.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy.AppImage linuxdeploy-plugin-qt.AppImage
+
+          ./linuxdeploy.AppImage \
+            --appdir AppDir \
+            -d AppDir/epigimp.desktop \
+            -i AppDir/epigimp.png \
+            --plugin qt \
+            --output appimage
+
+          mv *.AppImage epigimp-linux-x86_64.AppImage
+        shell: bash
+
+      # ---------- Windows: ZIP portable ----------
+      - name: Package Windows ZIP (windeployqt)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+
+          $exe = Get-ChildItem -Recurse build -Filter epigimp.exe | Select-Object -First 1
+          if (-not $exe) { throw "epigimp.exe not found" }
+
+          Copy-Item $exe.FullName dist\epigimp.exe
+
+          # windeployqt copie DLL/Plugins Qt nécessaires
+          $windeploy = Join-Path $env:Qt6_DIR "bin\windeployqt.exe"
+          & $windeploy --release --compiler-runtime dist\epigimp.exe
+
+          Compress-Archive -Path dist\* -DestinationPath epigimp-windows-x64.zip -Force
+
+      - name: Upload assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            epigimp-linux-x86_64.AppImage
+            epigimp-windows-x64.zip
