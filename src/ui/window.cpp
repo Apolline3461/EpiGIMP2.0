@@ -49,10 +49,7 @@ MainWindow::MainWindow(QWidget* parent)
     resize(1024, 768);
 }
 
-MainWindow::~MainWindow()
-{
-    // Qt gère automatiquement la destruction des objets enfants
-}
+MainWindow::~MainWindow() {}
 
 void MainWindow::createActions()
 {
@@ -198,11 +195,11 @@ void MainWindow::saveAsEpg()
                 const QRgb p = m_currentImage.pixel(x, y);
                 const uint8_t r = qRed(p);
                 const uint8_t g = qGreen(p);
-                const uint8_t bch = qBlue(p);
+                const uint8_t b = qBlue(p);
                 const uint8_t a = qAlpha(p);
                 const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
                                       (static_cast<uint32_t>(g) << 16) |
-                                      (static_cast<uint32_t>(bch) << 8) | static_cast<uint32_t>(a);
+                                      (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
                 b.setPixel(x, y, rgba);
             }
         }
@@ -249,9 +246,9 @@ void MainWindow::openEpg()
             const uint32_t rgba = buf.getPixel(x, y);
             const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
             const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
-            const uint8_t bch = static_cast<uint8_t>((rgba >> 8) & 0xFF);
+            const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
             const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
-            img.setPixel(x, y, qRgba(r, g, bch, a));
+            img.setPixel(x, y, qRgba(r, g, b, a));
         }
     }
 
