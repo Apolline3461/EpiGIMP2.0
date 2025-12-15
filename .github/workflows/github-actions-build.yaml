@@ -12,10 +12,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.03, windows-latest]
+        os: [ubuntu-24.04, windows-latest]
         build-type: [Release]
         include:
-          - os: ubuntu-24.03
+          - os: ubuntu-24.04
             qt-arch: 'gcc_64'
             cmake-generator: 'Unix Makefiles'
           - os: windows-latest
