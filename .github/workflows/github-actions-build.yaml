@@ -133,12 +133,41 @@ jobs:
             throw "vcpkg toolchain not found; ensure vcpkg is installed or update VCPKG_ROOT"
           }
           Write-Host "Using vcpkg toolchain: $toolchain"
-          cmake -B build `
-            -DCMAKE_BUILD_TYPE=${{ matrix.build-type }} `
-            -G "${{ matrix.cmake-generator }}" `
-            -A x64 `
-            -DVCPKG_TARGET_TRIPLET=x64-windows `
-            -DCMAKE_TOOLCHAIN_FILE="$toolchain"
+          # Try to detect installed triplet contents and pass explicit ZLIB variables if present
+          $triplet = "x64-windows"
+          $installedDir = Join-Path $vcpkgRoot "installed\$triplet"
+          Write-Host "Checking vcpkg installed dir: $installedDir"
+          if (Test-Path $installedDir) {
+            Write-Host "Installed files (top-level):"
+            Get-ChildItem -Force $installedDir -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
+          }
+          $zlibInclude = Join-Path $installedDir "include"
+          $zlibLibDir = Join-Path $installedDir "lib"
+          $zlibLib = $null
+          if (Test-Path $zlibLibDir) {
+            $zlibLib = Get-ChildItem -Path $zlibLibDir -Filter "zlib*.lib" -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object { $_.FullName }
+          }
+          $cmakeArgs = @(
+            "-B", "build",
+            "-DCMAKE_BUILD_TYPE=${{ matrix.build-type }}",
+            "-G", "${{ matrix.cmake-generator }}",
+            "-A", "x64",
+            "-DVCPKG_TARGET_TRIPLET=$triplet",
+            "-DCMAKE_TOOLCHAIN_FILE=$toolchain"
+          )
+          if (Test-Path $zlibInclude) {
+            Write-Host "Found zlib include: $zlibInclude"
+            $cmakeArgs += "-DZLIB_INCLUDE_DIR=$zlibInclude"
+          }
+          if ($zlibLib) {
+            Write-Host "Found zlib lib: $zlibLib"
+            $cmakeArgs += "-DZLIB_LIBRARY=$zlibLib"
+          }
+          if (Test-Path $installedDir) {
+            $cmakeArgs += "-DZLIB_ROOT=$installedDir"
+          }
+          Write-Host "Running cmake with args: $cmakeArgs"
+          cmake @cmakeArgs
 
       - name: 🏗️ Build EpiGimp2.0
         run: cmake --build build --config ${{ matrix.build-type }} --parallel
