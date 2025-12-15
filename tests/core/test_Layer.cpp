@@ -6,6 +6,9 @@
 #include "core/ImageBuffer.h"
 #include "core/Layer.h"
 
+using std::make_shared;
+using std::string;
+
 TEST(LayerTest, DefaultState)
 {
     constexpr uint64_t id = 42;
