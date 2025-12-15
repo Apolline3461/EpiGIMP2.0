@@ -6,15 +6,12 @@
 # Cible : C++20 / Qt6
 # Compatibilité : Linux / Windows
 # ============================================================
-
 cmake_minimum_required(VERSION 3.20)
-
 project(EpiGimp2.0
     VERSION 1.1
     DESCRIPTION "Projet Epitech : clone simplifié de GIMP en C++/Qt6"
     LANGUAGES CXX
 )
-
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # ============================================================
@@ -22,7 +19,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # ============================================================
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 if(MSVC)
     add_compile_options(
         /W3
@@ -41,14 +37,12 @@ endif()
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
-
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
 
 # ============================================================
 # FetchContent (nlohmann_json, stb)
 # ============================================================
 include(FetchContent)
-
 message(STATUS "Recherche de nlohmann/json…")
 find_package(nlohmann_json QUIET)
 if(NOT nlohmann_json_FOUND)
@@ -72,25 +66,35 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(stb)
 
 # ============================================================
-# libzip (via pkg-config) and OpenSSL
-# If libzip is not present on the system, fetch & build it
+# libzip and OpenSSL
+# Try find_package first (works with vcpkg and system packages)
+# If not found, fetch and build libzip from source
 # ============================================================
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBZIP QUIET libzip)
-if(NOT LIBZIP_FOUND)
-    message(STATUS "libzip introuvable — FetchContent build automatique de libzip")
-    # Build libzip from source so the project can configure on CI / minimal systems
-    FetchContent_Declare(
-        libzip
-        GIT_REPOSITORY https://github.com/nih-at/libzip.git
-        GIT_TAG v1.11.4
-        GIT_SHALLOW TRUE
-    )
-    # Prefer shared libs if available
-    set(BUILD_SHARED_LIBS ON CACHE BOOL "Build shared libs" FORCE)
-    FetchContent_MakeAvailable(libzip)
+find_package(libzip QUIET CONFIG)
+if(NOT libzip_FOUND)
+    message(STATUS "libzip introuvable via find_package — tentative pkg-config")
+    find_package(PkgConfig)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(LIBZIP QUIET libzip)
+    endif()
+    
+    if(NOT LIBZIP_FOUND)
+        message(STATUS "libzip introuvable — FetchContent build automatique de libzip")
+        # Build libzip from source so the project can configure on CI / minimal systems
+        FetchContent_Declare(
+            libzip
+            GIT_REPOSITORY https://github.com/nih-at/libzip.git
+            GIT_TAG v1.11.4
+            GIT_SHALLOW TRUE
+        )
+        # Prefer shared libs if available
+        set(BUILD_SHARED_LIBS ON CACHE BOOL "Build shared libs" FORCE)
+        FetchContent_MakeAvailable(libzip)
+    else()
+        message(STATUS "libzip trouvé via pkg-config ✔")
+    endif()
 else()
-    message(STATUS "libzip trouvé via pkg-config ✔")
+    message(STATUS "libzip trouvé via find_package ✔")
 endif()
 
 find_package(OpenSSL REQUIRED)
