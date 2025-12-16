@@ -14,7 +14,7 @@ class MainWindow : public QMainWindow
 
    public:
     explicit MainWindow(QWidget* parent = nullptr);
-    ~MainWindow();
+    ~MainWindow() = default;
 
    private slots:
     void zoomIn();
@@ -29,9 +29,6 @@ class MainWindow : public QMainWindow
     void createMenus();
     void updateImageDisplay();
     void scaleImage(double factor);
-
-    bool saveEpgFormat(const QString& fileName);
-    bool openEpgFormat(const QString& fileName);
 
     // Membres internes
     QLabel* m_imageLabel;

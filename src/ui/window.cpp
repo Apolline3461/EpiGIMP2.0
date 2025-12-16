@@ -49,11 +49,6 @@ MainWindow::MainWindow(QWidget* parent)
     resize(1024, 768);
 }
 
-MainWindow::~MainWindow()
-{
-    // Qt gère automatiquement la destruction des objets enfants
-}
-
 void MainWindow::createActions()
 {
     // Menu Fichier
@@ -249,9 +244,9 @@ void MainWindow::openEpg()
             const uint32_t rgba = buf.getPixel(x, y);
             const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
             const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
-            const uint8_t bch = static_cast<uint8_t>((rgba >> 8) & 0xFF);
+            const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
             const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
-            img.setPixel(x, y, qRgba(r, g, bch, a));
+            img.setPixel(x, y, qRgba(r, g, b, a));
         }
     }
 

@@ -102,3 +102,6 @@ EpiGimp2.0 sera disponible directement dans le GitHub Releases pour télécharge
 
 EpiGimp2.0 est distribué sous licence MIT.
 Vous êtes libres de l’utiliser, modifier et redistribuer le projet à des fins pédagogiques ou personnelles.
+
+![C++](https://img.shields.io/badge/c++-%2300599C.svg?style=for-the-badge&logo=c%2B%2B&logoColor=white)
+[![🖼️ Build EpiGimp2.0](https://github.com/Apolline3461/EpiGIMP2.0/actions/workflows/github-actions-build.yaml/badge.svg?branch=main)](https://github.com/Apolline3461/EpiGIMP2.0/actions/workflows/github-actions-build.yaml)
