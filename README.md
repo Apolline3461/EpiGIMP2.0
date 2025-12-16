@@ -10,6 +10,8 @@ Développé en **C++20 / Qt 6**, il permet la création, la retouche et la gesti
 - [Fonctionnalités actuelles](#fonctionnalités-actuelles)
 - [Format `.epg`](#-format-epg)
 - [Installation](#-installation)
+    - [Télécharger une Release](#télécharger-une-release-recommandé)
+    - [Build depuis les sources](#build-depuis-les-sources)
 - [Prise en main](#prise-en-main)
 - [Licence](#-licence)
 
@@ -55,29 +57,45 @@ Plus d’informations : voir la **[documentation technique du format `.epg`](./d
 
 ## Installation
 
-### Temporaire : Build depuis les sources
+### Télécharger une Release (recommandé)
+
+Les versions prêtes à l’emploi sont disponibles dans **GitHub Releases** :
+- **Linux** : `epigimp-linux-x86_64.AppImage`
+- **Windows** : `epigimp-windows-x86_64.zip` (portable)
+
+> Les releases sont générées automatiquement lors d’un push de tag `v*` (ex: `v1.1.0`).
+
+#### Linux (AppImage)
+1. Télécharge `epigimp-linux-x86_64.AppImage`
+2. Rends le fichier exécutable :
+   ```bash
+   chmod +x epigimp-linux-x86_64.AppImage
+   ./epigimp-linux-x86_64.AppImage```
+
+#### Windows (Zip portable)
+1. Télécharge `epigimp-windows-x86_64.zip`
+2. Décompresse le zip
+3. Lance epigimp.exe
+
+### Build depuis les sources
 
 #### Prérequis
-- CMake ≥ 3.25 
-- Qt 6.7.x 
-- C++20
+- CMake ≥ 3.20 (minimum du projet)
+- Compilateur C++ compatible C++20
+- Qt 6.x (Core, Gui, Widgets, Svg)
+- (Linux) Ninja recommandé
 
 #### Etapes à suivre 
 
 ```bash
-git clone https://github.com/Apolline3461/EpiGIMP2.0.git
+git clone --recurse-submodules https://github.com/Apolline3461/EpiGIMP2.0.git
 cd EpiGIMP2.0
 
-mkdir build && cd build
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
 
-cmake ..
-cmake --build .
-./bin/EpiGimp
+./build/bin/epigimp
 ```
-
-### A terme
-
-EpiGimp2.0 sera disponible directement dans le GitHub Releases pour télécharger la bonne version selon votre OS.
 
 ## Prise en main
 
