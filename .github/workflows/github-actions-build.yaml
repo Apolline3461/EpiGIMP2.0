@@ -27,6 +27,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: 🧹 Clean build directory (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Test-Path build) {
+            Remove-Item -Recurse -Force build
+          }
+
       # ------------------------------------------------------------
       # Qt 6
       # ------------------------------------------------------------
@@ -79,6 +87,7 @@ jobs:
           cd vcpkg
           git checkout b3dd708d38df5c856fe1c18dc0d59ab771f93921
           .\bootstrap-vcpkg.bat
+          echo "VCPKG_ROOT=$PWD" >> $env:GITHUB_ENV
 
       - name: 📦 Install vcpkg dependencies
         if: runner.os == 'Windows'
@@ -88,6 +97,11 @@ jobs:
         env:
           VCPKG_FORCE_SYSTEM_BINARIES: 1
 
+      - name: 🔍 Verify vcpkg packages
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          vcpkg list
       # ------------------------------------------------------------
       # Configure CMake
       # ------------------------------------------------------------
