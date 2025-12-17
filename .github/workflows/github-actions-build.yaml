@@ -2,14 +2,14 @@ name: Build epigimp
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [main, dev]
   pull_request:
-    branches: [ main, dev ]
+    branches: [main, dev]
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build (${{ matrix.os }})
+    name: Build on (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -67,7 +67,28 @@ jobs:
             libssl-dev \
             zlib1g-dev \
             libzip-dev \
+            zip \
             zipcmp || true
+
+          # Ensure zipmerge exists (some libzip packages reference /usr/bin/zipmerge)
+          if ! command -v zipmerge >/dev/null 2>&1; then
+            if command -v zip >/dev/null 2>&1; then
+              sudo ln -sf "$(command -v zip)" /usr/bin/zipmerge || true
+            else
+              sudo bash -c 'echo -e "#!/bin/sh\nexit 0" > /usr/bin/zipmerge'
+              sudo chmod +x /usr/bin/zipmerge
+            fi
+          fi
+
+          # Ensure ziptool exists (some libzip packages reference /usr/bin/ziptool)
+          if ! command -v ziptool >/dev/null 2>&1; then
+            if command -v zip >/dev/null 2>&1; then
+              sudo ln -sf "$(command -v zip)" /usr/bin/ziptool || true
+            else
+              sudo bash -c 'echo -e "#!/bin/sh\nexit 0" > /usr/bin/ziptool'
+              sudo chmod +x /usr/bin/ziptool
+            fi
+          fi
 
       # ------------------------------------------------------------
       # Windows: MSVC

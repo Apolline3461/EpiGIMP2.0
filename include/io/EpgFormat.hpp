@@ -11,8 +11,8 @@
 
 #include "core/document.hpp"
 #include "core/ImageBuffer.h"
-#include "io/EpgZip.hpp"
 #include "io/EpgTypes.hpp"
+#include "io/EpgZip.hpp"
 using json = nlohmann::json;
 
 void pngWriteCallback(void* context, void* data, int size);

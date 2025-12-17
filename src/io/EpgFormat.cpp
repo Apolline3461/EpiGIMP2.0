@@ -1,5 +1,5 @@
 #include "io/EpgFormat.hpp"
-#include "io/EpgJson.hpp"
+
 #include <stb_image.h>
 
 #include <chrono>
@@ -10,6 +10,8 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+
+#include "io/EpgJson.hpp"
 
 // Callback used by stb_image_write to collect the encoded PNG bytes.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)

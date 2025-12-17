@@ -73,5 +73,4 @@ struct OpenResult
     std::unique_ptr<Document> document;
 };
 
-
 }  // namespace io::epg

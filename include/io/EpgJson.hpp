@@ -1,7 +1,7 @@
 #pragma once
 
-#include "io/EpgZip.hpp"
 #include "io/EpgTypes.hpp"
+#include "io/EpgZip.hpp"
 
 // JSON (de)serialization helpers for EPG structures
 #include <nlohmann/json.hpp>
