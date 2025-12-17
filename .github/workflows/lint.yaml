@@ -60,8 +60,8 @@ jobs:
               base="${{ github.event.pull_request.base.sha }}"
               head="${{ github.sha }}"
             else
-              base="${{ github.event.before }}"
-              head="${{ github.sha }}"
+              base="${{ github.event.pull_request.base.sha }}"
+              head="${{ github.event.pull_request.head.sha }}"
             fi
 
             if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
@@ -133,10 +133,18 @@ jobs:
         if: ${{ steps.scope.outputs.has_cpp == 'true' }}
         run: |
           set -euo pipefail
-          xargs -0 clang-tidy -p build \
-            -checks='clang-analyzer-*,bugprone-*,performance-*' \
-            -warnings-as-errors='clang-analyzer-*,bugprone-*,performance-*' \
-            -header-filter='.*/(src|include)/.*' < cpp_files.bin
+          failed=0
+
+          while IFS= read -r -d '' f; do
+            echo "::group::clang-tidy $f"
+            clang-tidy -p build "$f" \
+              -checks='clang-analyzer-*,bugprone-*,performance-*' \
+              -warnings-as-errors='clang-analyzer-*,bugprone-*,performance-*' \
+              -header-filter='.*/(src|include)/.*' || failed=1
+            echo "::endgroup::"
+          done < cpp_files.bin
+
+          exit $failed
 
       - name: Cppcheck (from compile database, filtered)
         if: ${{ steps.scope.outputs.has_cpp == 'true' }}
