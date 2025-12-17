@@ -9,7 +9,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
-extern "C" {
+extern "C"
+{
 #include <stb_image.h>
 #include <stb_image_write.h>
 }
@@ -19,8 +20,9 @@ namespace EpgFormat
 static constexpr char MAGIC[] = "EPIGIMP";
 
 static constexpr int32_t kVersion = 1;
-static constexpr int32_t kChannels = 4; // RGBA
-struct EpgHeader {
+static constexpr int32_t kChannels = 4;  // RGBA
+struct EpgHeader
+{
     int32_t version{};
     int32_t width{};
     int32_t height{};
@@ -52,15 +54,16 @@ static bool writeHeader(std::ofstream& ofs, const EpgHeader& hdr)
     return ofs.good();
 }
 
-static bool readHeader(std::ifstream& ifs, EpgHeader& hdr) {
+static bool readHeader(std::ifstream& ifs, EpgHeader& hdr)
+{
     if (!ifs)
         return false;
 
     char magicBuf[sizeof(MAGIC)]{};
     ifs.read(magicBuf, sizeof(MAGIC) - 1);
     if (ifs.gcount() != static_cast<std::streamsize>(sizeof(MAGIC) - 1))
-    if (std::string(magicBuf, sizeof(MAGIC) - 1) != std::string(MAGIC))
-        return false;
+        if (std::string(magicBuf, sizeof(MAGIC) - 1) != std::string(MAGIC))
+            return false;
     ifs.read(reinterpret_cast<char*>(&hdr.version), sizeof(hdr.version));
     ifs.read(reinterpret_cast<char*>(&hdr.width), sizeof(hdr.width));
     ifs.read(reinterpret_cast<char*>(&hdr.height), sizeof(hdr.height));
@@ -85,15 +88,16 @@ static bool encodePngToMemory(const ImageBuffer& image, std::vector<uint8_t>& ou
     const int stride = width * comp;
     if (stride <= 0)
         return false;
-    const size_t expected = static_cast<size_t>(width) * static_cast<size_t>(height) * static_cast<size_t>(comp);
+    const size_t expected =
+        static_cast<size_t>(width) * static_cast<size_t>(height) * static_cast<size_t>(comp);
     if (image.data() == nullptr)
         return false;
-    stbi_write_png_to_func(png_write_callback, &out, width, height, comp, image.data(),
-                            stride);
+    stbi_write_png_to_func(png_write_callback, &out, width, height, comp, image.data(), stride);
     return !out.empty();
 }
 
-static unsigned char* decodePngFromMemory(const std::vector<uint8_t>& data, int& imgW, int& imgH, int& imgComp)
+static unsigned char* decodePngFromMemory(const std::vector<uint8_t>& data, int& imgW, int& imgH,
+                                          int& imgComp)
 {
     if (data.empty())
         return nullptr;
@@ -112,7 +116,7 @@ bool save(const std::string& fileName, const ImageBuffer& image)
         return false;
 
     EpgHeader hdr{};
-    hdr.version  = kVersion;
+    hdr.version = kVersion;
     hdr.width = static_cast<int32_t>(image.width());
     hdr.height = static_cast<int32_t>(image.height());
     hdr.channels = 4;
@@ -121,7 +125,8 @@ bool save(const std::string& fileName, const ImageBuffer& image)
     if (!writeHeader(ofs, hdr))
         return false;
 
-    if (hdr.dataSize > 0) {
+    if (hdr.dataSize > 0)
+    {
         ofs.write(reinterpret_cast<const char*>(pngData.data()), hdr.dataSize);
         if (ofs.fail())
             return false;
@@ -173,7 +178,8 @@ bool load(const std::string& fileName, ImageBuffer& outImage)
     }
 
     outImage = ImageBuffer(imgW, imgH);
-    const size_t total = static_cast<size_t>(imgW) * static_cast<size_t>(imgH) * static_cast<size_t>(kChannels);
+    const size_t total =
+        static_cast<size_t>(imgW) * static_cast<size_t>(imgH) * static_cast<size_t>(kChannels);
     std::memcpy(outImage.data(), decoded, total);
 
     stbi_image_free(decoded);
