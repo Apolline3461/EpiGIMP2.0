@@ -21,9 +21,44 @@ target_link_libraries(epigimp_io
         PUBLIC
         epigimp_core
         nlohmann_json::nlohmann_json
-        OpenSSL::SSL
-        OpenSSL::Crypto
+        epigimp_warnings
 )
+
+# OpenSSL: link with imported targets when available, else fallback to variables
+if(TARGET OpenSSL::SSL AND TARGET OpenSSL::Crypto)
+    target_link_libraries(epigimp_io PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+elseif(OPENSSL_FOUND)
+    target_include_directories(epigimp_io PUBLIC ${OPENSSL_INCLUDE_DIR})
+    target_link_libraries(epigimp_io PUBLIC ${OPENSSL_LIBRARIES})
+else()
+    message(FATAL_ERROR "epigimp_io: OpenSSL introuvable — requis pour lier epigimp_io")
+endif()
+
+# libzip: try system CMake config first, fallback to FetchContent
+find_package(libzip CONFIG QUIET)
+
+if(NOT libzip_FOUND)
+    message(STATUS "libzip introuvable — utilisation de FetchContent en dernier recours")
+    include(FetchContent)
+
+    FetchContent_Declare(
+        libzip
+        GIT_REPOSITORY https://github.com/nih-at/libzip.git
+        GIT_TAG v1.11.4
+        GIT_SHALLOW TRUE
+    )
+
+    # libzip options (important)
+    set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+    set(ENABLE_COMMONCRYPTO OFF CACHE BOOL "" FORCE)
+    set(ENABLE_GNUTLS OFF CACHE BOOL "" FORCE)
+    set(ENABLE_MBEDTLS OFF CACHE BOOL "" FORCE)
+    set(ENABLE_OPENSSL ON CACHE BOOL "" FORCE)
+
+    FetchContent_MakeAvailable(libzip)
+else()
+    message(STATUS "libzip trouvé ✔")
+endif()
 
 # Link libzip with proper target detection
 # Priority: pkg-config (Linux) > vcpkg (Windows) > system CMake config > FetchContent

@@ -28,8 +28,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+add_library(epigimp_warnings INTERFACE)
 if(MSVC)
-    add_compile_options(
+    target_compile_options(epigimp_warnings INTERFACE
         /W3
         /permissive-
         /Zc:preprocessor
@@ -37,7 +38,9 @@ if(MSVC)
         /utf-8
     )
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    target_compile_options(epigimp_warnings INTERFACE
+        -Wall -Wextra -Wpedantic
+    )
 endif()
 
 # ------------------------------------------------------------
@@ -92,41 +95,6 @@ find_package(ZLIB REQUIRED)
 # OpenSSL
 # ------------------------------------------------------------
 find_package(OpenSSL REQUIRED)
-
-# ------------------------------------------------------------
-# libzip
-# ------------------------------------------------------------
-if(EXISTS "/usr/bin/zipmerge")
-    find_package(libzip CONFIG QUIET)
-else()
-    # If the system libzip config references a zipmerge executable that doesn't exist
-    # CMake will error out when importing targets. Prefer FetchContent fallback
-    # in that case.
-    message(STATUS "zipmerge introuvable — ignorer le package libzip installé, utilisation de FetchContent")
-    set(libzip_FOUND FALSE)
-endif()
-
-if(NOT libzip_FOUND)
-    message(STATUS "libzip introuvable via packages — FetchContent en dernier recours")
-
-    FetchContent_Declare(
-        libzip
-        GIT_REPOSITORY https://github.com/nih-at/libzip.git
-        GIT_TAG v1.11.4
-        GIT_SHALLOW TRUE
-    )
-
-    # libzip options (important)
-    set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
-    set(ENABLE_COMMONCRYPTO OFF CACHE BOOL "" FORCE)
-    set(ENABLE_GNUTLS OFF CACHE BOOL "" FORCE)
-    set(ENABLE_MBEDTLS OFF CACHE BOOL "" FORCE)
-    set(ENABLE_OPENSSL ON CACHE BOOL "" FORCE)
-
-    FetchContent_MakeAvailable(libzip)
-else()
-    message(STATUS "libzip trouvé ✔")
-endif()
 
 # ------------------------------------------------------------
 # Project structure
