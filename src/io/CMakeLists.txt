@@ -6,6 +6,18 @@ file(GLOB IO_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
 )
 
+
+# ------------------------------------------------------------
+# ZLIB (explicit — REQUIRED)
+# ------------------------------------------------------------
+find_package(ZLIB REQUIRED)
+
+# ------------------------------------------------------------
+# OpenSSL
+# ------------------------------------------------------------
+find_package(OpenSSL REQUIRED)
+
+
 add_library(epigimp_io STATIC
         ${IO_HEADERS}
         ${IO_SOURCES}
@@ -23,6 +35,8 @@ target_link_libraries(epigimp_io
         nlohmann_json::nlohmann_json
         epigimp_warnings
 )
+
+
 
 # OpenSSL: link with imported targets when available, else fallback to variables
 if(TARGET OpenSSL::SSL AND TARGET OpenSSL::Crypto)

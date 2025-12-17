@@ -87,16 +87,6 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(stb)
 
 # ------------------------------------------------------------
-# ZLIB (explicit — REQUIRED)
-# ------------------------------------------------------------
-find_package(ZLIB REQUIRED)
-
-# ------------------------------------------------------------
-# OpenSSL
-# ------------------------------------------------------------
-find_package(OpenSSL REQUIRED)
-
-# ------------------------------------------------------------
 # Project structure
 # ------------------------------------------------------------
 set(EPIGIMP_ROOT_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
