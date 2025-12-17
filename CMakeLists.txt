@@ -99,10 +99,7 @@ find_package(OpenSSL REQUIRED)
 # ------------------------------------------------------------
 # Project structure
 # ------------------------------------------------------------
-set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
-set(EPIGIMP_ROOT_SRC_DIR ${CMAKE_SOURCE_DIR}/src)
-set(INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
-set(EPIGIMP_ROOT_INCLUDE_DIR ${INCLUDE_DIR})
+set(EPIGIMP_ROOT_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 
 add_subdirectory(src/core)
 add_subdirectory(src/io)

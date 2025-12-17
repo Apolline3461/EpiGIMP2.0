@@ -11,6 +11,7 @@
 
 #include "core/document.hpp"
 #include "core/ImageBuffer.h"
+#include "io/EpgZip.hpp"
 #include "io/EpgTypes.hpp"
 using json = nlohmann::json;
 
