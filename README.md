@@ -7,9 +7,12 @@ Développé en **C++20 / Qt 6**, il permet la création, la retouche et la gesti
 
 ## Sommaire
 - [Présentation](#-présentation)
-- [Fonctionnalités](#-fonctionnalités)
+- [Fonctionnalités actuelles](#fonctionnalités-actuelles)
 - [Format `.epg`](#-format-epg)
 - [Installation](#-installation)
+    - [Télécharger une Release](#télécharger-une-release-recommandé)
+    - [Build depuis les sources](#build-depuis-les-sources)
+- [Prise en main](#prise-en-main)
 - [Licence](#-licence)
 
 ---
@@ -19,49 +22,84 @@ Développé en **C++20 / Qt 6**, il permet la création, la retouche et la gesti
 > Projet réalisé dans le cadre d’Epitech
 > Par **Apolline Fontaine** et **Léandre Godet**
 
-**Objectif :** livrer un **MVP réaliste** d’éditeur d’images, fluide et robuste, en 10 semaines de développement.
+**Objectif :** livrer un **MVP réaliste** d’éditeur d’images, fluide et robuste, avec un socle technique propre (CI, tests, architecture adaptée).
 
 ---
 
-## Fonctionnalités
+## Fonctionnalités actuelles
 
-a complété
+### Gestion de fichiers (implémenté)
+- Nouveau projet : création d’un canvas vierge (dimensions choisies). 
+- Ouvrir : import d’images PNG / JPEG. 
+- Enregistrer / Ouvrir : format projet .epg. 
+- Exporter : export en PNG / JPEG.
+
+> Le reste des fonctionnalités arrive progressivement.
+> Ce README se limite volontairement aux fonctionnalités déjà implémentées.
+> La liste complète des fonctionnalités visées est détaillée dans le [cahier des charges](./EPIGIMP2.0%20cdc.pdf) du repo.
+
 
 ---
 
 ## Format `.epg`
 
-Format propriétaire et textuel, encodé en UTF-8, inspiré de `.xcf`.
+Le `.epg` est le format de projet d’EpiGimp2.0 : il permet de sauvegarder un projet non destructif afin de le réouvrir à l’identique.
 
-### Contenu typique
+Techniquement, un fichier `.epg` est une **archive ZIP** contenant :
+- `project.json` : description du projet (canvas, calques, métadonnées…)
+- `preview.png` : aperçu du rendu (256×256)
+- `layers/NNNN.png` : images des calques (identifiants sur 4 chiffres : `0001`, `0042`, …)
 
-a détailler
+Plus d’informations : voir la **[documentation technique du format `.epg`](./docs/epgformat.md)**.
+
 
 ---
 
 ## Installation
 
-### Prérequis
+### Télécharger une Release (recommandé)
 
-CMake ≥ 3.25
-Qt 6.7.x
-C++20
+Les versions prêtes à l’emploi sont disponibles dans **GitHub Releases** :
+- **Linux** : `epigimp-linux-x86_64.AppImage`
+- **Windows** : `epigimp-windows-x86_64.zip` (portable)
 
-### Build
+> Les releases sont générées automatiquement lors d’un push de tag `v*` (ex: `v1.1.0`).
+
+#### Linux (AppImage)
+1. Télécharge `epigimp-linux-x86_64.AppImage`
+2. Rends le fichier exécutable :
+   ```bash
+   chmod +x epigimp-linux-x86_64.AppImage
+   ./epigimp-linux-x86_64.AppImage```
+
+#### Windows (Zip portable)
+1. Télécharge `epigimp-windows-x86_64.zip`
+2. Décompresse le zip
+3. Lance epigimp.exe
+
+### Build depuis les sources
+
+#### Prérequis
+- CMake ≥ 3.20 (minimum du projet)
+- Compilateur C++ compatible C++20
+- Qt 6.x (Core, Gui, Widgets, Svg)
+- (Linux) Ninja recommandé
+
+#### Etapes à suivre 
 
 ```bash
-
-git clone https://github.com/Apolline3461/EpiGIMP2.0.git
+git clone --recurse-submodules https://github.com/Apolline3461/EpiGIMP2.0.git
 cd EpiGIMP2.0
 
-mkdir build && cd build
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
 
-cmake ..
-make
-./bin/EpiGimp
+./build/bin/epigimp
 ```
 
-## Raccourcis principaux
+## Prise en main
+
+### Raccourcis principaux
 
 | Action | Raccourci |
 | --- | --- |

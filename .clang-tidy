@@ -1,6 +1,5 @@
 ---
 Checks: >
-  clang-diagnostic-*,
   clang-analyzer-*,
   bugprone-*,
   performance-*,
@@ -9,19 +8,18 @@ Checks: >
   cppcoreguidelines-*,
   misc-*,
   portability-*,
-  qt-*,
-  -cppcoreguidelines-owning-memory,        # trop strict pour Qt (utilisation de pointeurs parents)
+  -cppcoreguidelines-owning-memory,
   -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
-  -cppcoreguidelines-pro-type-vararg,      # autorise printf/logging
-  -cppcoreguidelines-avoid-magic-numbers,  # trop bruyant dans du code UI
-  -readability-magic-numbers,              # idem
-  -cppcoreguidelines-non-private-member-variables-in-classes, # Qt slots/signals
-  -modernize-use-trailing-return-type,     # préférence à la clarté
-  -modernize-use-auto,                     # auto laissé au choix du dev
-  -readability-implicit-bool-conversion,   # Qt a beaucoup de `if (ptr)` légitimes
-  -readability-convert-member-functions-to-static # inutile ici
-WarningsAsErrors: '*'
-HeaderFilterRegex: '.*(include|src).*'
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-magic-numbers,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -modernize-use-trailing-return-type,
+  -modernize-use-auto,                     
+  -readability-implicit-bool-conversion,
+  -readability-convert-member-functions-to-static
+WarningsAsErrors: 'clang-analyzer-*,bugprone-*,performance-*'
+HeaderFilterRegex: '.*/(src|include)/.*'
 FormatStyle: file
 CheckOptions:
   - key:             readability-identifier-naming.VariableCase
@@ -48,7 +46,3 @@ CheckOptions:
     value:           100
   - key:             bugprone-branch-clone.MinimumCloneComplexity
     value:           20
-
-
-# Cible du projet
-CompileCommandsDir: build

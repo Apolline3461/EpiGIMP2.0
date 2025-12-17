@@ -14,6 +14,10 @@ add_library(epigimp_io STATIC
 target_include_directories(epigimp_io
         PUBLIC
         ${EPIGIMP_ROOT_INCLUDE_DIR}
+)
+
+target_include_directories(epigimp_io
+        SYSTEM PRIVATE
         ${stb_SOURCE_DIR}
 )
 
