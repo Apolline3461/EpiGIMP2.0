@@ -40,7 +40,7 @@ std::string formatLayerId(size_t index)
 std::unique_ptr<ImageBuffer> decodePngToImageBuffer(const std::vector<unsigned char>& pngData)
 {
     // Quick sanity: check PNG signature (8 bytes)
-    if (pngData.size() < 8)
+    if (pngData.size() < 8 || memcmp(pngData.data(), kPngSignature, 8) != 0)
         throw std::runtime_error("Not a PNG file (too small)");
 
     int width = 0, height = 0, channels = 0;

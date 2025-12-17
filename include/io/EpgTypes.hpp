@@ -15,6 +15,9 @@
 // PNG signature constant
 inline constexpr unsigned char kPngSignature[8] = {137, 80, 78, 71, 13, 10, 26, 10};
 
+namespace io::epg
+{
+
 class ZipHandle
 {
    public:
@@ -177,3 +180,5 @@ struct Manifest
     IOConfig io;
     Metadata metadata;
 };
+
+}  // namespace io::epg

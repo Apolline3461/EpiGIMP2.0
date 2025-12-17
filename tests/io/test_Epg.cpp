@@ -38,7 +38,7 @@ TEST(EpgFormat, SaveAndOpenRoundTrip)
 
     EXPECT_NO_THROW(storage.save(doc, path));
 
-    OpenResult res = storage.open(path);
+    auto res = storage.open(path);
     EXPECT_TRUE(res.success) << res.errorMessage;
     ASSERT_NE(res.document, nullptr);
     EXPECT_EQ(res.document->width, doc.width);
@@ -104,7 +104,7 @@ TEST(EpgFormatExtra, OpenNonExistentFile)
     std::error_code ec;
     std::filesystem::remove(path, ec);
 
-    OpenResult res = storage.open(path);
+    auto res = storage.open(path);
     EXPECT_FALSE(res.success);
     EXPECT_NE(res.errorMessage.size(), 0u);
 }
@@ -133,7 +133,7 @@ TEST(EpgFormatExtra, SaveAndOpenMultipleLayers)
 
     EXPECT_NO_THROW(storage.save(doc, path));
 
-    OpenResult res = storage.open(path);
+    auto res = storage.open(path);
     EXPECT_TRUE(res.success) << res.errorMessage;
     ASSERT_NE(res.document, nullptr);
     EXPECT_EQ(res.document->layers.size(), 2u);
@@ -159,7 +159,7 @@ TEST(EpgFormatExtra, SaveEmptyDocument)
 
     // Saving an empty document should not throw and should be openable
     EXPECT_NO_THROW(storage.save(doc, path));
-    OpenResult res = storage.open(path);
+    auto res = storage.open(path);
     EXPECT_TRUE(res.success) << res.errorMessage;
     ASSERT_NE(res.document, nullptr);
     EXPECT_EQ(res.document->layers.size(), 0u);
@@ -190,7 +190,7 @@ TEST(EpgFormatMore, SaveAndOpenPreserveLayerProperties)
 
     EXPECT_NO_THROW(storage.save(doc, path));
 
-    OpenResult res = storage.open(path);
+    auto res = storage.open(path);
     EXPECT_TRUE(res.success) << res.errorMessage;
     ASSERT_NE(res.document, nullptr);
 
@@ -414,7 +414,7 @@ TEST(EpgHelpers, WriteAndLoadManifestAndLayers)
     doc.layers.push_back(make_shared<Layer>(1ULL, string("L1"), buf, true, false, 1.0f));
 
     ZipEpgStorage storage;
-    Manifest m = storage.createManifestFromDocument(doc);
+    auto m = storage.createManifestFromDocument(doc);
 
     auto tmp = std::filesystem::temp_directory_path() / "epg_helpers_manifest.epg";
     std::string path = tmp.string();
@@ -436,7 +436,7 @@ TEST(EpgHelpers, WriteAndLoadManifestAndLayers)
     zip_t* zr = zip_open(path.c_str(), ZIP_RDONLY, &err2);
     ASSERT_NE(zr, nullptr);
 
-    Manifest loaded = storage.loadManifestFromZip(zr);
+    auto loaded = storage.loadManifestFromZip(zr);
     EXPECT_EQ(loaded.layers.size(), m.layers.size());
     for (const auto& L : loaded.layers)
     {
@@ -478,7 +478,7 @@ TEST(EpgFormatTest, OpenInvalidFileFails)
     }
 
     ZipEpgStorage storage;
-    OpenResult res = storage.open(tmp.string());
+    auto res = storage.open(tmp.string());
     EXPECT_FALSE(res.success);
 
     std::error_code ec;

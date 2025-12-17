@@ -63,21 +63,21 @@ Le cœur du format `.epg` repose sur un fichier JSON UTF-8 structuré comme suit
 
 ```json
 {
-  "epg_version": 1,
+  "epgVersion": 1,
   "manifest": {
     "entries": [
       { "path": "project.json", "sha256": "a3f23c3b..." },
       { "path": "layers/0001.png", "sha256": "0ff3c2..." }
     ],
-    "file_count": 5,
-    "generated_utc": "2025-11-13T15:00:00Z"
+    "fileCount": 5,
+    "generatedUtc": "2025-11-13T15:00:00Z"
   },
   "canvas": {
     "name": "EpiGimp2.0",
     "width": 1920,
     "height": 1080,
     "dpi": 72,
-    "color_space": "sRGB",
+    "colorSpace": "sRGB",
     "background": { "r": 255, "g": 255, "b": 255, "a": 0 }
   },
 
@@ -89,7 +89,7 @@ Le cœur du format `.epg` repose sur un fichier JSON UTF-8 structuré comme suit
       "visible": true,
       "locked": false,
       "opacity": 1.0,
-      "blend_mode": "normal",
+      "blendMode": "normal",
       "transform": {
         "tx": 0,
         "ty": 0,
@@ -112,7 +112,7 @@ Le cœur du format `.epg` repose sur un fichier JSON UTF-8 structuré comme suit
       "visible": true,
       "locked": false,
       "opacity": 0.85,
-      "blend_mode": "normal",
+      "blendMode": "normal",
       "transform": {
         "tx": 120,
         "ty": 450,
@@ -127,34 +127,34 @@ Le cœur du format `.epg` repose sur un fichier JSON UTF-8 structuré comme suit
         "height": 80
       },
       "path": "layers/0002.png",
-      "text_data": {
+      "textData": {
         "content": "Bonjour le monde",
-        "font_family": "Arial",
-        "font_size": 48,
-        "font_weight": "normal",
+        "fontFamily": "Arial",
+        "fontSize": 48,
+        "fontWeight": "normal",
         "color": { "r": 0, "g": 0, "b": 0, "a": 255 },
         "alignment": "left"
       }
     }
   ],
 
-  "layer_groups": [],
+  "layerGroups": [],
 
   "io": {
-    "pixel_format_storage": "RGBA8_unorm_straight",
-    "pixel_format_runtime": "ARGB32_premultiplied",
+    "pixelFormatStorage": "RGBA8_unorm_straight",
+    "pixelFormatRuntime": "ARGB32_premultiplied",
     "color_depth": 8,
     "compression": "png"
   },
 
   "metadata": {
-    "created_utc": "2025-11-13T14:30:00Z",
-    "modified_utc": "2025-11-13T15:45:00Z",
+    "createdUtc": "2025-11-13T14:30:00Z",
+    "modifiedUtc": "2025-11-13T15:45:00Z",
     "author": "Jean Dupont",
     "description": "Bannière publicitaire pour campagne Q4",
     "tags": ["marketing", "web", "bannière"],
     "license": "proprietary"
-  },
+  }
 }
 ```
 
@@ -162,7 +162,7 @@ Le cœur du format `.epg` repose sur un fichier JSON UTF-8 structuré comme suit
 
 ## 4. Description détaillée des sections
 
-### 4.1. `epg_version`
+### 4.1. `epgVersion`
 
 - **Type** : `integer`
 - **Description** : version du format `.epg`
@@ -173,24 +173,24 @@ Le cœur du format `.epg` repose sur un fichier JSON UTF-8 structuré comme suit
 
 Manifeste d'intégrité du projet
 
-| Champ         | Type    | Description                          |
-| ------------- | ------- | ------------------------------------ |
-| entries       | array   | Liste des fichiers avec hash SHA-256 |
-| file_count    | integer | Nombre total de fichiers             |
-| generated_utc | string  | Date de génération (ISO 8601)        |
+| Champ        | Type    | Description                          |
+| ------------ | ------- | ------------------------------------ |
+| entries      | array   | Liste des fichiers avec hash SHA-256 |
+| fileCount    | integer | Nombre total de fichiers             |
+| generatedUtc | string  | Date de génération (ISO 8601)        |
 
 ### 4.3. `canvas`
 
 Configuration de la zone de travail.
 
-| Champ         | Type      | Obligatoire | Description           | Valeurs/Limites                     |
-| ------------- | --------- | ----------- | --------------------- | ----------------------------------- |
-| `name`        | `string`  | ✅          | Nom de l'application  | 1 à 32 char                         |
-| `width`       | `integer` | ✅          | Largeur en pixels     | 1 à 65535                           |
-| `height`      | `integer` | ✅          | Hauteur en pixels     | 1 à 65535                           |
-| `dpi`         | `integer` | ✅          | Résolution            | 72, 96, 150, 300...                 |
-| `color_space` | `string`  | ✅          | Espace colorimétrique | `sRGB`, `Adobe RGB`, `ProPhoto RGB` |
-| `background`  | `object`  | ✅          | Couleur RGBA de fond  | r,g,b ∈ [0,255], a ∈ [0,255]        |
+| Champ        | Type      | Obligatoire | Description           | Valeurs/Limites                     |
+| ------------ | --------- | ----------- | --------------------- | ----------------------------------- |
+| `name`       | `string`  | ✅          | Nom de l'application  | 1 à 32 char                         |
+| `width`      | `integer` | ✅          | Largeur en pixels     | 1 à 65535                           |
+| `height`     | `integer` | ✅          | Hauteur en pixels     | 1 à 65535                           |
+| `dpi`        | `integer` | ✅          | Résolution            | 72, 96, 150, 300...                 |
+| `colorSpace` | `string`  | ✅          | Espace colorimétrique | `sRGB`, `Adobe RGB`, `ProPhoto RGB` |
+| `background` | `object`  | ✅          | Couleur RGBA de fond  | r,g,b ∈ [0,255], a ∈ [0,255]        |
 
 **Exemple** :
 
@@ -204,36 +204,36 @@ Liste ordonnée des calques (du fond vers le premier plan).
 
 #### 4.4.1. Propriétés communes
 
-| Champ        | Type            | Obligatoire | Description           | Valeurs                                 |
-| ------------ | --------------- | ----------- | --------------------- | --------------------------------------- |
-| `id`         | `string`        | ✅          | Identifiant unique    | Format `NNNN`                           |
-| `name`       | `string`        | ✅          | Nom d'affichage       | UTF-8, max 255 car.                     |
-| `type`       | `string`        | ✅          | Type de calque        | `raster`, `text`, `shape`, `adjustment` |
-| `visible`    | `boolean`       | ✅          | Visibilité            | `true`/`false`                          |
-| `locked`     | `boolean`       | ✅          | Verrouillage          | `true`/`false`                          |
-| `opacity`    | `float`         | ✅          | Opacité               | [0.0, 1.0]                              |
-| `blend_mode` | `string`        | ✅          | Mode de fusion        | Voir §4.4.3                             |
-| `transform`  | `object`        | ✅          | Transformation 2D     | Voir §4.4.4                             |
-| `bounds`     | `object`        | ✅          | Rectangle englobant   | x, y, width, height                     |
-| `path`       | `string`        | ✅          | Chemin vers l'image   | Relatif à la racine                     |
+| Champ       | Type      | Obligatoire | Description         | Valeurs                                 |
+| ----------- | --------- | ----------- | ------------------- | --------------------------------------- |
+| `id`        | `string`  | ✅          | Identifiant unique  | Format `NNNN`                           |
+| `name`      | `string`  | ✅          | Nom d'affichage     | UTF-8, max 255 car.                     |
+| `type`      | `string`  | ✅          | Type de calque      | `raster`, `text`, `shape`, `adjustment` |
+| `visible`   | `boolean` | ✅          | Visibilité          | `true`/`false`                          |
+| `locked`    | `boolean` | ✅          | Verrouillage        | `true`/`false`                          |
+| `opacity`   | `float`   | ✅          | Opacité             | [0.0, 1.0]                              |
+| `blendMode` | `string`  | ✅          | Mode de fusion      | Voir §4.4.3                             |
+| `transform` | `object`  | ✅          | Transformation 2D   | Voir §4.4.4                             |
+| `bounds`    | `object`  | ✅          | Rectangle englobant | x, y, width, height                     |
+| `path`      | `string`  | ✅          | Chemin vers l'image | Relatif à la racine                     |
 
 #### 4.4.2. Propriétés spécifiques aux calques texte
 
-| Champ                   | Type      | Description                                       |
-| ----------------------- | --------- | ------------------------------------------------- |
-| `text_data.content`     | `string`  | Contenu textuel                                   |
-| `text_data.font_family` | `string`  | Police de caractères                              |
-| `text_data.font_size`   | `integer` | Taille en points                                  |
-| `text_data.font_weight` | `string`  | Épaisseur (`normal`, `bold`, `light`...)          |
-| `text_data.color`       | `object`  | Couleur RGBA                                      |
-| `text_data.alignment`   | `string`  | Alignement (`left`, `center`, `right`, `justify`) |
+| Champ                 | Type      | Description                                       |
+| --------------------- | --------- | ------------------------------------------------- |
+| `textData.content`    | `string`  | Contenu textuel                                   |
+| `textData.fontFamily` | `string`  | Police de caractères                              |
+| `textData.fontSize`   | `integer` | Taille en points                                  |
+| `textData.fontWeight` | `string`  | Épaisseur (`normal`, `bold`, `light`...)          |
+| `textData.color`      | `object`  | Couleur RGBA                                      |
+| `textData.alignment`  | `string`  | Alignement (`left`, `center`, `right`, `justify`) |
 
 #### 4.4.3. Modes de fusion supportés
 
-| Mode          | Description            |
-| ------------- | ---------------------- |
-| `normal`      | Superposition standard |
-| `multiply`    | Multiplication         |
+| Mode       | Description            |
+| ---------- | ---------------------- |
+| `normal`   | Superposition standard |
+| `multiply` | Multiplication         |
 
 #### 4.4.4. Objet `transform`
 
@@ -251,43 +251,43 @@ Liste ordonnée des calques (du fond vers le premier plan).
 
 **Ordre d'application** : échelle → inclinaison → rotation → translation
 
-### 4.5. `layer_groups`
+### 4.5. `layerGroups`
 
 Groupes de calques pour l'organisation hiérarchique.
 
-| Champ        | Type      | Description                      |
-| ------------ | --------- | -------------------------------- |
-| `id`         | `string`  | Identifiant unique du groupe     |
-| `name`       | `string`  | Nom du groupe                    |
-| `visible`    | `boolean` | Visibilité du groupe             |
-| `locked`     | `boolean` | Verrouillage du groupe           |
-| `opacity`    | `float`   | Opacité globale                  |
-| `blend_mode` | `string`  | Mode de fusion du groupe         |
-| `layer_ids`  | `array`   | Liste des IDs de calques membres |
+| Champ       | Type      | Description                      |
+| ----------- | --------- | -------------------------------- |
+| `id`        | `string`  | Identifiant unique du groupe     |
+| `name`      | `string`  | Nom du groupe                    |
+| `visible`   | `boolean` | Visibilité du groupe             |
+| `locked`    | `boolean` | Verrouillage du groupe           |
+| `opacity`   | `float`   | Opacité globale                  |
+| `blendMode` | `string`  | Mode de fusion du groupe         |
+| `layerIds`  | `array`   | Liste des IDs de calques membres |
 
 ### 4.6. `io`
 
 Configuration des formats de pixels.
 
-| Champ                  | Type      | Description           | Valeurs                                         |
-| ---------------------- | --------- | --------------------- | ----------------------------------------------- |
-| `pixel_format_storage` | `string`  | Format de stockage    | `RGBA8_unorm_straight`, `RGBA16_unorm_straight` |
-| `pixel_format_runtime` | `string`  | Format d'exécution    | `ARGB32_premultiplied`, `RGBA32_premultiplied`  |
-| `color_depth`          | `integer` | Profondeur de couleur | 8, 16, 32                                       |
-| `compression`          | `string`  | Format de compression | `png`, `tiff`                                   |
+| Champ                | Type      | Description           | Valeurs                                         |
+| -------------------- | --------- | --------------------- | ----------------------------------------------- |
+| `pixelFormatStorage` | `string`  | Format de stockage    | `RGBA8_unorm_straight`, `RGBA16_unorm_straight` |
+| `pixelFormatRuntime` | `string`  | Format d'exécution    | `ARGB32_premultiplied`, `RGBA32_premultiplied`  |
+| `color_depth`        | `integer` | Profondeur de couleur | 8, 16, 32                                       |
+| `compression`        | `string`  | Format de compression | `png`, `tiff`                                   |
 
 ### 4.7. `metadata`
 
 Métadonnées du projet.
 
-| Champ          | Type     | Obligatoire | Description                      |
-| -------------- | -------- | ----------- | -------------------------------- |
-| `created_utc`  | `string` | ✅          | Date de création (ISO 8601)      |
-| `modified_utc` | `string` | ✅          | Dernière modification (ISO 8601) |
-| `author`       | `string` | ❌          | Nom de l'auteur                  |
-| `description`  | `string` | ❌          | Description du projet            |
-| `tags`         | `array`  | ❌          | Mots-clés                        |
-| `license`      | `string` | ❌          | Type de licence                  |
+| Champ         | Type     | Obligatoire | Description                      |
+| ------------- | -------- | ----------- | -------------------------------- |
+| `createdUtc`  | `string` | ✅          | Date de création (ISO 8601)      |
+| `modifiedUtc` | `string` | ✅          | Dernière modification (ISO 8601) |
+| `author`      | `string` | ❌          | Nom de l'auteur                  |
+| `description` | `string` | ❌          | Description du projet            |
+| `tags`        | `array`  | ❌          | Mots-clés                        |
+| `license`     | `string` | ❌          | Type de licence                  |
 
 ### 4.8. `selection`
 
@@ -317,13 +317,13 @@ Les implémentations peuvent utiliser toute licence compatible.
 
 ```json
 {
-  "epg_version": 1,
+  "epgVersion": 1,
   "canvas": {
     "name": "EpiGimp2.0",
     "width": 800,
     "height": 600,
     "dpi": 72,
-    "color_space": "sRGB",
+    "colorSpace": "sRGB",
     "background": { "r": 255, "g": 255, "b": 255, "a": 0 }
   },
   "layers": [
@@ -334,28 +334,34 @@ Les implémentations peuvent utiliser toute licence compatible.
       "visible": true,
       "locked": false,
       "opacity": 1.0,
-      "blend_mode": "normal",
-      "transform": { "tx": 0, "ty": 0, "scaleX": 1.0, "scaleY": 1.0, "rotation": 0.0 },
+      "blendMode": "normal",
+      "transform": {
+        "tx": 0,
+        "ty": 0,
+        "scaleX": 1.0,
+        "scaleY": 1.0,
+        "rotation": 0.0
+      },
       "bounds": { "x": 0, "y": 0, "width": 800, "height": 600 },
       "path": "layers/0001.png"
     }
   ],
-  "layer_groups": [],
+  "layerGroups": [],
   "io": {
-    "pixel_format_storage": "RGBA8_unorm_straight",
-    "pixel_format_runtime": "ARGB32_premultiplied",
+    "pixelFormatStorage": "RGBA8_unorm_straight",
+    "pixelFormatRuntime": "ARGB32_premultiplied",
     "color_depth": 8,
     "compression": "png"
   },
   "metadata": {
-    "created_utc": "2025-11-13T10:00:00Z",
-    "modified_utc": "2025-11-13T10:00:00Z"
+    "createdUtc": "2025-11-13T10:00:00Z",
+    "modifiedUtc": "2025-11-13T10:00:00Z"
   },
   "selection": {
     "active": false,
     "type": null,
     "bounds": null
-  },
+  }
 }
 ```
 
@@ -363,12 +369,12 @@ Les implémentations peuvent utiliser toute licence compatible.
 
 ```json
 {
-  "epg_version": 1,
+  "epgVersion": 1,
   "canvas": {
     "width": 1920,
     "height": 1080,
     "dpi": 72,
-    "color_space": "sRGB",
+    "colorSpace": "sRGB",
     "background": { "r": 255, "g": 255, "b": 255, "a": 255 }
   },
   "layers": [
@@ -379,8 +385,14 @@ Les implémentations peuvent utiliser toute licence compatible.
       "visible": true,
       "locked": false,
       "opacity": 1.0,
-      "blend_mode": "normal",
-      "transform": { "tx": 0, "ty": 0, "scaleX": 1.0, "scaleY": 1.0, "rotation": 0.0 },
+      "blendMode": "normal",
+      "transform": {
+        "tx": 0,
+        "ty": 0,
+        "scaleX": 1.0,
+        "scaleY": 1.0,
+        "rotation": 0.0
+      },
       "bounds": { "x": 0, "y": 0, "width": 1920, "height": 1080 },
       "path": "layers/0001.png"
     },
@@ -391,15 +403,21 @@ Les implémentations peuvent utiliser toute licence compatible.
       "visible": true,
       "locked": false,
       "opacity": 0.9,
-      "blend_mode": "multiply",
-      "transform": { "tx": 100, "ty": 200, "scaleX": 1.0, "scaleY": 1.0, "rotation": 0.0 },
+      "blendMode": "multiply",
+      "transform": {
+        "tx": 100,
+        "ty": 200,
+        "scaleX": 1.0,
+        "scaleY": 1.0,
+        "rotation": 0.0
+      },
       "bounds": { "x": 100, "y": 200, "width": 800, "height": 120 },
       "path": "layers/0002.png",
-      "text_data": {
+      "textData": {
         "content": "Bienvenue sur EpiGimp",
-        "font_family": "Arial",
-        "font_size": 72,
-        "font_weight": "bold",
+        "fontFamily": "Arial",
+        "fontSize": 72,
+        "fontWeight": "bold",
         "color": { "r": 0, "g": 0, "b": 0, "a": 255 },
         "alignment": "left"
       }

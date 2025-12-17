@@ -240,7 +240,7 @@ void MainWindow::openEpg()
         return;
 
     ZipEpgStorage storage;
-    OpenResult res = storage.open(fileName.toStdString());
+    auto res = storage.open(fileName.toStdString());
     if (!res.success || !res.document)
     {
         QString err = QString::fromLocal8Bit(res.errorMessage.empty() ? "Erreur inconnue"

@@ -24,6 +24,7 @@
 #include "io/Logger.hpp"
 
 using json = nlohmann::json;
+using namespace io::epg;
 
 // ----------------- ZIP helpers --------------------------------------------
 
@@ -448,7 +449,7 @@ std::vector<unsigned char> ZipEpgStorage::encodePngToVector(const unsigned char*
 void ZipEpgStorage::writePreviewToZip(zip_t* zipHandle,
                                       const std::vector<unsigned char>& pngData) const
 {
-    if (pngData.size() < 8)
+    if (pngData.size() < 8 || memcmp(pngData.data(), kPngSignature, 8) != 0)
         throw std::runtime_error("generatePreview: PNG trop petit");
 
     if (std::memcmp(pngData.data(), kPngSignature, 8) != 0)
@@ -465,7 +466,7 @@ void ZipEpgStorage::writePreviewToZip(zip_t* zipHandle,
     writeFileToZip(zipHandle, "preview.png", pngData.data(), pngData.size());
 }
 
-OpenResult ZipEpgStorage::open(const std::string& path)
+ZipEpgStorage::OpenResult ZipEpgStorage::open(const std::string& path)
 {
     int err = 0;
     zip_t* raw = zip_open(path.c_str(), ZIP_RDONLY, &err);
@@ -475,7 +476,7 @@ OpenResult ZipEpgStorage::open(const std::string& path)
     }
     ZipHandle zip(raw);
 
-    OpenResult res;
+    ZipEpgStorage::OpenResult res;
     try
     {
         // Load and validate manifest from the ZIP

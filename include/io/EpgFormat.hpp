@@ -29,17 +29,18 @@ class ZipEpgStorage : public IStorage
     ~ZipEpgStorage() = default;
 
     // Expose legacy nested type names for compatibility with EpgJson.hpp
-    using Transform = ::Transform;
-    using Bounds = ::Bounds;
-    using TextData = ::TextData;
-    using ManifestLayer = ::ManifestLayer;
-    using LayerGroup = ::LayerGroup;
-    using IOConfig = ::IOConfig;
-    using Metadata = ::Metadata;
-    using ManifestInfo = ::ManifestInfo;
-    using Canvas = ::Canvas;
-    using Manifest = ::Manifest;
-    using Color = ::Color;
+    using Transform = io::epg::Transform;
+    using Bounds = io::epg::Bounds;
+    using TextData = io::epg::TextData;
+    using ManifestLayer = io::epg::ManifestLayer;
+    using LayerGroup = io::epg::LayerGroup;
+    using IOConfig = io::epg::IOConfig;
+    using Metadata = io::epg::Metadata;
+    using ManifestInfo = io::epg::ManifestInfo;
+    using Canvas = io::epg::Canvas;
+    using Manifest = io::epg::Manifest;
+    using Color = io::epg::Color;
+    using OpenResult = io::epg::OpenResult;
 
     // Interface IStorage-like methods
     OpenResult open(const std::string& path) override;
