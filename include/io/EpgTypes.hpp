@@ -108,15 +108,34 @@ struct TextData
     std::string alignment{"left"};
 };
 
+// Enums for layer type and blend mode (namespace scope)
+enum class LayerType
+{
+    Raster,
+    Text,
+    Unknown
+};
+
+enum class BlendMode
+{
+    Normal,
+    Multiply,
+    Screen,
+    Overlay,
+    Darken,
+    Lighten,
+    Unknown
+};
+
 struct ManifestLayer
 {
     std::string id;
     std::string name;
-    std::string type{"raster"};
+    LayerType type{LayerType::Raster};
     bool visible{true};
     bool locked{false};
     float opacity{1.0f};
-    std::string blend_mode{"normal"};
+    BlendMode blend_mode{BlendMode::Normal};
     Transform transform;
     Bounds bounds;
     std::string path;
@@ -131,7 +150,7 @@ struct LayerGroup
     bool visible{true};
     bool locked{false};
     float opacity{1.0f};
-    std::string blend_mode{"normal"};
+    BlendMode blend_mode{BlendMode::Normal};
     std::vector<std::string> layer_ids;
 };
 

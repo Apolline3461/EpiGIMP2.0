@@ -190,11 +190,11 @@ ZipEpgStorage::Manifest ZipEpgStorage::createManifestFromDocument(const Document
         ManifestLayer L;
         L.id = layerId;
         L.name = doc.layers[i]->name();
-        L.type = "raster";
+        L.type = LayerType::Raster;
         L.visible = doc.layers[i]->visible();
         L.locked = doc.layers[i]->locked();
         L.opacity = doc.layers[i]->opacity();
-        L.blend_mode = "normal";
+        L.blend_mode = BlendMode::Normal;
         L.path = "layers/" + layerId + ".png";
         L.sha256 = "";  // sera remplie lors de la sauvegarde
         L.transform = Transform{};

@@ -14,6 +14,93 @@ using json = nlohmann::json;
 namespace io::epg
 {
 
+// Conversion helpers between enums and strings for JSON
+inline std::string layerTypeToString(LayerType t)
+{
+    switch (t)
+    {
+        case LayerType::Raster:
+            return "raster";
+        case LayerType::Text:
+            return "text";
+        default:
+            return "unknown";
+    }
+}
+
+inline LayerType layerTypeFromString(const std::string& s)
+{
+    if (s == "raster")
+        return LayerType::Raster;
+    if (s == "text")
+        return LayerType::Text;
+    return LayerType::Unknown;
+}
+
+inline std::string blendModeToString(BlendMode m)
+{
+    switch (m)
+    {
+        case BlendMode::Normal:
+            return "normal";
+        case BlendMode::Multiply:
+            return "multiply";
+        case BlendMode::Screen:
+            return "screen";
+        case BlendMode::Overlay:
+            return "overlay";
+        case BlendMode::Darken:
+            return "darken";
+        case BlendMode::Lighten:
+            return "lighten";
+        default:
+            return "unknown";
+    }
+}
+
+inline BlendMode blendModeFromString(const std::string& s)
+{
+    if (s == "normal")
+        return BlendMode::Normal;
+    if (s == "multiply")
+        return BlendMode::Multiply;
+    if (s == "screen")
+        return BlendMode::Screen;
+    if (s == "overlay")
+        return BlendMode::Overlay;
+    if (s == "darken")
+        return BlendMode::Darken;
+    if (s == "lighten")
+        return BlendMode::Lighten;
+    return BlendMode::Unknown;
+}
+
+inline void to_json(json& j, const LayerType& t)
+{
+    j = layerTypeToString(t);
+}
+
+inline void from_json(const json& j, LayerType& t)
+{
+    if (j.is_string())
+        t = layerTypeFromString(j.get<std::string>());
+    else
+        t = LayerType::Unknown;
+}
+
+inline void to_json(json& j, const BlendMode& m)
+{
+    j = blendModeToString(m);
+}
+
+inline void from_json(const json& j, BlendMode& m)
+{
+    if (j.is_string())
+        m = blendModeFromString(j.get<std::string>());
+    else
+        m = BlendMode::Unknown;
+}
+
 inline void to_json(json& j, const Color& c)
 {
     j = json{{"r", c.r}, {"g", c.g}, {"b", c.b}, {"a", c.a}};
@@ -113,7 +200,7 @@ inline void from_json(const json& j, ManifestLayer& L)
         L.transform = j["transform"].get<Transform>();
     if (j.contains("bounds"))
         L.bounds = j["bounds"].get<Bounds>();
-    if (j.contains("textData") && L.type == "text")
+    if (j.contains("textData") && L.type == LayerType::Text)
         L.text_data = j["textData"].get<TextData>();
 }
 
