@@ -1,4 +1,4 @@
-name: Build EpiGimp2.0
+name: Build epigimp
 
 on:
   push:

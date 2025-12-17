@@ -15,26 +15,47 @@
 
 using namespace std;
 
-// From test_Epg.cpp
-TEST(EpgFormat, SaveAndOpenRoundTrip)
+// Fixture to reduce repetition in EPG tests
+class EpgTest : public ::testing::Test
 {
+   protected:
     Document doc;
+    ZipEpgStorage storage;
+
+    std::filesystem::path tmpPath(const std::string& name)
+    {
+        return std::filesystem::temp_directory_path() / name;
+    }
+
+    std::shared_ptr<ImageBuffer> makeBuf(int w, int h, uint32_t color)
+    {
+        auto b = make_shared<ImageBuffer>(w, h);
+        b->fill(color);
+        return b;
+    }
+
+    void removeTemp(const std::string& name)
+    {
+        std::error_code ec;
+        std::filesystem::remove(tmpPath(name), ec);
+    }
+};
+
+// From test_Epg.cpp
+TEST_F(EpgTest, SaveAndOpenRoundTrip)
+{
     doc.width = 16;
     doc.height = 16;
     doc.dpi = 72.0f;
 
-    auto buf = make_shared<ImageBuffer>(16, 16);
-    buf->fill(0xFF0000FFu);  // rouge opaque
+    auto buf = makeBuf(16, 16, 0xFF0000FFu);  // rouge opaque
 
     auto layer = make_shared<Layer>(1ULL, string("Layer1"), buf, true, false, 1.0f);
     doc.layers.push_back(layer);
 
-    ZipEpgStorage storage;
-
-    auto tmp = std::filesystem::temp_directory_path() / "epg_test_roundtrip.epg";
+    auto tmp = tmpPath("epg_test_roundtrip.epg");
     std::string path = tmp.string();
-    std::error_code ec;
-    std::filesystem::remove(path, ec);
+    removeTemp("epg_test_roundtrip.epg");
 
     EXPECT_NO_THROW(storage.save(doc, path));
 
@@ -51,27 +72,22 @@ TEST(EpgFormat, SaveAndOpenRoundTrip)
     uint32_t px = loadedLayer->image()->getPixel(0, 0);
     EXPECT_EQ(px, buf->getPixel(0, 0));
 
-    std::filesystem::remove(path, ec);
+    removeTemp("epg_test_roundtrip.epg");
 }
 
-TEST(EpgFormat, ExportPngCreatesFile)
+TEST_F(EpgTest, ExportPngCreatesFile)
 {
-    Document doc;
     doc.width = 8;
     doc.height = 8;
 
-    auto buf = make_shared<ImageBuffer>(8, 8);
-    buf->fill(0x00FF00FFu);  // vert opaque
+    auto buf = makeBuf(8, 8, 0x00FF00FFu);  // vert opaque
 
     auto layer = make_shared<Layer>(1ULL, string("L"), buf, true, false, 1.0f);
     doc.layers.push_back(layer);
 
-    ZipEpgStorage storage;
-
-    auto tmp = std::filesystem::temp_directory_path() / "epg_export_test.png";
+    auto tmp = tmpPath("epg_export_test.png");
     std::string path = tmp.string();
-    std::error_code ec;
-    std::filesystem::remove(path, ec);
+    removeTemp("epg_export_test.png");
 
     EXPECT_NO_THROW(storage.exportPng(doc, path));
     EXPECT_TRUE(std::filesystem::exists(path));
@@ -90,7 +106,7 @@ TEST(EpgFormat, ExportPngCreatesFile)
     EXPECT_EQ(sig[6], 26);
     EXPECT_EQ(sig[7], 10);
     f.close();
-    std::filesystem::remove(path, ec);
+    removeTemp("epg_export_test.png");
 }
 
 // From test_Epg_extra.cpp
@@ -109,27 +125,22 @@ TEST(EpgFormatExtra, OpenNonExistentFile)
     EXPECT_NE(res.errorMessage.size(), 0u);
 }
 
-TEST(EpgFormatExtra, SaveAndOpenMultipleLayers)
+TEST_F(EpgTest, SaveAndOpenMultipleLayers)
 {
-    Document doc;
     doc.width = 4;
     doc.height = 4;
 
-    auto buf1 = make_shared<ImageBuffer>(4, 4);
-    buf1->fill(0x112233FFu);
-    auto buf2 = make_shared<ImageBuffer>(4, 4);
-    buf2->fill(0x445566FFu);
+    auto buf1 = makeBuf(4, 4, 0x112233FFu);
+    auto buf2 = makeBuf(4, 4, 0x445566FFu);
 
     auto l1 = make_shared<Layer>(1ULL, string("L1"), buf1);
     auto l2 = make_shared<Layer>(2ULL, string("L2"), buf2);
     doc.layers.push_back(l1);
     doc.layers.push_back(l2);
 
-    ZipEpgStorage storage;
-    auto tmp = std::filesystem::temp_directory_path() / "epg_test_multilayer.epg";
+    auto tmp = tmpPath("epg_test_multilayer.epg");
     std::string path = tmp.string();
-    std::error_code ec;
-    std::filesystem::remove(path, ec);
+    removeTemp("epg_test_multilayer.epg");
 
     EXPECT_NO_THROW(storage.save(doc, path));
 
@@ -142,7 +153,7 @@ TEST(EpgFormatExtra, SaveAndOpenMultipleLayers)
     EXPECT_EQ(res.document->layers[0]->image()->getPixel(0, 0), buf1->getPixel(0, 0));
     EXPECT_EQ(res.document->layers[1]->image()->getPixel(0, 0), buf2->getPixel(0, 0));
 
-    std::filesystem::remove(path, ec);
+    removeTemp("epg_test_multilayer.epg");
 }
 
 TEST(EpgFormatExtra, SaveEmptyDocument)
@@ -168,25 +179,21 @@ TEST(EpgFormatExtra, SaveEmptyDocument)
 }
 
 // From test_Epg_more.cpp
-TEST(EpgFormatMore, SaveAndOpenPreserveLayerProperties)
+TEST_F(EpgTest, SaveAndOpenPreserveLayerProperties)
 {
-    Document doc;
     doc.width = 8;
     doc.height = 8;
     doc.dpi = 300.0f;
 
-    auto buf = make_shared<ImageBuffer>(8, 8);
-    buf->fill(0xAABBCCFFu);
+    auto buf = makeBuf(8, 8, 0xAABBCCFFu);
 
     // create layer with various properties
     auto layer = make_shared<Layer>(42ULL, string("Props"), buf, false, true, 0.5f);
     doc.layers.push_back(layer);
 
-    ZipEpgStorage storage;
-    auto tmp = std::filesystem::temp_directory_path() / "epg_test_props.epg";
+    auto tmp = tmpPath("epg_test_props.epg");
     std::string path = tmp.string();
-    std::error_code ec;
-    std::filesystem::remove(path, ec);
+    removeTemp("epg_test_props.epg");
 
     EXPECT_NO_THROW(storage.save(doc, path));
 
@@ -207,32 +214,27 @@ TEST(EpgFormatMore, SaveAndOpenPreserveLayerProperties)
     EXPECT_EQ(loaded->locked(), true);
     EXPECT_FLOAT_EQ(loaded->opacity(), 0.5f);
 
-    std::filesystem::remove(path, ec);
+    removeTemp("epg_test_props.epg");
 }
 
-TEST(EpgFormatMore, ExportPng_CompositionWithOpacity)
+TEST_F(EpgTest, ExportPng_CompositionWithOpacity)
 {
-    Document doc;
     doc.width = 4;
     doc.height = 4;
 
     // bottom: green opaque
-    auto bottom = make_shared<ImageBuffer>(4, 4);
-    bottom->fill(0x00FF00FFu);
+    auto bottom = makeBuf(4, 4, 0x00FF00FFu);
     // top: red opaque but with opacity 0.5 on layer
-    auto top = make_shared<ImageBuffer>(4, 4);
-    top->fill(0xFF0000FFu);
+    auto top = makeBuf(4, 4, 0xFF0000FFu);
 
     auto l1 = make_shared<Layer>(1ULL, string("BG"), bottom, true, false, 1.0f);
     auto l2 = make_shared<Layer>(2ULL, string("Top"), top, true, false, 0.5f);
     doc.layers.push_back(l1);
     doc.layers.push_back(l2);
 
-    ZipEpgStorage storage;
-    auto tmp = std::filesystem::temp_directory_path() / "epg_comp_test.png";
+    auto tmp = tmpPath("epg_comp_test.png");
     std::string path = tmp.string();
-    std::error_code ec;
-    std::filesystem::remove(path, ec);
+    removeTemp("epg_comp_test.png");
 
     EXPECT_NO_THROW(storage.exportPng(doc, path));
     EXPECT_TRUE(std::filesystem::exists(path));
@@ -257,7 +259,7 @@ TEST(EpgFormatMore, ExportPng_CompositionWithOpacity)
     EXPECT_EQ(a, 255);
 
     stbi_image_free(data);
-    std::filesystem::remove(path, ec);
+    removeTemp("epg_comp_test.png");
 }
 
 TEST(EpgFormatMore, ExportPng_ThrowsOnEmptyDocument)
@@ -483,4 +485,37 @@ TEST(EpgFormatTest, OpenInvalidFileFails)
 
     std::error_code ec;
     fs::remove(tmp, ec);
+}
+
+TEST_F(EpgTest, SaveAndOpenPreservesLayerOrder)
+{
+    doc.width = 4;
+    doc.height = 4;
+
+    auto buf1 = makeBuf(4, 4, 0x112233FFu);
+    auto buf2 = makeBuf(4, 4, 0x445566FFu);
+
+    auto l1 = make_shared<Layer>(1ULL, string("First"), buf1);
+    auto l2 = make_shared<Layer>(2ULL, string("Second"), buf2);
+    doc.layers.push_back(l1);
+    doc.layers.push_back(l2);
+
+    auto tmp = tmpPath("epg_test_order.epg");
+    std::string path = tmp.string();
+    removeTemp("epg_test_order.epg");
+
+    EXPECT_NO_THROW(storage.save(doc, path));
+
+    auto res = storage.open(path);
+    EXPECT_TRUE(res.success) << res.errorMessage;
+    ASSERT_NE(res.document, nullptr);
+    ASSERT_EQ(res.document->layers.size(), 2u);
+
+    EXPECT_EQ(res.document->layers[0]->name(), "First");
+    EXPECT_EQ(res.document->layers[1]->name(), "Second");
+
+    EXPECT_EQ(res.document->layers[0]->image()->getPixel(0, 0), buf1->getPixel(0, 0));
+    EXPECT_EQ(res.document->layers[1]->image()->getPixel(0, 0), buf2->getPixel(0, 0));
+
+    removeTemp("epg_test_order.epg");
 }
