@@ -38,6 +38,12 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Disable Microsoft APT repos (workaround)
+        if: runner.os == 'Linux'
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/azure-cli.list \
+                    /etc/apt/sources.list.d/microsoft-prod.list || true
+
       - name: Install deps (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -78,9 +84,9 @@ jobs:
         shell: bash
 
       - name: Upload artifacts
+        if: github.ref_name == 'main' || github.ref_name == 'dev'
         uses: actions/upload-artifact@v4
         with:
           name: epigimp-${{ runner.os }}-${{ matrix.build-type }}
-          path: |
-            build/bin/**
+          path: build/bin/**
           retention-days: 7

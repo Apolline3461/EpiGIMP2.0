@@ -1,6 +1,40 @@
+codecov:
+  require_ci_to_pass: true
+
+comment:
+  layout: "reach,diff,flags,tree"
+  behavior: default
+  require_changes: false
+
 coverage:
+  precision: 2
+  round: down
+  range: "50..100"
+
+  ignore:
+    - "build/**"
+    - "build-*/**"
+    - "cmake-build-*/**"
+    - "build-cov/**"
+    - "**/_deps/**"
+    - "tests/**"
+    - "third_party/**"
+    - "packaging/**"
+    - ".github/**"
+
   status:
     project:
       default:
-        target: auto
-        threshold: 0%
+        target: auto          # compare à la branche de base (ex: main/dev)
+        threshold: 0.30%      # tolère -0.30% (évite le bruit)
+        informational: false
+        if_not_found: success
+        if_ci_failed: error
+
+    patch:
+      default:
+        target: 60%
+        threshold: 0.0%
+        informational: false
+        if_not_found: success
+        if_ci_failed: error

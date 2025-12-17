@@ -23,6 +23,11 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Disable Microsoft APT repos (workaround)
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/azure-cli.list \
+                    /etc/apt/sources.list.d/microsoft-prod.list || true
+
       - name: Install deps
         run: |
           sudo apt-get update
@@ -69,4 +74,5 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true

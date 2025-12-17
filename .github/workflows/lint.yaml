@@ -31,8 +31,11 @@ jobs:
           set -euo pipefail
 
           mode="changed"
-          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.ref_name }}" == "main" ]]; then
-            mode="full"
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base_ref="${{ github.event.pull_request.base.ref }}"
+            if [[ "$base_ref" == "main" ]]; then
+              mode="full"
+            fi
           fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "Selected lint mode: $mode"
@@ -82,6 +85,11 @@ jobs:
 
           if [[ -s format_files.bin ]]; then echo "has_format=true" >> "$GITHUB_OUTPUT"; else echo "has_format=false" >> "$GITHUB_OUTPUT"; fi
           if [[ -s cpp_files.bin ]]; then echo "has_cpp=true" >> "$GITHUB_OUTPUT"; else echo "has_cpp=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Disable Microsoft APT repos (workaround)
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/azure-cli.list \
+                    /etc/apt/sources.list.d/microsoft-prod.list || true
 
       - name: Install tools
         run: |
