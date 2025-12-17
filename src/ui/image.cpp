@@ -10,6 +10,8 @@
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QVBoxLayout>
+#include <QDialogButtonBox>
+#include <QDialog>
 
 void ImageActions::newImage(MainWindow* window)
 {
