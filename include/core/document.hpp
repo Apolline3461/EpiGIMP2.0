@@ -8,7 +8,6 @@
 class ImageBuffer;
 class Layer;
 
-// Version finale de la structure Document utilisée par l'IO EPG et les tests.
 // Fournit des constructeurs et des méthodes utilitaires simples pour gérer
 // la liste de calques (layers) sans exposer davantage d'implémentation.
 struct Document
