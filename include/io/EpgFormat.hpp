@@ -19,7 +19,10 @@ std::string getCurrentTimestampUTC();
 std::string formatLayerId(size_t index);
 std::unique_ptr<ImageBuffer> decodePngToImageBuffer(const std::vector<unsigned char>& pngData);
 
-class ZipEpgStorage
+// Storage interface (extracted to separate header)
+#include "io/IStorage.hpp"
+
+class ZipEpgStorage : public IStorage
 {
    public:
     ZipEpgStorage() = default;
@@ -39,9 +42,9 @@ class ZipEpgStorage
     using Color = ::Color;
 
     // Interface IStorage-like methods
-    OpenResult open(const std::string& path);
-    void save(const Document& doc, const std::string& path);
-    void exportPng(const Document& doc, const std::string& path);
+    OpenResult open(const std::string& path) override;
+    void save(const Document& doc, const std::string& path) override;
+    void exportPng(const Document& doc, const std::string& path) override;
 
     // Helpers (made public for unit testing)
     Manifest loadManifestFromZip(zip_t* zipHandle) const;
@@ -72,15 +75,3 @@ class ZipEpgStorage
     std::unique_ptr<Document> createDocumentFromManifest(const Manifest& manifest,
                                                          zip_t* zipHandle) const;
 };
-
-// Abstract storage interface
-class IStorage
-{
-   public:
-    virtual ~IStorage() = default;
-    virtual OpenResult open(const std::string& path) = 0;
-    virtual void save(const Document& doc, const std::string& path) = 0;
-    virtual void exportPng(const Document& doc, const std::string& path) = 0;
-};
-
-#include "io/EpgJson.hpp"

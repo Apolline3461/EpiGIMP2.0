@@ -20,6 +20,7 @@
 #include "core/document.hpp"
 #include "core/Layer.h"
 #include "io/EpgFormat.hpp"
+#include "io/EpgJson.hpp"
 #include "io/Logger.hpp"
 
 using json = nlohmann::json;

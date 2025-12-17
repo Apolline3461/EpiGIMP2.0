@@ -14,6 +14,7 @@
 #include "core/ImageBuffer.h"
 #include "core/Layer.h"
 #include "io/EpgFormat.hpp"
+#include "io/EpgJson.hpp"
 #include "ui/image.hpp"
 
 MainWindow::MainWindow(QWidget* parent)
