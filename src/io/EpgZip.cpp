@@ -160,28 +160,28 @@ void ZipEpgStorage::validateManifest(const Manifest& m) const
 ZipEpgStorage::Manifest ZipEpgStorage::createManifestFromDocument(const Document& doc) const
 {
     Manifest m;
-    m.epg_version = 1;
+    m.epgVersion = 1;
 
     // Canvas
     m.canvas.name = "EpiGimp2.0";
     m.canvas.width = doc.width;
     m.canvas.height = doc.height;
     m.canvas.dpi = static_cast<int>(doc.dpi);
-    m.canvas.color_space = "sRGB";
+    m.canvas.colorSpace = "sRGB";
     m.canvas.background = Color{255, 255, 255, 0};
 
     // IO defaults
-    m.io.pixel_format_storage = "RGBA8_unorm_straight";
-    m.io.pixel_format_runtime = "ARGB32_premultiplied";
-    m.io.color_depth = 8;
+    m.io.pixelFormatStorage = "RGBA8_unorm_straight";
+    m.io.pixelFormatRuntime = "ARGB32_premultiplied";
+    m.io.colorDepth = 8;
     m.io.compression = "png";
 
     // Metadata
     std::string const now = getCurrentTimestampUTC();
     m.metadata.author = "EpiGimp User";
     m.metadata.description = "Document créé avec EpiGimp";
-    m.metadata.created_utc = now;
-    m.metadata.modified_utc = now;
+    m.metadata.createdUtc = now;
+    m.metadata.modifiedUtc = now;
 
     // Layers
     for (size_t i = 0; i < doc.layers.size(); ++i)
@@ -194,7 +194,7 @@ ZipEpgStorage::Manifest ZipEpgStorage::createManifestFromDocument(const Document
         L.visible = doc.layers[i]->visible();
         L.locked = doc.layers[i]->locked();
         L.opacity = doc.layers[i]->opacity();
-        L.blend_mode = BlendMode::Normal;
+        L.blendMode = BlendMode::Normal;
         L.path = "layers/" + layerId + ".png";
         L.sha256 = "";  // sera remplie lors de la sauvegarde
         L.transform = Transform{};
@@ -317,7 +317,7 @@ void ZipEpgStorage::writeLayersToZip(zip_t* zipHandle, Manifest& m, const Docume
         manifestEntries.emplace_back(L.path, sha);
     }
 
-    m.manifest_info.entries = manifestEntries;
+    m.manifestInfo.entries = manifestEntries;
 }
 
 void ZipEpgStorage::writeManifestToZip(zip_t* zipHandle, const Manifest& m) const
@@ -510,9 +510,9 @@ void ZipEpgStorage::save(const Document& doc, const std::string& path)
         // Write layers and update manifest with computed SHA256s
         writeLayersToZip(zip.get(), m, doc);
 
-        m.metadata.modified_utc = getCurrentTimestampUTC();
-        m.manifest_info.file_count = static_cast<int>(1 + m.manifest_info.entries.size());
-        m.manifest_info.generated_utc = getCurrentTimestampUTC();
+        m.metadata.modifiedUtc = getCurrentTimestampUTC();
+        m.manifestInfo.fileCount = static_cast<int>(1 + m.manifestInfo.entries.size());
+        m.manifestInfo.generatedUtc = getCurrentTimestampUTC();
 
         // Write manifest file
         writeManifestToZip(zip.get(), m);

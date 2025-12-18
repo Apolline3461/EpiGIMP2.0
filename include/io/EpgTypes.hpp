@@ -37,9 +37,9 @@ struct Bounds
 struct TextData
 {
     std::string content;
-    std::string font_family{"Arial"};
-    int font_size{12};
-    std::string font_weight{"normal"};
+    std::string fontFamily{"Arial"};
+    int fontSize{12};
+    std::string fontWeight{"normal"};
     Color color{0, 0, 0, 255};
     std::string alignment{"left"};
 };
@@ -71,12 +71,12 @@ struct ManifestLayer
     bool visible{true};
     bool locked{false};
     float opacity{1.0f};
-    BlendMode blend_mode{BlendMode::Normal};
+    BlendMode blendMode{BlendMode::Normal};
     Transform transform;
     Bounds bounds;
     std::string path;
     std::string sha256;
-    std::optional<TextData> text_data;
+    std::optional<TextData> textData;
 };
 
 struct LayerGroup
@@ -86,22 +86,22 @@ struct LayerGroup
     bool visible{true};
     bool locked{false};
     float opacity{1.0f};
-    BlendMode blend_mode{BlendMode::Normal};
-    std::vector<std::string> layer_ids;
+    BlendMode blendMode{BlendMode::Normal};
+    std::vector<std::string> layerIds;
 };
 
 struct IOConfig
 {
-    std::string pixel_format_storage{"RGBA8_unorm_straight"};
-    std::string pixel_format_runtime{"ARGB32_premultiplied"};
-    int color_depth{8};
+    std::string pixelFormatStorage{"RGBA8_unorm_straight"};
+    std::string pixelFormatRuntime{"ARGB32_premultiplied"};
+    int colorDepth{8};
     std::string compression{"png"};
 };
 
 struct Metadata
 {
-    std::string created_utc;
-    std::string modified_utc;
+    std::string createdUtc;
+    std::string modifiedUtc;
     std::string author;
     std::string description;
     std::vector<std::string> tags;
@@ -111,8 +111,8 @@ struct Metadata
 struct ManifestInfo
 {
     std::vector<std::pair<std::string, std::string>> entries;
-    int file_count{0};
-    std::string generated_utc;
+    int fileCount{0};
+    std::string generatedUtc;
 };
 
 struct Canvas
@@ -121,17 +121,17 @@ struct Canvas
     int width{800};
     int height{600};
     int dpi{72};
-    std::string color_space{"sRGB"};
+    std::string colorSpace{"sRGB"};
     Color background{255, 255, 255, 0};
 };
 
 struct Manifest
 {
-    int epg_version{1};
-    ManifestInfo manifest_info;
+    int epgVersion{1};
+    ManifestInfo manifestInfo;
     Canvas canvas;
     std::vector<ManifestLayer> layers;
-    std::vector<LayerGroup> layer_groups;
+    std::vector<LayerGroup> layerGroups;
     IOConfig io;
     Metadata metadata;
 };

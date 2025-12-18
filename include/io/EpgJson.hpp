@@ -152,17 +152,17 @@ inline void from_json(const json& j, Bounds& b)
 
 inline void to_json(json& j, const TextData& td)
 {
-    j = json{{"content", td.content},     {"fontFamily", td.font_family},
-             {"fontSize", td.font_size},  {"fontWeight", td.font_weight},
+    j = json{{"content", td.content},     {"fontFamily", td.fontFamily},
+             {"fontSize", td.fontSize},  {"fontWeight", td.fontWeight},
              {"alignment", td.alignment}, {"color", td.color}};
 }
 
 inline void from_json(const json& j, TextData& td)
 {
     td.content = j.value("content", td.content);
-    td.font_family = j.value("fontFamily", td.font_family);
-    td.font_size = j.value("fontSize", td.font_size);
-    td.font_weight = j.value("fontWeight", td.font_weight);
+    td.fontFamily = j.value("fontFamily", td.fontFamily);
+    td.fontSize = j.value("fontSize", td.fontSize);
+    td.fontWeight = j.value("fontWeight", td.fontWeight);
     td.alignment = j.value("alignment", td.alignment);
     if (j.contains("color"))
         td.color = j["color"].get<Color>();
@@ -176,14 +176,14 @@ inline void to_json(json& j, const ManifestLayer& L)
              {"visible", L.visible},
              {"locked", L.locked},
              {"opacity", L.opacity},
-             {"blendMode", L.blend_mode},
+             {"blendMode", L.blendMode},
              {"path", L.path}};
     if (!L.sha256.empty())
         j["sha256"] = L.sha256;
     j["transform"] = L.transform;
     j["bounds"] = L.bounds;
-    if (L.text_data.has_value())
-        j["textData"] = L.text_data.value();
+    if (L.textData.has_value())
+        j["textData"] = L.textData.value();
 }
 
 inline void from_json(const json& j, ManifestLayer& L)
@@ -194,7 +194,7 @@ inline void from_json(const json& j, ManifestLayer& L)
     L.visible = j.value("visible", L.visible);
     L.locked = j.value("locked", L.locked);
     L.opacity = j.value("opacity", L.opacity);
-    L.blend_mode = j.value("blendMode", L.blend_mode);
+    L.blendMode = j.value("blendMode", L.blendMode);
     L.path = j.value("path", L.path);
     L.sha256 = j.value("sha256", L.sha256);
     if (j.contains("transform"))
@@ -202,7 +202,7 @@ inline void from_json(const json& j, ManifestLayer& L)
     if (j.contains("bounds"))
         L.bounds = j["bounds"].get<Bounds>();
     if (j.contains("textData") && L.type == LayerType::Text)
-        L.text_data = j["textData"].get<TextData>();
+        L.textData = j["textData"].get<TextData>();
 }
 
 inline void to_json(json& j, const LayerGroup& g)
@@ -212,8 +212,8 @@ inline void to_json(json& j, const LayerGroup& g)
              {"visible", g.visible},
              {"locked", g.locked},
              {"opacity", g.opacity},
-             {"blendMode", g.blend_mode},
-             {"layerIds", g.layer_ids}};
+             {"blendMode", g.blendMode},
+             {"layerIds", g.layerIds}};
 }
 
 inline void from_json(const json& j, LayerGroup& g)
@@ -223,30 +223,30 @@ inline void from_json(const json& j, LayerGroup& g)
     g.visible = j.value("visible", g.visible);
     g.locked = j.value("locked", g.locked);
     g.opacity = j.value("opacity", g.opacity);
-    g.blend_mode = j.value("blendMode", g.blend_mode);
+    g.blendMode = j.value("blendMode", g.blendMode);
     if (j.contains("layerIds"))
-        g.layer_ids = j["layerIds"].get<std::vector<std::string>>();
+        g.layerIds = j["layerIds"].get<std::vector<std::string>>();
 }
 
 inline void to_json(json& j, const IOConfig& io)
 {
-    j = json{{"pixelFormatStorage", io.pixel_format_storage},
-             {"pixelFormatRuntime", io.pixel_format_runtime},
-             {"colorDepth", io.color_depth},
+    j = json{{"pixelFormatStorage", io.pixelFormatStorage},
+             {"pixelFormatRuntime", io.pixelFormatRuntime},
+             {"colorDepth", io.colorDepth},
              {"compression", io.compression}};
 }
 
 inline void from_json(const json& j, IOConfig& io)
 {
-    io.pixel_format_storage = j.value("pixelFormatStorage", io.pixel_format_storage);
-    io.pixel_format_runtime = j.value("pixelFormatRuntime", io.pixel_format_runtime);
-    io.color_depth = j.value("colorDepth", io.color_depth);
+    io.pixelFormatStorage = j.value("pixelFormatStorage", io.pixelFormatStorage);
+    io.pixelFormatRuntime = j.value("pixelFormatRuntime", io.pixelFormatRuntime);
+    io.colorDepth = j.value("colorDepth", io.colorDepth);
     io.compression = j.value("compression", io.compression);
 }
 
 inline void to_json(json& j, const Metadata& m)
 {
-    j = json{{"createdUtc", m.created_utc}, {"modifiedUtc", m.modified_utc}};
+    j = json{{"createdUtc", m.createdUtc}, {"modifiedUtc", m.modifiedUtc}};
     if (!m.author.empty())
         j["author"] = m.author;
     if (!m.description.empty())
@@ -259,8 +259,8 @@ inline void to_json(json& j, const Metadata& m)
 
 inline void from_json(const json& j, Metadata& m)
 {
-    m.created_utc = j.value("createdUtc", m.created_utc);
-    m.modified_utc = j.value("modifiedUtc", m.modified_utc);
+    m.createdUtc = j.value("createdUtc", m.createdUtc);
+    m.modifiedUtc = j.value("modifiedUtc", m.modifiedUtc);
     m.author = j.value("author", m.author);
     m.description = j.value("description", m.description);
     if (j.contains("tags"))
@@ -276,14 +276,14 @@ inline void to_json(json& j, const ManifestInfo& mi)
     {
         j["entries"].push_back(json{{"path", e.first}, {"sha256", e.second}});
     }
-    j["fileCount"] = mi.file_count;
-    j["generatedUtc"] = mi.generated_utc;
+    j["fileCount"] = mi.fileCount;
+    j["generatedUtc"] = mi.generatedUtc;
 }
 
 inline void from_json(const json& j, ManifestInfo& mi)
 {
-    mi.file_count = j.value("fileCount", mi.file_count);
-    mi.generated_utc = j.value("generatedUtc", mi.generated_utc);
+    mi.fileCount = j.value("fileCount", mi.fileCount);
+    mi.generatedUtc = j.value("generatedUtc", mi.generatedUtc);
     if (j.contains("entries"))
     {
         mi.entries.clear();
@@ -302,7 +302,7 @@ inline void to_json(json& j, const Canvas& c)
              {"width", c.width},
              {"height", c.height},
              {"dpi", c.dpi},
-             {"colorSpace", c.color_space},
+             {"colorSpace", c.colorSpace},
              {"background", c.background}};
 }
 
@@ -312,7 +312,7 @@ inline void from_json(const json& j, Canvas& c)
     c.width = j.value("width", c.width);
     c.height = j.value("height", c.height);
     c.dpi = j.value("dpi", c.dpi);
-    c.color_space = j.value("colorSpace", c.color_space);
+    c.colorSpace = j.value("colorSpace", c.colorSpace);
     if (j.contains("background"))
         c.background = j["background"].get<Color>();
 }
@@ -320,20 +320,20 @@ inline void from_json(const json& j, Canvas& c)
 inline void to_json(json& j, const Manifest& m)
 {
     j = json::object();
-    j["epgVersion"] = m.epg_version;
+    j["epgVersion"] = m.epgVersion;
     j["canvas"] = m.canvas;
     j["io"] = m.io;
     j["metadata"] = m.metadata;
     j["layers"] = json::array();
     for (const auto& L : m.layers)
         j["layers"].push_back(L);
-    j["layerGroups"] = m.layer_groups;
-    j["manifestInfo"] = m.manifest_info;
+    j["layerGroups"] = m.layerGroups;
+    j["manifestInfo"] = m.manifestInfo;
 }
 
 inline void from_json(const json& j, Manifest& m)
 {
-    m.epg_version = j.value("epgVersion", m.epg_version);
+    m.epgVersion = j.value("epgVersion", m.epgVersion);
     if (j.contains("canvas"))
         m.canvas = j["canvas"].get<Canvas>();
     if (j.contains("io"))
@@ -347,9 +347,9 @@ inline void from_json(const json& j, Manifest& m)
             m.layers.push_back(jl.get<ManifestLayer>());
     }
     if (j.contains("layerGroups"))
-        m.layer_groups = j["layerGroups"].get<std::vector<LayerGroup>>();
+        m.layerGroups = j["layerGroups"].get<std::vector<LayerGroup>>();
     if (j.contains("manifestInfo"))
-        m.manifest_info = j["manifestInfo"].get<ManifestInfo>();
+        m.manifestInfo = j["manifestInfo"].get<ManifestInfo>();
 }
 
 }  // namespace io::epg
