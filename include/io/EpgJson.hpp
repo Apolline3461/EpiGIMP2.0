@@ -153,7 +153,7 @@ inline void from_json(const json& j, Bounds& b)
 inline void to_json(json& j, const TextData& td)
 {
     j = json{{"content", td.content},     {"fontFamily", td.fontFamily},
-             {"fontSize", td.fontSize},  {"fontWeight", td.fontWeight},
+             {"fontSize", td.fontSize},   {"fontWeight", td.fontWeight},
              {"alignment", td.alignment}, {"color", td.color}};
 }
 
@@ -298,12 +298,8 @@ inline void from_json(const json& j, ManifestInfo& mi)
 
 inline void to_json(json& j, const Canvas& c)
 {
-    j = json{{"name", c.name},
-             {"width", c.width},
-             {"height", c.height},
-             {"dpi", c.dpi},
-             {"colorSpace", c.colorSpace},
-             {"background", c.background}};
+    j = json{{"name", c.name}, {"width", c.width},           {"height", c.height},
+             {"dpi", c.dpi},   {"colorSpace", c.colorSpace}, {"background", c.background}};
 }
 
 inline void from_json(const json& j, Canvas& c)
