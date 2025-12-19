@@ -22,4 +22,5 @@ target_link_libraries(epigimp_render
         epigimp_core
         Qt6::Core
         Qt6::Gui
+        epigimp_warnings
 )

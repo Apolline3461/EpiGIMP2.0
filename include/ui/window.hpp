@@ -6,6 +6,9 @@
 #include <QMainWindow>
 #include <QMenu>
 #include <QScrollArea>
+#include <QString>
+
+class ImageActions;
 
 class MainWindow : public QMainWindow
 {
