@@ -2,14 +2,15 @@
 
 #include <memory>
 
+#include "app/Command.hpp"
 #include "app/History.hpp"
 #include "core/ImageBuffer.h"
 #include "core/Layer.h"
 
 using namespace app;
 
-static void applyToLayer(std::shared_ptr<ImageBuffer> img,
-                         const std::vector<History::PixelChange>& ch, bool useBefore)
+static void applyToLayer(std::shared_ptr<ImageBuffer> img, const std::vector<app::PixelChange>& ch,
+                         bool useBefore)
 {
     for (const auto& c : ch)
     {
@@ -27,7 +28,7 @@ TEST(HistoryTest, UndoRedoPixels)
 
     History history(128);
 
-    auto apply = [&](uint64_t layerId, const std::vector<History::PixelChange>& ch, bool useBefore)
+    auto apply = [&](uint64_t layerId, const std::vector<app::PixelChange>& ch, bool useBefore)
     {
         (void)layerId;
         applyToLayer(img, ch, useBefore);
@@ -36,16 +37,14 @@ TEST(HistoryTest, UndoRedoPixels)
     // push 25 small brush strokes
     for (int s = 0; s < 25; ++s)
     {
-        History::Action a;
-        a.layerId = 1;
-        a.description = "stroke" + std::to_string(s);
-        // change a single pixel
-        History::PixelChange pc{s % 10, (s / 10), 0x00000000u,
-                                static_cast<uint32_t>(0xFF000000u | (s & 0xFF))};
-        a.changes.push_back(pc);
-        // apply forward and push
-        apply(a.layerId, a.changes, false);
-        history.push(std::move(a));
+        std::vector<app::PixelChange> changes;
+        app::PixelChange pc{s % 10, (s / 10), 0x00000000u,
+                            static_cast<uint32_t>(0xFF000000u | (s & 0xFF))};
+        changes.push_back(pc);
+        // create command, execute forward and push
+        auto cmd = std::make_unique<app::DataCommand>(1, std::move(changes), apply);
+        cmd->redo();
+        history.push(std::move(cmd));
     }
 
     // verify some pixels changed
@@ -55,7 +54,7 @@ TEST(HistoryTest, UndoRedoPixels)
     // undo all
     for (int i = 0; i < 25; ++i)
     {
-        history.undo(apply);
+        history.undo();
     }
 
     // all pixels should be restored to 0
@@ -66,7 +65,7 @@ TEST(HistoryTest, UndoRedoPixels)
     // redo all
     for (int i = 0; i < 25; ++i)
     {
-        history.redo(apply);
+        history.redo();
     }
 
     // verify pixels again

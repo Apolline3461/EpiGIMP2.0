@@ -12,60 +12,53 @@ using app::History;
 
 History::History(std::size_t maxDepth) : maxDepth_{maxDepth} {}
 
-void History::push(Action action)
+void History::push(CommandPtr cmd)
 {
-    if (action.changes.empty())
+    if (!cmd)
         return;
 
-    // If we're not at the end, drop redo history
-    if (index_ + 1 < actions_.size())
-        actions_.erase(actions_.begin() + index_ + 1, actions_.end());
+    undo_.push_back(std::move(cmd));
+    redo_.clear();
 
-    actions_.push_back(std::move(action));
     // keep size within maxDepth_
-    if (actions_.size() > maxDepth_)
-        actions_.erase(actions_.begin(), actions_.begin() + (actions_.size() - maxDepth_));
-
-    index_ = actions_.size() - 1;
+    if (undo_.size() > maxDepth_)
+        undo_.erase(undo_.begin(), undo_.begin() + (undo_.size() - maxDepth_));
 }
 
 bool History::canUndo() const noexcept
 {
-    return !actions_.empty() && index_ != static_cast<std::size_t>(-1);
+    return !undo_.empty();
 }
 
 bool History::canRedo() const noexcept
 {
-    return index_ + 1 < actions_.size();
+    return !redo_.empty();
 }
 
-void History::undo(const ApplyFn& apply)
+void History::undo()
 {
     if (!canUndo())
         return;
 
-    const Action& a = actions_[index_];
-    // apply inverse: set pixels to before
-    apply(a.layerId, a.changes, /*useBefore=*/true);
-    if (index_ == 0)
-        index_ = static_cast<std::size_t>(-1);
-    else
-        --index_;
+    auto cmd = std::move(undo_.back());
+    undo_.pop_back();
+    cmd->undo();
+    redo_.push_back(std::move(cmd));
 }
 
-void History::redo(const ApplyFn& apply)
+void History::redo()
 {
     if (!canRedo())
         return;
 
-    ++index_;
-    const Action& a = actions_[index_];
-    // apply forward: set pixels to after
-    apply(a.layerId, a.changes, /*useBefore=*/false);
+    auto cmd = std::move(redo_.back());
+    redo_.pop_back();
+    cmd->redo();
+    undo_.push_back(std::move(cmd));
 }
 
 void History::clear()
 {
-    actions_.clear();
-    index_ = static_cast<std::size_t>(-1);
+    undo_.clear();
+    redo_.clear();
 }
