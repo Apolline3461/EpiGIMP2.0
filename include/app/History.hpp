@@ -22,7 +22,7 @@ class History
    public:
     using CommandPtr = std::unique_ptr<Command>;
 
-    explicit History(std::size_t maxDepth = 256);
+    explicit History(std::size_t maxDepth = 20);
 
     void push(CommandPtr cmd);
 
