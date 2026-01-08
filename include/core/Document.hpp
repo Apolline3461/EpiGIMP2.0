@@ -4,13 +4,14 @@
 
 #pragma once
 
-using namespace std;
+#include <memory>
+#include <vector>
 
 class Layer;
 
 class Document {
 public:
-    explicit Document(int widht, int height, float dpi=72.f);
+    explicit Document(int width, int height, float dpi=72.f);
 
     int width() const noexcept;
     int height() const noexcept;
@@ -28,11 +29,11 @@ public:
     //const Selection& selection() const noexcept;
 
 private:
-    int widht_{};
+    int width_{};
     int height_{};
     float dpi_{};
 
-    vector<shared_ptr<Layer>> layers_{};
+    std::vector<std::shared_ptr<Layer>> layers_{};
 
     // Selection selection_{};
 
