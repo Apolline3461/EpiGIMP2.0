@@ -28,18 +28,18 @@ std::shared_ptr<Layer> Document::layerAt(int index) const {
     return layers_[static_cast<std::size_t>(index)];
 }
 
+int Document::addLayer(std::shared_ptr<Layer> layer) {
+    if (!layer)
+        return -1;
+    layers_.push_back(std::move(layer));
+    return static_cast<int>(layers_.size()) - 1;
+}
+
 int Document::addLayer(std::shared_ptr<Layer> layer, int idx) {
     if (!layer)
         return -1;
 
-    const int size = static_cast<int>(layers_.size());
-
-    if (idx == -1 || idx == size) {
-        layers_.push_back(std::move(layer));
-        return size;
-    }
-
-    if (idx < 0 || idx > size)
+    if (const int size = static_cast<int>(layers_.size()); idx < 0 || idx > size)
         return -1;
 
     layers_.insert(layers_.begin() + idx, std::move(layer));

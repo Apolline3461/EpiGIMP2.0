@@ -13,17 +13,18 @@ class Document {
 public:
     explicit Document(int width, int height, float dpi=72.f);
 
-    int width() const noexcept;
-    int height() const noexcept;
-    float dpi() const noexcept;
+    [[nodiscard]] int width() const noexcept;
+    [[nodiscard]] int height() const noexcept;
+    [[nodiscard]] float dpi() const noexcept;
 
-    int addLayer(std::shared_ptr<Layer> layer, int idx = -1);
+    int addLayer(std::shared_ptr<Layer> layer);
+    int addLayer(std::shared_ptr<Layer> layer, int idx);
     void removeLayer(int idx);
     void reorderLayer(int from, int to);
     void mergeDown(int from);
 
-    int layerCount() const noexcept;
-    std::shared_ptr<Layer> layerAt(int index) const;
+    [[nodiscard]] int layerCount() const noexcept;
+    [[nodiscard]] std::shared_ptr<Layer> layerAt(int index) const;
 
 
     //const Selection& selection() const noexcept;
