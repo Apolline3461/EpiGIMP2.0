@@ -61,8 +61,8 @@ void Document::reorderLayer(int from, int to) {
 
     auto tmpLayer = layers_[static_cast<std::size_t>(from)];
     layers_.erase(layers_.begin() + from);
-    if (from < to)
-        --to;
+    if (to > static_cast<int>(layers_.size()))
+        to = static_cast<int>(layers_.size());
     layers_.insert(layers_.begin() + to, std::move(tmpLayer));
 }
 
