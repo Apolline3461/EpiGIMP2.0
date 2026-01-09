@@ -127,3 +127,45 @@ TEST(Compositor, SemiTransparentTopLayerBlendsWithBelow) {
     EXPECT_NE(px, rgba(0xFF, 0x00, 0x00, 0xFF));
     EXPECT_NE(px, rgba(0x00, 0x00, 0xFF, 0xFF));
 }
+
+TEST(Compositor, RoiSinglePixel) {
+    Document doc(4, 4);
+
+    auto img = std::make_shared<ImageBuffer>(4, 4);
+    img->fill(rgba(0, 0, 0, 0));
+
+    img->setPixel(1, 1, rgba(0xAA, 0xBB, 0xCC, 0xFF));
+
+    const auto layer = std::make_shared<Layer>(1, "L1", img);
+    doc.addLayer(layer);
+
+    ImageBuffer out(1, 1);
+    constexpr Compositor comp;
+    comp.composeROI(doc, 1, 1, 1, 1, out);
+
+    EXPECT_EQ(out.getPixel(0, 0), rgba(0xAA, 0xBB, 0xCC, 0xFF));
+}
+
+TEST(Compositor, RoiHorizontalStrip) {
+    Document doc(4, 4);
+
+    auto img = std::make_shared<ImageBuffer>(4, 4);
+    img->fill(rgba(0, 0, 0, 0));
+
+    constexpr std::uint32_t c1 = rgba(0x10, 0x20, 0x30, 0xFF);
+    constexpr std::uint32_t c2 = rgba(0x40, 0x50, 0x60, 0xFF);
+    img->setPixel(1, 2, c1);
+    img->setPixel(2, 2, c2);
+
+    const auto layer = std::make_shared<Layer>(1, "L1", img);
+    doc.addLayer(layer);
+
+    // ROI : x=1, y=2, w=2, h=1
+    ImageBuffer out(2, 1);
+    constexpr Compositor comp;
+    comp.composeROI(doc, 1, 2, 2, 1, out);
+
+    EXPECT_EQ(out.getPixel(0, 0), c1);
+    EXPECT_EQ(out.getPixel(1, 0), c2);
+}
+

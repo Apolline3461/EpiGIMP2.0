@@ -76,27 +76,37 @@ static std::uint32_t blendPixel(std::uint32_t src,
     );
 }
 
-void Compositor::compose(const Document& doc, ImageBuffer& out) const
-{
+// ---- Fonction interne : compose une région du doc vers out -----------------
+//
+// docX0, docY0 : point haut/gauche dans le document
+// roiW, roiH   : taille de la région
+// out          : image de sortie (roiW x roiH)
+// On assume que roi est dans les bornes du document (sinon on peut clamp).
 
-    const int width  = doc.width();
-    const int height = doc.height();
-
-    out.fill(0u);
-
-    const int count = doc.layerCount();
-    if (count == 0) {
+static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, int roiH, ImageBuffer& out) {
+    if (roiW <= 0 || roiH <= 0)
         return;
-    }
+    const int docW = doc.width();
+    const int docH = doc.height();
+    if (docW <= 0 || docH <= 0)
+        return;
+    if (docX0 >= docW || docY0 >= docH)
+        return;
+    const int maxW = std::min(roiW, docW - docX0);
+    const int maxH = std::min(roiH, docH - docY0);
+    if (maxW <= 0 || maxH <= 0)
+        return;
 
-    for (int i = 0; i < count; ++i) {
+    const int layerCount = doc.layerCount();
+    if (layerCount == 0)
+        return;
+
+    for (int i = 0; i < layerCount; ++i) {
         const auto layer = doc.layerAt(i);
         if (!layer)
             continue;
-
         if (!layer->visible())
             continue;
-
         const auto& imgPtr = layer->image();
         if (!imgPtr)
             continue;
@@ -105,14 +115,36 @@ void Compositor::compose(const Document& doc, ImageBuffer& out) const
         if (opacity <= 0.0f)
             continue;
 
-        for (int y = 0; y < height; ++y) {
-            for (int x = 0; x < width; ++x) {
-                const std::uint32_t src = imgPtr->getPixel(x, y);
-                const std::uint32_t dst = out.getPixel(x, y);
+        for (int sy = 0; sy < maxH; ++sy) {
+            const int docY = docY0 + sy;
+            for (int sx = 0; sx < maxW; ++sx) {
+                const int docX = docX0 + sx;
+                const std::uint32_t src = imgPtr->getPixel(docX, docY);
+                const std::uint32_t dst = out.getPixel(sx, sy);
                 const std::uint32_t blended = blendPixel(src, dst, opacity);
-                out.setPixel(x, y, blended);
+                out.setPixel(sx, sy, blended);
             }
         }
     }
 }
 
+void Compositor::compose(const Document& doc, ImageBuffer& out) const {
+    const int width  = doc.width();
+    const int height = doc.height();
+
+    if (out.width() != width || out.height() != height)
+        return;
+    out.fill(0u);
+    composeRegion(doc, 0, 0, width, height, out);
+}
+
+void Compositor::composeROI(const Document& doc, int x, int y, int w, int h, ImageBuffer& out) const {
+
+    if (w <= 0 || h <= 0)
+        return;
+    if (out.width() != w || out.height() != h)
+        return;
+
+    out.fill(0u);
+    composeRegion(doc, x, y, w, h, out);
+}
