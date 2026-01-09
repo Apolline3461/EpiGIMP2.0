@@ -2,7 +2,7 @@
 // Created by apolline on 17/12/2025.
 //
 #include "core/Document.hpp"
-#include "core/Layer.h"
+#include "core/Layer.hpp"
 
 Document::Document(const int width, const int height, const float dpi): width_{width}, height_{height}, dpi_{dpi} {}
 

@@ -6,7 +6,7 @@
 #include <memory>
 
 #include "core/Document.hpp"
-#include "core/Layer.h"
+#include "core/Layer.hpp"
 
 class ImageBuffer;
 
@@ -167,6 +167,11 @@ TEST(Document, LayerPointersAreShared) {
     EXPECT_EQ(doc.layerAt(1), L2);
     EXPECT_EQ(doc.layerAt(2), L3);
 }
+
+// TEST(Document, DefaultSelectionHasNoMask) {
+//     Document doc(100, 100);
+//     EXPECT_FALSE(doc.selection().hasMask());
+// }
 
 // -----------------------------------------------------------------------------
 // Fixture Tests

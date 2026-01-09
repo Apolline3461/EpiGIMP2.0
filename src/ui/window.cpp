@@ -11,7 +11,7 @@
 
 #include <string>
 
-#include "core/ImageBuffer.h"
+#include "core/ImageBuffer.hpp"
 #include "io/EpgFormat.hpp"
 #include "ui/image.hpp"
 

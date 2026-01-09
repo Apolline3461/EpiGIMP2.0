@@ -2,7 +2,7 @@
 // Created by apolline on 25/11/2025.
 //
 
-#include "core/Layer.h"
+#include "core/Layer.hpp"
 
 #include <cassert>
 #include <utility>

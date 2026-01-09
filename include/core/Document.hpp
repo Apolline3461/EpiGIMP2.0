@@ -28,6 +28,9 @@ public:
 
 
     //const Selection& selection() const noexcept;
+    //[[nodiscard]] Selection& selection() noexcept { return selection_; }
+    //[[nodiscard]] const Selection& selection() const noexcept { return selection_; }
+
 
 private:
     int width_{};

@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "core/ImageBuffer.h"
+#include "core/ImageBuffer.hpp"
 
 namespace EpgFormat
 {
