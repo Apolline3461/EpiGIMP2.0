@@ -1,7 +1,10 @@
 #include "ui/image.hpp"
 
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QHBoxLayout>
 #include <QImageReader>
 #include <QImageWriter>
 #include <QLabel>
