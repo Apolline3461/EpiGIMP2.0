@@ -120,7 +120,8 @@ void ImageActions::saveImage(MainWindow* window)
 
     QFileDialog dialog(window, QObject::tr("Enregistrer l'image"), picturesPath);
     dialog.setAcceptMode(QFileDialog::AcceptSave);
-    dialog.setNameFilters({QObject::tr("PNG (*.png)"), QObject::tr("JPEG (*.jpg *.jpeg)"), QObject::tr("Tous les fichiers (*)")});
+    dialog.setNameFilters({QObject::tr("PNG (*.png)"), QObject::tr("JPEG (*.jpg *.jpeg)"),
+                           QObject::tr("Tous les fichiers (*)")});
     dialog.selectNameFilter(QObject::tr("PNG (*.png)"));
     if (!dialog.exec())
         return;
@@ -131,19 +132,29 @@ void ImageActions::saveImage(MainWindow* window)
     if (fileName.isEmpty())
         return;
 
-    if (selectedFilter.contains("PNG", Qt::CaseInsensitive)) {
+    if (selectedFilter.contains("PNG", Qt::CaseInsensitive))
+    {
         format = "png";
         if (!fileName.endsWith(".png", Qt::CaseInsensitive))
             fileName += ".png";
-    } else if (selectedFilter.contains("JPEG", Qt::CaseInsensitive)) {
+    }
+    else if (selectedFilter.contains("JPEG", Qt::CaseInsensitive))
+    {
         format = "jpg";
-        if (!fileName.endsWith(".jpg", Qt::CaseInsensitive) && !fileName.endsWith(".jpeg", Qt::CaseInsensitive))
+        if (!fileName.endsWith(".jpg", Qt::CaseInsensitive) &&
+            !fileName.endsWith(".jpeg", Qt::CaseInsensitive))
             fileName += ".jpg";
-    } else {
+    }
+    else
+    {
         // fallback: try to guess from extension, default to png
-        if (fileName.endsWith(".jpg", Qt::CaseInsensitive) || fileName.endsWith(".jpeg", Qt::CaseInsensitive)) {
+        if (fileName.endsWith(".jpg", Qt::CaseInsensitive) ||
+            fileName.endsWith(".jpeg", Qt::CaseInsensitive))
+        {
             format = "jpg";
-        } else {
+        }
+        else
+        {
             format = "png";
             if (!fileName.endsWith(".png", Qt::CaseInsensitive))
                 fileName += ".png";
