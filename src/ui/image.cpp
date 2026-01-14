@@ -9,10 +9,14 @@
 #include <QImageWriter>
 #include <QLabel>
 #include <QMessageBox>
+#include <QMouseEvent>
+#include <QRubberBand>
 #include <QSpinBox>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QVBoxLayout>
+
+#include "ui/window.hpp"
 
 void ImageActions::newImage(MainWindow* window)
 {
@@ -186,4 +190,45 @@ void ImageActions::closeImage(MainWindow* window)
 
     window->setWindowTitle(QObject::tr("EpiGimp 2.0"));
     window->statusBar()->showMessage(QObject::tr("Image fermée"), 2000);
+}
+
+ImageLabel::ImageLabel(QWidget* parent)
+    : QLabel(parent), m_rubberBand_(new QRubberBand(QRubberBand::Rectangle, this))
+{
+    setMouseTracking(true);
+}
+
+void ImageLabel::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton)
+    {
+        m_origin_ = event->pos();
+        m_rubberBand_->setGeometry(QRect(m_origin_, QSize()));
+        m_rubberBand_->show();
+    }
+    QLabel::mousePressEvent(event);
+}
+
+void ImageLabel::mouseMoveEvent(QMouseEvent* event)
+{
+    if (m_rubberBand_->isVisible())
+    {
+        QRect rect(m_origin_, event->pos());
+        m_rubberBand_->setGeometry(rect.normalized());
+    }
+    QLabel::mouseMoveEvent(event);
+}
+
+void ImageLabel::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton && m_rubberBand_->isVisible())
+    {
+        m_rubberBand_->hide();
+        QRect rect(m_origin_, event->pos());
+        rect = rect.normalized();
+        // ensure non-empty
+        if (rect.width() > 0 && rect.height() > 0)
+            emit selectionFinished(rect);
+    }
+    QLabel::mouseReleaseEvent(event);
 }
