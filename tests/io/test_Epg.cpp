@@ -7,7 +7,7 @@
 #include <filesystem>
 #include <fstream>
 
-#include "core/document.hpp"
+#include "core/Document.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
@@ -15,11 +15,9 @@
 
 using namespace std;
 
-// Fixture to reduce repetition in EPG tests
 class EpgTest : public ::testing::Test
 {
    protected:
-    Document doc;
     ZipEpgStorage storage;
 
     std::filesystem::path tmpPath(const std::string& name)
@@ -41,17 +39,13 @@ class EpgTest : public ::testing::Test
     }
 };
 
-// From test_Epg.cpp
 TEST_F(EpgTest, SaveAndOpenRoundTrip)
 {
-    doc.width = 16;
-    doc.height = 16;
-    doc.dpi = 72.0f;
+    Document doc(16, 16, 72.0f);
 
     auto buf = makeBuf(16, 16, 0xFF0000FFu);  // rouge opaque
-
     auto layer = make_shared<Layer>(1ULL, string("Layer1"), buf, true, false, 1.0f);
-    doc.layers.push_back(layer);
+    doc.addLayer(layer);
 
     auto tmp = tmpPath("epg_test_roundtrip.epg");
     std::string path = tmp.string();
@@ -62,13 +56,16 @@ TEST_F(EpgTest, SaveAndOpenRoundTrip)
     auto res = storage.open(path);
     EXPECT_TRUE(res.success) << res.errorMessage;
     ASSERT_NE(res.document, nullptr);
-    EXPECT_EQ(res.document->width, doc.width);
-    EXPECT_EQ(res.document->height, doc.height);
-    ASSERT_EQ(res.document->layers.size(), 1u);
 
-    auto loadedLayer = res.document->layers[0];
+    EXPECT_EQ(res.document->width(), doc.width());
+    EXPECT_EQ(res.document->height(), doc.height());
+    ASSERT_EQ(res.document->layerCount(), 1);
+
+    auto loadedLayer = res.document->layerAt(0);
+    ASSERT_NE(loadedLayer, nullptr);
     EXPECT_EQ(loadedLayer->name(), "Layer1");
     ASSERT_NE(loadedLayer->image(), nullptr);
+
     uint32_t px = loadedLayer->image()->getPixel(0, 0);
     EXPECT_EQ(px, buf->getPixel(0, 0));
 
@@ -77,13 +74,11 @@ TEST_F(EpgTest, SaveAndOpenRoundTrip)
 
 TEST_F(EpgTest, ExportPngCreatesFile)
 {
-    doc.width = 8;
-    doc.height = 8;
+    Document doc(8, 8, 72.0f);
 
     auto buf = makeBuf(8, 8, 0x00FF00FFu);  // vert opaque
-
     auto layer = make_shared<Layer>(1ULL, string("L"), buf, true, false, 1.0f);
-    doc.layers.push_back(layer);
+    doc.addLayer(layer);
 
     auto tmp = tmpPath("epg_export_test.png");
     std::string path = tmp.string();
@@ -109,7 +104,6 @@ TEST_F(EpgTest, ExportPngCreatesFile)
     removeTemp("epg_export_test.png");
 }
 
-// From test_Epg_extra.cpp
 TEST(EpgFormatExtra, OpenNonExistentFile)
 {
     ZipEpgStorage storage;
@@ -127,16 +121,15 @@ TEST(EpgFormatExtra, OpenNonExistentFile)
 
 TEST_F(EpgTest, SaveAndOpenMultipleLayers)
 {
-    doc.width = 4;
-    doc.height = 4;
+    Document doc(4, 4, 72.0f);
 
     auto buf1 = makeBuf(4, 4, 0x112233FFu);
     auto buf2 = makeBuf(4, 4, 0x445566FFu);
 
     auto l1 = make_shared<Layer>(1ULL, string("L1"), buf1);
     auto l2 = make_shared<Layer>(2ULL, string("L2"), buf2);
-    doc.layers.push_back(l1);
-    doc.layers.push_back(l2);
+    doc.addLayer(l1);
+    doc.addLayer(l2);
 
     auto tmp = tmpPath("epg_test_multilayer.epg");
     std::string path = tmp.string();
@@ -147,20 +140,24 @@ TEST_F(EpgTest, SaveAndOpenMultipleLayers)
     auto res = storage.open(path);
     EXPECT_TRUE(res.success) << res.errorMessage;
     ASSERT_NE(res.document, nullptr);
-    EXPECT_EQ(res.document->layers.size(), 2u);
+    ASSERT_EQ(res.document->layerCount(), 2);
 
-    // verify pixel equality for both layers
-    EXPECT_EQ(res.document->layers[0]->image()->getPixel(0, 0), buf1->getPixel(0, 0));
-    EXPECT_EQ(res.document->layers[1]->image()->getPixel(0, 0), buf2->getPixel(0, 0));
+    auto l1Loaded = res.document->layerAt(0);
+    auto l2Loaded = res.document->layerAt(1);
+    ASSERT_NE(l1Loaded, nullptr);
+    ASSERT_NE(l2Loaded, nullptr);
+    ASSERT_NE(l1Loaded->image(), nullptr);
+    ASSERT_NE(l2Loaded->image(), nullptr);
+
+    EXPECT_EQ(l1Loaded->image()->getPixel(0, 0), buf1->getPixel(0, 0));
+    EXPECT_EQ(l2Loaded->image()->getPixel(0, 0), buf2->getPixel(0, 0));
 
     removeTemp("epg_test_multilayer.epg");
 }
 
 TEST(EpgFormatExtra, SaveEmptyDocument)
 {
-    Document doc;
-    doc.width = 2;
-    doc.height = 2;
+    Document doc(2, 2, 72.0f);
 
     ZipEpgStorage storage;
     auto tmp = std::filesystem::temp_directory_path() / "epg_test_empty.epg";
@@ -173,23 +170,20 @@ TEST(EpgFormatExtra, SaveEmptyDocument)
     auto res = storage.open(path);
     EXPECT_TRUE(res.success) << res.errorMessage;
     ASSERT_NE(res.document, nullptr);
-    EXPECT_EQ(res.document->layers.size(), 0u);
+    EXPECT_EQ(res.document->layerCount(), 0);
 
     std::filesystem::remove(path, ec);
 }
 
-// From test_Epg_more.cpp
 TEST_F(EpgTest, SaveAndOpenPreserveLayerProperties)
 {
-    doc.width = 8;
-    doc.height = 8;
-    doc.dpi = 300.0f;
+    Document doc(8, 8, 300.0f);
 
     auto buf = makeBuf(8, 8, 0xAABBCCFFu);
 
     // create layer with various properties
     auto layer = make_shared<Layer>(42ULL, string("Props"), buf, false, true, 0.5f);
-    doc.layers.push_back(layer);
+    doc.addLayer(layer);
 
     auto tmp = tmpPath("epg_test_props.epg");
     std::string path = tmp.string();
@@ -201,11 +195,12 @@ TEST_F(EpgTest, SaveAndOpenPreserveLayerProperties)
     EXPECT_TRUE(res.success) << res.errorMessage;
     ASSERT_NE(res.document, nullptr);
 
-    // dpi saved as integer in manifest -> compare as int
-    EXPECT_EQ(static_cast<int>(res.document->dpi), static_cast<int>(doc.dpi));
+    EXPECT_EQ(res.document->dpi(), doc.dpi());
 
-    ASSERT_EQ(res.document->layers.size(), 1u);
-    auto loaded = res.document->layers[0];
+    ASSERT_EQ(res.document->layerCount(), 1);
+    auto loaded = res.document->layerAt(0);
+    ASSERT_NE(loaded, nullptr);
+
     // Epg format génère des IDs séquentiels (1-based) lors de la sauvegarde,
     // donc l'ID rétabli après ouverture doit être 1 pour le premier calque.
     EXPECT_EQ(loaded->id(), 1ULL);
@@ -219,8 +214,7 @@ TEST_F(EpgTest, SaveAndOpenPreserveLayerProperties)
 
 TEST_F(EpgTest, ExportPng_CompositionWithOpacity)
 {
-    doc.width = 4;
-    doc.height = 4;
+    Document doc(4, 4, 72.0f);
 
     // bottom: green opaque
     auto bottom = makeBuf(4, 4, 0x00FF00FFu);
@@ -229,8 +223,8 @@ TEST_F(EpgTest, ExportPng_CompositionWithOpacity)
 
     auto l1 = make_shared<Layer>(1ULL, string("BG"), bottom, true, false, 1.0f);
     auto l2 = make_shared<Layer>(2ULL, string("Top"), top, true, false, 0.5f);
-    doc.layers.push_back(l1);
-    doc.layers.push_back(l2);
+    doc.addLayer(l1);
+    doc.addLayer(l2);
 
     auto tmp = tmpPath("epg_comp_test.png");
     std::string path = tmp.string();
@@ -242,8 +236,8 @@ TEST_F(EpgTest, ExportPng_CompositionWithOpacity)
     int w, h, channels;
     unsigned char* data = stbi_load(path.c_str(), &w, &h, &channels, 4);
     ASSERT_NE(data, nullptr);
-    ASSERT_EQ(w, doc.width);
-    ASSERT_EQ(h, doc.height);
+    ASSERT_EQ(w, doc.width());
+    ASSERT_EQ(h, doc.height());
     ASSERT_EQ(channels, 4);
 
     // pixel at 0,0 -> composition result: (127,127,0,255)
@@ -264,9 +258,7 @@ TEST_F(EpgTest, ExportPng_CompositionWithOpacity)
 
 TEST(EpgFormatMore, ExportPng_ThrowsOnEmptyDocument)
 {
-    Document doc;
-    doc.width = 4;
-    doc.height = 4;
+    const Document doc(4, 4, 72.0f);
 
     ZipEpgStorage storage;
     EXPECT_THROW(storage.exportPng(doc, "some_path.png"), std::runtime_error);
@@ -274,15 +266,13 @@ TEST(EpgFormatMore, ExportPng_ThrowsOnEmptyDocument)
 
 TEST(EpgFormatRAII, SaveCreatesPreviewAndLayerEntries)
 {
-    Document doc;
-    doc.width = 16;
-    doc.height = 16;
+    Document doc(16, 16, 72.0f);
 
     auto buf = make_shared<ImageBuffer>(16, 16);
     buf->fill(0x123456FFu);
 
     auto layer = make_shared<Layer>(1ULL, string("Layer1"), buf, true, false, 1.0f);
-    doc.layers.push_back(layer);
+    doc.addLayer(layer);
 
     ZipEpgStorage storage;
 
@@ -310,15 +300,13 @@ TEST(EpgFormatRAII, SaveCreatesPreviewAndLayerEntries)
 
 TEST(EpgHelpers, ComposePreviewAndEncodeProducesPngSignature)
 {
-    Document doc;
-    doc.width = 16;
-    doc.height = 8;
+    Document doc(16, 8, 72.0f);
 
     auto buf = make_shared<ImageBuffer>(16, 8);
     buf->fill(0x112233FFu);
 
     auto layer = make_shared<Layer>(1ULL, string("L"), buf, true, false, 1.0f);
-    doc.layers.push_back(layer);
+    doc.addLayer(layer);
 
     ZipEpgStorage storage;
 
@@ -338,12 +326,11 @@ TEST(EpgHelpers, ComposePreviewAndEncodeProducesPngSignature)
 
 TEST(EpgHelpers, WritePreviewToZipCreatesEntry)
 {
-    Document doc;
-    doc.width = 10;
-    doc.height = 10;
+    Document doc(10, 10, 72.0f);
+
     auto buf = make_shared<ImageBuffer>(10, 10);
     buf->fill(0xFFFFFFFFu);
-    doc.layers.push_back(make_shared<Layer>(1ULL, string("L"), buf, true, false, 1.0f));
+    doc.addLayer(make_shared<Layer>(1ULL, string("L"), buf, true, false, 1.0f));
 
     ZipEpgStorage storage;
     int w = 0, h = 0;
@@ -377,9 +364,7 @@ TEST(EpgHelpers, WritePreviewToZipCreatesEntry)
 
 TEST(EpgHelpers, ComposeFlattenedRGBAMatchesExpectedComposition)
 {
-    Document doc;
-    doc.width = 4;
-    doc.height = 4;
+    Document doc(4, 4, 72.0f);
 
     auto bottom = make_shared<ImageBuffer>(4, 4);
     bottom->fill(0x00FF00FFu);
@@ -388,12 +373,12 @@ TEST(EpgHelpers, ComposeFlattenedRGBAMatchesExpectedComposition)
 
     auto l1 = make_shared<Layer>(1ULL, string("BG"), bottom, true, false, 1.0f);
     auto l2 = make_shared<Layer>(2ULL, string("Top"), top, true, false, 0.5f);
-    doc.layers.push_back(l1);
-    doc.layers.push_back(l2);
+    doc.addLayer(l1);
+    doc.addLayer(l2);
 
     ZipEpgStorage storage;
     auto out = storage.composeFlattenedRGBA(doc);
-    ASSERT_EQ(static_cast<int>(out.size()), doc.width * doc.height * 4);
+    ASSERT_EQ(static_cast<int>(out.size()), doc.width() * doc.height() * 4);
 
     unsigned char r = out[0];
     unsigned char g = out[1];
@@ -408,12 +393,11 @@ TEST(EpgHelpers, ComposeFlattenedRGBAMatchesExpectedComposition)
 
 TEST(EpgHelpers, WriteAndLoadManifestAndLayers)
 {
-    Document doc;
-    doc.width = 8;
-    doc.height = 8;
+    Document doc(8, 8, 72.0f);
+
     auto buf = make_shared<ImageBuffer>(8, 8);
     buf->fill(0x123456FFu);
-    doc.layers.push_back(make_shared<Layer>(1ULL, string("L1"), buf, true, false, 1.0f));
+    doc.addLayer(make_shared<Layer>(1ULL, string("L1"), buf, true, false, 1.0f));
 
     ZipEpgStorage storage;
     auto m = storage.createManifestFromDocument(doc);
@@ -489,16 +473,15 @@ TEST(EpgFormatTest, OpenInvalidFileFails)
 
 TEST_F(EpgTest, SaveAndOpenPreservesLayerOrder)
 {
-    doc.width = 4;
-    doc.height = 4;
+    Document doc(4, 4, 72.0f);
 
     auto buf1 = makeBuf(4, 4, 0x112233FFu);
     auto buf2 = makeBuf(4, 4, 0x445566FFu);
 
     auto l1 = make_shared<Layer>(1ULL, string("First"), buf1);
     auto l2 = make_shared<Layer>(2ULL, string("Second"), buf2);
-    doc.layers.push_back(l1);
-    doc.layers.push_back(l2);
+    doc.addLayer(l1);
+    doc.addLayer(l2);
 
     auto tmp = tmpPath("epg_test_order.epg");
     std::string path = tmp.string();
@@ -509,13 +492,20 @@ TEST_F(EpgTest, SaveAndOpenPreservesLayerOrder)
     auto res = storage.open(path);
     EXPECT_TRUE(res.success) << res.errorMessage;
     ASSERT_NE(res.document, nullptr);
-    ASSERT_EQ(res.document->layers.size(), 2u);
+    ASSERT_EQ(res.document->layerCount(), 2);
 
-    EXPECT_EQ(res.document->layers[0]->name(), "First");
-    EXPECT_EQ(res.document->layers[1]->name(), "Second");
+    auto firstLoaded = res.document->layerAt(0);
+    auto secondLoaded = res.document->layerAt(1);
+    ASSERT_NE(firstLoaded, nullptr);
+    ASSERT_NE(secondLoaded, nullptr);
 
-    EXPECT_EQ(res.document->layers[0]->image()->getPixel(0, 0), buf1->getPixel(0, 0));
-    EXPECT_EQ(res.document->layers[1]->image()->getPixel(0, 0), buf2->getPixel(0, 0));
+    EXPECT_EQ(firstLoaded->name(), "First");
+    EXPECT_EQ(secondLoaded->name(), "Second");
+
+    ASSERT_NE(firstLoaded->image(), nullptr);
+    ASSERT_NE(secondLoaded->image(), nullptr);
+    EXPECT_EQ(firstLoaded->image()->getPixel(0, 0), buf1->getPixel(0, 0));
+    EXPECT_EQ(secondLoaded->image()->getPixel(0, 0), buf2->getPixel(0, 0));
 
     removeTemp("epg_test_order.epg");
 }
