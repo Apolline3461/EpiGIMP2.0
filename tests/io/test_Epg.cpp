@@ -15,8 +15,7 @@
 
 using namespace std;
 
-class EpgTest : public ::testing::Test
-{
+class EpgTest : public ::testing::Test {
    protected:
     ZipEpgStorage storage;
 
