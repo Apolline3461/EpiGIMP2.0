@@ -18,7 +18,7 @@
 #include <vector>
 
 #include "core/document.hpp"
-#include "core/Layer.h"
+#include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
 #include "io/EpgJson.hpp"
 #include "io/Logger.hpp"

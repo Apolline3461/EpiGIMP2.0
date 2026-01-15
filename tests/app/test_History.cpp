@@ -4,8 +4,8 @@
 
 #include "app/Command.hpp"
 #include "app/History.hpp"
-#include "core/ImageBuffer.h"
-#include "core/Layer.h"
+#include "core/ImageBuffer.hpp"
+#include "core/Layer.hpp"
 
 using namespace app;
 

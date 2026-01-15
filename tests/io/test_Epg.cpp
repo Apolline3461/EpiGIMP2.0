@@ -8,8 +8,8 @@
 #include <fstream>
 
 #include "core/document.hpp"
-#include "core/ImageBuffer.h"
-#include "core/Layer.h"
+#include "core/ImageBuffer.hpp"
+#include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
 #include "stb_image.h"
 
