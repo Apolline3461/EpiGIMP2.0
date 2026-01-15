@@ -277,7 +277,7 @@ void ZipEpgStorage::writeLayersToZip(zip_t* zipHandle, Manifest& m, const Docume
     {
         auto& L = m.layers[i];
 
-        if ( static_cast<int>(i) >= doc.layerCount())
+        if (static_cast<int>(i) >= doc.layerCount())
             throw std::runtime_error(
                 "Incohérence: nombre de calques différent entre Document et Manifest");
 
@@ -363,7 +363,8 @@ std::vector<unsigned char> ZipEpgStorage::composePreviewRGBA(const Document& doc
     const int docW = doc.width();
     const int docH = doc.height();
 
-    if (docW <= 0 || docH <= 0) {
+    if (docW <= 0 || docH <= 0)
+    {
         outW = 0;
         outH = 0;
         return {};
@@ -381,7 +382,8 @@ std::vector<unsigned char> ZipEpgStorage::composePreviewRGBA(const Document& doc
 
     std::vector<unsigned char> preview(static_cast<size_t>(w) * static_cast<size_t>(h) * 4u, 0);
 
-    for (int i = 0; i < doc.layerCount(); ++i) {
+    for (int i = 0; i < doc.layerCount(); ++i)
+    {
         auto layerPtr = doc.layerAt(i);
         if (!layerPtr || !layerPtr->visible() || !layerPtr->image())
             continue;
@@ -552,25 +554,26 @@ std::vector<unsigned char> ZipEpgStorage::composeFlattenedRGBA(const Document& d
     if (docW <= 0 || docH <= 0)
         return {};
 
-    std::vector<unsigned char> out(
-        static_cast<size_t>(docW) * static_cast<size_t>(docH) * 4u,
-        0
-    );
-    for (int i = 0; i < doc.layerCount(); ++i) {
+    std::vector<unsigned char> out(static_cast<size_t>(docW) * static_cast<size_t>(docH) * 4u, 0);
+    for (int i = 0; i < doc.layerCount(); ++i)
+    {
         auto layerPtr = doc.layerAt(i);
         if (!layerPtr || !layerPtr->visible() || !layerPtr->image())
             continue;
         const ImageBuffer& img = *layerPtr->image();
 
-        for (int y = 0; y < docH && y < img.height(); ++y) {
-            for (int x = 0; x < docW && x < img.width(); ++x) {
+        for (int y = 0; y < docH && y < img.height(); ++y)
+        {
+            for (int x = 0; x < docW && x < img.width(); ++x)
+            {
                 int const dstIdx = (y * docW + x) * 4;
                 int const srcIdx = (y * img.width() + x) * 4;
 
                 float const alpha =
                     (static_cast<float>(img.data()[srcIdx + 3]) / 255.0f) * layerPtr->opacity();
 
-                for (int c = 0; c < 3; ++c) {
+                for (int c = 0; c < 3; ++c)
+                {
                     auto const src = static_cast<float>(img.data()[srcIdx + c]);
                     auto const dst = static_cast<float>(out[dstIdx + c]);
                     out[dstIdx + c] =

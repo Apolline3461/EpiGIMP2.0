@@ -9,9 +9,10 @@
 
 class Layer;
 
-class Document {
-public:
-    explicit Document(int width, int height, float dpi=72.f);
+class Document
+{
+   public:
+    explicit Document(int width, int height, float dpi = 72.f);
 
     [[nodiscard]] int width() const noexcept;
     [[nodiscard]] int height() const noexcept;
@@ -26,13 +27,11 @@ public:
     [[nodiscard]] int layerCount() const noexcept;
     [[nodiscard]] std::shared_ptr<Layer> layerAt(int index) const;
 
-
-    //const Selection& selection() const noexcept;
+    // const Selection& selection() const noexcept;
     //[[nodiscard]] Selection& selection() noexcept { return selection_; }
     //[[nodiscard]] const Selection& selection() const noexcept { return selection_; }
 
-
-private:
+   private:
     int width_{};
     int height_{};
     float dpi_{};
@@ -40,6 +39,4 @@ private:
     std::vector<std::shared_ptr<Layer>> layers_{};
 
     // Selection selection_{};
-
 };
-

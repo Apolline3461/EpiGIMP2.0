@@ -9,9 +9,8 @@
 #include <string>
 #include <vector>
 
-
-#include "core/ImageBuffer.hpp"
 #include "core/Document.hpp"
+#include "core/ImageBuffer.hpp"
 #include "io/EpgTypes.hpp"
 #include "io/EpgZip.hpp"
 using json = nlohmann::json;
@@ -22,7 +21,6 @@ std::string formatLayerId(size_t index);
 std::unique_ptr<ImageBuffer> decodePngToImageBuffer(const std::vector<unsigned char>& pngData);
 
 #include "io/IStorage.hpp"
-
 
 class ZipEpgStorage : public IStorage
 {

@@ -355,7 +355,8 @@ void MainWindow::saveAsEpg()
     try
     {
         auto imgPtr = std::make_shared<ImageBuffer>(buf);
-        auto layer = std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
+        auto layer =
+            std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
         doc.addLayer(layer);
 
         ZipEpgStorage storage;
@@ -388,8 +389,8 @@ void MainWindow::openEpg()
     const auto res = storage.open(fileName.toStdString());
     if (!res.success || !res.document)
     {
-        const QString err = QString::fromLocal8Bit(res.errorMessage.empty() ? "Erreur inconnue"
-                                                                      : res.errorMessage.c_str());
+        const QString err = QString::fromLocal8Bit(
+            res.errorMessage.empty() ? "Erreur inconnue" : res.errorMessage.c_str());
         QMessageBox::critical(this, tr("Erreur"),
                               tr("Impossible de charger le fichier EPG %1\n%2")
                                   .arg(QDir::toNativeSeparators(fileName))
@@ -397,14 +398,16 @@ void MainWindow::openEpg()
         return;
     }
 
-    const Document &doc = *res.document;
-    if (doc.layerCount() == 0) {
+    const Document& doc = *res.document;
+    if (doc.layerCount() == 0)
+    {
         QMessageBox::critical(this, tr("Erreur"), tr("Le document ne contient pas d'image."));
         return;
     }
 
     const auto firstLayer = doc.layerAt(0);
-    if (!firstLayer || !firstLayer->image()) {
+    if (!firstLayer || !firstLayer->image())
+    {
         QMessageBox::critical(this, tr("Erreur"), tr("Le document ne contient pas d'image."));
         return;
     }
