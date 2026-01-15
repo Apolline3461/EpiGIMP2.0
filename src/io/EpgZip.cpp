@@ -282,7 +282,7 @@ void ZipEpgStorage::writeLayersToZip(zip_t* zipHandle, Manifest& m, const Docume
                 "Incohérence: nombre de calques différent entre Document et Manifest");
 
         const auto layerPtr = doc.layerAt(static_cast<int>(i));
-        if (!layerPtr->image() || !layerPtr->image())
+        if (!layerPtr->image())
             throw std::runtime_error("Layer " + layerPtr->name() + " n'a pas de pixels");
 
         const ImageBuffer& img = *layerPtr->image();
