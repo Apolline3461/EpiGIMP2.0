@@ -3,7 +3,6 @@
 #include <memory>
 #include <string>
 
-#include "core/document.hpp"
 #include "io/EpgTypes.hpp"
 
 // Interface abstract for storage backends

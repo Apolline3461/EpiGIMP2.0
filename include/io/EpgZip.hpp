@@ -9,7 +9,6 @@
 #include <utility>
 #include <vector>
 
-#include "core/document.hpp"
 #include "core/ImageBuffer.hpp"
 
 // PNG signature constant
