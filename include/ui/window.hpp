@@ -12,6 +12,8 @@
 #include <QScrollArea>
 #include <QString>
 
+class ImageActions;
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
