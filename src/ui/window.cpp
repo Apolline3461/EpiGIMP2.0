@@ -321,7 +321,7 @@ void MainWindow::saveAsEpg()
         return;
     }
 
-    QString currentPath = QDir::currentPath() + "/untitled.epg";
+    const QString currentPath = QDir::currentPath() + "/untitled.epg";
     QString fileName = QFileDialog::getSaveFileName(this, tr("Enregistrer au format EpiGimp"),
                                                     currentPath, tr("EpiGimp (*.epg)"));
 
@@ -350,16 +350,13 @@ void MainWindow::saveAsEpg()
     }
 
     // Build a Document with a single layer and save using ZipEpgStorage
-    Document doc;
-    doc.width = buf.width();
-    doc.height = buf.height();
+    Document doc(buf.width(), buf.height(), 72.f);
 
     try
     {
         auto imgPtr = std::make_shared<ImageBuffer>(buf);
-        auto layer =
-            std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
-        doc.layers.push_back(layer);
+        auto layer = std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
+        doc.addLayer(layer);
 
         ZipEpgStorage storage;
         storage.save(doc, fileName.toStdString());
@@ -380,7 +377,7 @@ void MainWindow::saveAsEpg()
 void MainWindow::openEpg()
 {
     QString currentPath = QDir::currentPath();
-    QString fileName =
+    const QString fileName =
         QFileDialog::getOpenFileName(this, tr("Ouvrir un fichier EpiGimp"), currentPath,
                                      tr("EpiGimp (*.epg);;Tous les fichiers (*)"));
 
@@ -388,10 +385,10 @@ void MainWindow::openEpg()
         return;
 
     ZipEpgStorage storage;
-    auto res = storage.open(fileName.toStdString());
+    const auto res = storage.open(fileName.toStdString());
     if (!res.success || !res.document)
     {
-        QString err = QString::fromLocal8Bit(res.errorMessage.empty() ? "Erreur inconnue"
+        const QString err = QString::fromLocal8Bit(res.errorMessage.empty() ? "Erreur inconnue"
                                                                       : res.errorMessage.c_str());
         QMessageBox::critical(this, tr("Erreur"),
                               tr("Impossible de charger le fichier EPG %1\n%2")
@@ -400,14 +397,19 @@ void MainWindow::openEpg()
         return;
     }
 
-    const auto& doc = *res.document;
-    if (doc.layers.empty() || !doc.layers[0]->image())
-    {
+    const Document &doc = *res.document;
+    if (doc.layerCount() == 0) {
         QMessageBox::critical(this, tr("Erreur"), tr("Le document ne contient pas d'image."));
         return;
     }
 
-    const ImageBuffer& ib = *doc.layers[0]->image();
+    const auto firstLayer = doc.layerAt(0);
+    if (!firstLayer || !firstLayer->image()) {
+        QMessageBox::critical(this, tr("Erreur"), tr("Le document ne contient pas d'image."));
+        return;
+    }
+    const ImageBuffer& ib = *firstLayer->image();
+
     QImage img(ib.width(), ib.height(), QImage::Format_ARGB32);
     for (int y = 0; y < ib.height(); ++y)
     {
