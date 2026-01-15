@@ -1,177 +1,63 @@
 #include "io/EpgFormat.hpp"
 
-#include <cstdint>
-#include <cstring>
-#include <fstream>
-#include <vector>
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-
-extern "C"
-{
 #include <stb_image.h>
-#include <stb_image_write.h>
+
+#include <chrono>
+#include <cstring>
+#include <ctime>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
+
+#include "io/EpgJson.hpp"
+
+// Callback used by stb_image_write to collect the encoded PNG bytes.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+void pngWriteCallback(void* context, void* data, int size)
+{
+    auto* buffer = reinterpret_cast<std::vector<unsigned char>*>(context);
+    unsigned char* bytes = reinterpret_cast<unsigned char*>(data);
+    buffer->insert(buffer->end(), bytes, bytes + size);
 }
 
-namespace EpgFormat
+std::string getCurrentTimestampUTC()
 {
-
-static const char MAGIC[] = "EPIGIMP";
-static constexpr int32_t MAX_DATA_SIZE = 100 * 1024 * 1024;  // 100 MB limit to prevent DoS
-
-static void png_write_callback(void* context, void* data, int size)
-{
-    auto* vec = static_cast<std::vector<uint8_t>*>(context);
-    const auto* bytes = static_cast<const uint8_t*>(data);
-    vec->insert(vec->end(), bytes, bytes + size);
+    auto now = std::chrono::system_clock::now();
+    std::time_t const t = std::chrono::system_clock::to_time_t(now);
+    std::tm const tm = *std::gmtime(&t);
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
+    return oss.str();
 }
 
-static bool writeHeader(std::ofstream& ofs, int32_t w, int32_t h, int32_t c, int32_t dataSize)
+std::string formatLayerId(size_t index)
 {
-    if (!ofs)
-        return false;
-
-    ofs.write(MAGIC, sizeof(MAGIC) - 1);
-    const int32_t version = 1;
-    ofs.write(reinterpret_cast<const char*>(&version), sizeof(version));
-
-    ofs.write(reinterpret_cast<const char*>(&w), sizeof(w));
-    ofs.write(reinterpret_cast<const char*>(&h), sizeof(h));
-    ofs.write(reinterpret_cast<const char*>(&c), sizeof(c));
-
-    ofs.write(reinterpret_cast<const char*>(&dataSize), sizeof(dataSize));
-    return ofs.good();
+    std::ostringstream oss;
+    oss << std::setw(4) << std::setfill('0') << (index + 1);
+    return oss.str();
 }
 
-static bool readHeader(std::ifstream& ifs, int32_t& version, int32_t& w, int32_t& h, int32_t& c,
-                       int32_t& dataSize)
+std::unique_ptr<ImageBuffer> decodePngToImageBuffer(const std::vector<unsigned char>& pngData)
 {
-    if (!ifs)
-        return false;
+    // Quick sanity: check PNG signature (8 bytes)
+    if (pngData.size() < 8 || memcmp(pngData.data(), kPngSignature, 8) != 0)
+        throw std::runtime_error("Not a PNG file (too small)");
 
-    char magicBuf[sizeof(MAGIC)];
-    ifs.read(magicBuf, sizeof(MAGIC) - 1);
-    if (ifs.gcount() != static_cast<std::streamsize>(sizeof(MAGIC) - 1))
-        return false;
-    if (std::string(magicBuf, sizeof(MAGIC) - 1) != std::string(MAGIC))
-        return false;
+    int width = 0, height = 0, channels = 0;
+    unsigned char* decoded = stbi_load_from_memory(pngData.data(), static_cast<int>(pngData.size()),
+                                                   &width, &height, &channels, 4);
 
-    ifs.read(reinterpret_cast<char*>(&version), sizeof(version));
-    if (ifs.fail())
-        return false;
-
-    ifs.read(reinterpret_cast<char*>(&w), sizeof(w));
-    if (ifs.fail())
-        return false;
-    ifs.read(reinterpret_cast<char*>(&h), sizeof(h));
-    if (ifs.fail())
-        return false;
-    ifs.read(reinterpret_cast<char*>(&c), sizeof(c));
-    if (ifs.fail())
-        return false;
-
-    ifs.read(reinterpret_cast<char*>(&dataSize), sizeof(dataSize));
-    if (ifs.fail())
-        return false;
-
-    return true;
-}
-
-static bool encodePngToMemory(const ImageBuffer& image, std::vector<uint8_t>& out)
-{
-    const int width = image.width();
-    const int height = image.height();
-    constexpr int comp = 4;  // RGBA
-    out.clear();
-    stbi_write_png_to_func(png_write_callback, &out, width, height, comp, image.data(),
-                           width * comp);
-    return !out.empty();
-}
-
-static unsigned char* decodePngFromMemory(const std::vector<uint8_t>& data, int& imgW, int& imgH,
-                                          int& imgComp)
-{
-    if (data.empty())
-        return nullptr;
-    return stbi_load_from_memory(data.data(), static_cast<int>(data.size()), &imgW, &imgH, &imgComp,
-                                 4);
-}
-
-bool save(const std::string& fileName, const ImageBuffer& image)
-{
-    std::vector<uint8_t> pngData;
-    if (!encodePngToMemory(image, pngData))
-        return false;
-
-    std::ofstream ofs(fileName, std::ios::binary);
-    if (!ofs)
-        return false;
-
-    const auto w = static_cast<int32_t>(image.width());
-    const auto h = static_cast<int32_t>(image.height());
-    constexpr auto c = 4;
-    const auto dataSize = static_cast<int32_t>(pngData.size());
-
-    if (!writeHeader(ofs, w, h, c, dataSize))
-        return false;
-
-    if (dataSize > 0)
-    {
-        ofs.write(reinterpret_cast<const char*>(pngData.data()), dataSize);
-        if (ofs.fail())
-            return false;
-    }
-
-    return ofs.good();
-}
-
-bool load(const std::string& fileName, ImageBuffer& outImage)
-{
-    std::ifstream ifs(fileName, std::ios::binary);
-    if (!ifs)
-        return false;
-
-    int32_t version = 0;
-    int32_t w = 0, h = 0, c = 0, dataSize = 0;
-    if (!readHeader(ifs, version, w, h, c, dataSize))
-        return false;
-
-    if (version != 1)
-        return false;
-
-    if (w <= 0 || h <= 0 || w > MAX_DIM || h > MAX_DIM)
-        return false;
-    if (c != 4)
-        return false;
-    if (int64_t pixelCount = static_cast<int64_t>(w) * static_cast<int64_t>(h);
-        pixelCount <= 0 || pixelCount > MAX_PIXELS)
-        return false;
-    if (dataSize <= 0 || dataSize > (MAX_PIXELS * 4))
-        return false;
-
-    std::vector<uint8_t> pngData(static_cast<size_t>(dataSize));
-    ifs.read(reinterpret_cast<char*>(pngData.data()), dataSize);
-    if (ifs.gcount() != dataSize || ifs.fail())
-        return false;
-
-    int imgW = 0, imgH = 0, imgComp = 0;
-    unsigned char* decoded = decodePngFromMemory(pngData, imgW, imgH, imgComp);
     if (!decoded)
-        return false;
+        throw std::runtime_error(
+            std::string("stb_image: impossible de décoder le PNG en mémoire: ") +
+            stbi_failure_reason());
 
-    // Create output ImageBuffer and copy pixels (stb gives RGBA)
-    if (imgW <= 0 || imgH <= 0)
-    {
-        stbi_image_free(decoded);
-        return false;
-    }
-
-    outImage = ImageBuffer(imgW, imgH);
-    const size_t total = static_cast<size_t>(imgW) * static_cast<size_t>(imgH) * 4u;
-    std::memcpy(outImage.data(), decoded, total);
+    auto buf = std::make_unique<ImageBuffer>(width, height);
+    size_t const bytes = static_cast<size_t>(width) * static_cast<size_t>(height) * 4u;
+    std::memcpy(buf->data(), decoded, bytes);
 
     stbi_image_free(decoded);
-    return true;
+    return buf;
 }
-
-}  // namespace EpgFormat
