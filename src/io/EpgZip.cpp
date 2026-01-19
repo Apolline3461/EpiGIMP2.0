@@ -17,8 +17,8 @@
 #include <utility>
 #include <vector>
 
-#include "core/document.hpp"
-#include "core/Layer.h"
+#include "core/Document.hpp"
+#include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
 #include "io/EpgJson.hpp"
 #include "io/Logger.hpp"
@@ -164,9 +164,9 @@ ZipEpgStorage::Manifest ZipEpgStorage::createManifestFromDocument(const Document
 
     // Canvas
     m.canvas.name = "EpiGimp2.0";
-    m.canvas.width = doc.width;
-    m.canvas.height = doc.height;
-    m.canvas.dpi = static_cast<int>(doc.dpi);
+    m.canvas.width = doc.width();
+    m.canvas.height = doc.height();
+    m.canvas.dpi = doc.dpi();
     m.canvas.colorSpace = "sRGB";
     m.canvas.background = Color{255, 255, 255, 0};
 
@@ -184,24 +184,24 @@ ZipEpgStorage::Manifest ZipEpgStorage::createManifestFromDocument(const Document
     m.metadata.modifiedUtc = now;
 
     // Layers
-    for (size_t i = 0; i < doc.layers.size(); ++i)
+    for (size_t i = 0; i < doc.layerCount(); ++i)
     {
         std::string const layerId = formatLayerId(i);
         ManifestLayer L;
         L.id = layerId;
-        L.name = doc.layers[i]->name();
+        L.name = doc.layerAt(i)->name();
         L.type = LayerType::Raster;
-        L.visible = doc.layers[i]->visible();
-        L.locked = doc.layers[i]->locked();
-        L.opacity = doc.layers[i]->opacity();
+        L.visible = doc.layerAt(i)->visible();
+        L.locked = doc.layerAt(i)->locked();
+        L.opacity = doc.layerAt(i)->opacity();
         L.blendMode = BlendMode::Normal;
         L.path = "layers/" + layerId + ".png";
         L.sha256 = "";  // sera remplie lors de la sauvegarde
         L.transform = Transform{};
         L.bounds.x = 0;
         L.bounds.y = 0;
-        L.bounds.width = doc.width;
-        L.bounds.height = doc.height;
+        L.bounds.width = doc.width();
+        L.bounds.height = doc.height();
         m.layers.push_back(L);
     }
 
@@ -211,10 +211,7 @@ ZipEpgStorage::Manifest ZipEpgStorage::createManifestFromDocument(const Document
 std::unique_ptr<Document> ZipEpgStorage::createDocumentFromManifest(const Manifest& m,
                                                                     zip_t* handle) const
 {
-    auto doc = std::make_unique<Document>();
-    doc->width = m.canvas.width;
-    doc->height = m.canvas.height;
-    doc->dpi = static_cast<float>(m.canvas.dpi);
+    auto doc = std::make_unique<Document>(m.canvas.width, m.canvas.height, m.canvas.dpi);
 
     for (const auto& lm : m.layers)
     {
@@ -224,9 +221,7 @@ std::unique_ptr<Document> ZipEpgStorage::createDocumentFromManifest(const Manife
             if (!lm.sha256.empty())
             {
                 if (!verifySHA256(pngData.data(), pngData.size(), lm.sha256))
-                {
                     epg::log_warn(std::string("checksum SHA256 mismatch for ") + lm.path);
-                }
             }
             auto buf = decodePngToImageBuffer(pngData);
             std::shared_ptr<ImageBuffer> sharedBuf;
@@ -236,7 +231,7 @@ std::unique_ptr<Document> ZipEpgStorage::createDocumentFromManifest(const Manife
             auto layer = std::make_shared<Layer>(std::stoull(lm.id), lm.name, sharedBuf, lm.visible,
                                                  lm.locked, lm.opacity);
 
-            doc->layers.push_back(layer);
+            doc->addLayer(layer);
         }
         catch (const std::exception& e)
         {
@@ -282,11 +277,11 @@ void ZipEpgStorage::writeLayersToZip(zip_t* zipHandle, Manifest& m, const Docume
     {
         auto& L = m.layers[i];
 
-        if (i >= doc.layers.size())
+        if (static_cast<int>(i) >= doc.layerCount())
             throw std::runtime_error(
                 "Incohérence: nombre de calques différent entre Document et Manifest");
 
-        auto& layerPtr = doc.layers[i];
+        const auto layerPtr = doc.layerAt(static_cast<int>(i));
         if (!layerPtr->image())
             throw std::runtime_error("Layer " + layerPtr->name() + " n'a pas de pixels");
 
@@ -332,7 +327,7 @@ void ZipEpgStorage::writeManifestToZip(zip_t* zipHandle, const Manifest& m) cons
 
 void ZipEpgStorage::generatePreview(const Document& doc, zip_t* handle) const
 {
-    if (doc.layers.empty())
+    if (doc.layerCount() == 0)
         return;
 
     int w = 0, h = 0;
@@ -363,23 +358,34 @@ void ZipEpgStorage::generatePreview(const Document& doc, zip_t* handle) const
 std::vector<unsigned char> ZipEpgStorage::composePreviewRGBA(const Document& doc, int& outW,
                                                              int& outH) const
 {
-    const int previewMax = 256;
+    constexpr int previewMax = 256;
 
-    int const pW = std::min(previewMax, doc.width);
-    int const pH = std::min(previewMax, doc.height);
+    const int docW = doc.width();
+    const int docH = doc.height();
 
-    float const scaleX = static_cast<float>(pW) / static_cast<float>(doc.width);
-    float const scaleY = static_cast<float>(pH) / static_cast<float>(doc.height);
+    if (docW <= 0 || docH <= 0)
+    {
+        outW = 0;
+        outH = 0;
+        return {};
+    }
+
+    int const pW = std::min(previewMax, docW);
+    int const pH = std::min(previewMax, docH);
+
+    float const scaleX = static_cast<float>(pW) / static_cast<float>(docW);
+    float const scaleY = static_cast<float>(pH) / static_cast<float>(docH);
     float const scale = std::min(scaleX, scaleY);
 
-    int const w = std::max(1, static_cast<int>(static_cast<float>(doc.width) * scale));
-    int const h = std::max(1, static_cast<int>(static_cast<float>(doc.height) * scale));
+    int const w = std::max(1, static_cast<int>(static_cast<float>(docW) * scale));
+    int const h = std::max(1, static_cast<int>(static_cast<float>(docH) * scale));
 
     std::vector<unsigned char> preview(static_cast<size_t>(w) * static_cast<size_t>(h) * 4u, 0);
 
-    for (const auto& layerPtr : doc.layers)
+    for (int i = 0; i < doc.layerCount(); ++i)
     {
-        if (!layerPtr->visible() || !layerPtr->image())
+        auto layerPtr = doc.layerAt(i);
+        if (!layerPtr || !layerPtr->visible() || !layerPtr->image())
             continue;
 
         const ImageBuffer& img = *layerPtr->image();
@@ -417,7 +423,7 @@ std::vector<unsigned char> ZipEpgStorage::composePreviewRGBA(const Document& doc
                         const float srcVal =
                             (c == 0 ? static_cast<float>(sr)
                                     : (c == 1 ? static_cast<float>(sg) : static_cast<float>(sb)));
-                        const float dstVal = static_cast<float>(preview[dstIdx + c]);
+                        const auto dstVal = static_cast<float>(preview[dstIdx + c]);
 
                         const float numerator =
                             srcVal * srcAlphaNorm + dstVal * dstAlphaNorm * (1.0f - srcAlphaNorm);
@@ -528,7 +534,7 @@ void ZipEpgStorage::save(const Document& doc, const std::string& path)
 
 void ZipEpgStorage::exportPng(const Document& doc, const std::string& path)
 {
-    if (doc.layers.empty())
+    if (doc.layerCount() == 0)
         throw std::runtime_error("Document vide, impossible d'exporter");
 
     std::vector<unsigned char> out = composeFlattenedRGBA(doc);
@@ -536,24 +542,31 @@ void ZipEpgStorage::exportPng(const Document& doc, const std::string& path)
     if (out.empty())
         throw std::runtime_error("Impossible de composer l'image pour l'export PNG");
 
-    if (!stbi_write_png(path.c_str(), doc.width, doc.height, 4, out.data(), doc.width * 4))
+    if (!stbi_write_png(path.c_str(), doc.width(), doc.height(), 4, out.data(), doc.width() * 4))
         throw std::runtime_error("Impossible d'écrire le fichier PNG: " + path);
 }
 
 std::vector<unsigned char> ZipEpgStorage::composeFlattenedRGBA(const Document& doc) const
 {
-    std::vector<unsigned char> out(static_cast<size_t>(doc.width) * doc.height * 4, 0);
+    const int docW = doc.width();
+    const int docH = doc.height();
 
-    for (const auto& layerPtr : doc.layers)
+    if (docW <= 0 || docH <= 0)
+        return {};
+
+    std::vector<unsigned char> out(static_cast<size_t>(docW) * static_cast<size_t>(docH) * 4u, 0);
+    for (int i = 0; i < doc.layerCount(); ++i)
     {
-        if (!layerPtr->visible() || !layerPtr->image())
+        auto layerPtr = doc.layerAt(i);
+        if (!layerPtr || !layerPtr->visible() || !layerPtr->image())
             continue;
         const ImageBuffer& img = *layerPtr->image();
-        for (int y = 0; y < doc.height && y < img.height(); ++y)
+
+        for (int y = 0; y < docH && y < img.height(); ++y)
         {
-            for (int x = 0; x < doc.width && x < img.width(); ++x)
+            for (int x = 0; x < docW && x < img.width(); ++x)
             {
-                int const dstIdx = (y * doc.width + x) * 4;
+                int const dstIdx = (y * docW + x) * 4;
                 int const srcIdx = (y * img.width() + x) * 4;
 
                 float const alpha =
@@ -561,8 +574,8 @@ std::vector<unsigned char> ZipEpgStorage::composeFlattenedRGBA(const Document& d
 
                 for (int c = 0; c < 3; ++c)
                 {
-                    float const src = static_cast<float>(img.data()[srcIdx + c]);
-                    float const dst = static_cast<float>(out[dstIdx + c]);
+                    auto const src = static_cast<float>(img.data()[srcIdx + c]);
+                    auto const dst = static_cast<float>(out[dstIdx + c]);
                     out[dstIdx + c] =
                         static_cast<unsigned char>(src * alpha + dst * (1.0f - alpha));
                 }

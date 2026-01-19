@@ -120,7 +120,7 @@ struct Canvas
     std::string name{"EpiGimp2.0"};
     int width{800};
     int height{600};
-    int dpi{72};
+    float dpi{72};
     std::string colorSpace{"sRGB"};
     Color background{255, 255, 255, 0};
 };

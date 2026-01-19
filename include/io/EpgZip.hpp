@@ -9,8 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "core/document.hpp"
-#include "core/ImageBuffer.h"
+#include "core/ImageBuffer.hpp"
 
 // PNG signature constant
 inline constexpr unsigned char kPngSignature[8] = {137, 80, 78, 71, 13, 10, 26, 10};
