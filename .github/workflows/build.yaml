@@ -1,11 +1,6 @@
 name: Build epigimp
 
 on:
-  push:
-    branches: [main, dev]
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
   pull_request:
     branches: [ main, dev ]
     paths-ignore:
@@ -67,7 +62,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: 'c3f0...'
+          vcpkgGitCommitId: 'de51e6bfa96e1245f2a969a8cde249baac89f7be'
           vcpkgJsonGlob: 'vcpkg.json'
 
       - name: Install Qt6
@@ -77,13 +72,23 @@ jobs:
           arch: ${{ matrix.qt-arch }}
           cache: true
 
-      - name: Configure
+      - name: Configure (Linux)
+        if: runner.os == 'linux'
+        run: >
+          cmake -B build
+          -G "${{ matrix.generator }}"
+          -DCMAKE_BUILD_TYPE=${{ matrix.build-type }}
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Configure (Windows)
+        if: runner.os == 'windows'
         run: >
           cmake -B build
           -G "${{ matrix.generator }}"
           -DCMAKE_BUILD_TYPE=${{ matrix.build-type }}
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+          
 
       - name: Build
         run: cmake --build build --config ${{ matrix.build-type }} --parallel
