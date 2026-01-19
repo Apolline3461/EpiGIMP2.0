@@ -63,6 +63,13 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Install deps (Windows via vcpkg)
+        if: runner.os == 'Windows'
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 'c3f0...'
+          vcpkgJsonGlob: 'vcpkg.json'
+
       - name: Install Qt6
         uses: jurplel/install-qt-action@v3
         with:
@@ -76,6 +83,7 @@ jobs:
           -G "${{ matrix.generator }}"
           -DCMAKE_BUILD_TYPE=${{ matrix.build-type }}
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
 
       - name: Build
         run: cmake --build build --config ${{ matrix.build-type }} --parallel
