@@ -2,19 +2,19 @@
 // Created by apolline on 25/11/2025.
 //
 
-#include "core/Layer.h"
+#include "core/Layer.hpp"
 
 #include <cassert>
 #include <utility>
 
-Layer::Layer(const uint64_t id, string name, shared_ptr<ImageBuffer> image, bool visible,
+Layer::Layer(const uint64_t id, std::string name, std::shared_ptr<ImageBuffer> image, bool visible,
              bool locked, float opacity)
     : id_{id},
-      name_{move(name)},
+      name_{std::move(name)},
       visible_{visible},
       locked_{locked},
       opacity_{opacity},
-      image_{move(image)}
+      image_{std::move(image)}
 {
 }
 std::uint64_t Layer::id() const noexcept
@@ -27,7 +27,7 @@ const std::string& Layer::name() const noexcept
 }
 void Layer::setName(std::string name)
 {
-    name_ = move(name);
+    name_ = std::move(name);
 }
 
 bool Layer::visible() const noexcept
@@ -69,12 +69,12 @@ void Layer::setOpacity(const float opacity)
         opacity_ = opacity;
 }
 
-const shared_ptr<ImageBuffer>& Layer::image() const noexcept
+const std::shared_ptr<ImageBuffer>& Layer::image() const noexcept
 {
     return image_;
 }
 
 void Layer::setImageBuffer(std::shared_ptr<ImageBuffer> image)
 {
-    image_ = move(image);
+    image_ = std::move(image);
 }

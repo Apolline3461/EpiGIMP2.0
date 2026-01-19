@@ -15,6 +15,7 @@ target_link_libraries(test_io
         PRIVATE
         epigimp_io
         GTest::gtest_main
+        stb_headers
 )
 
 include(GoogleTest)
