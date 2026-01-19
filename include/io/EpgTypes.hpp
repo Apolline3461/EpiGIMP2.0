@@ -52,7 +52,7 @@ enum class LayerType
     Unknown
 };
 
-enum class BlendMode
+enum class BlendMode : std::uint8_t
 {
     Normal,
     Multiply,

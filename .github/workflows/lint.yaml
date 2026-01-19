@@ -144,7 +144,7 @@ jobs:
             echo "::group::clang-tidy $f"
             clang-tidy -p build "$f" \
               -config="$CFG" \
-              -header-filter='.*/(src|include)/.*' || failed=1
+              -header-filter="^${GITHUB_WORKSPACE}/(src|include)/.*" || failed=1
             echo "::endgroup::"
           done < cpp_files.bin
           exit $failed

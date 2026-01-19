@@ -2,20 +2,22 @@
 ** Consolidated EPG tests
 */
 
-#include <gtest/gtest.h>
+#include <stb_image.h>
 
 #include <filesystem>
 #include <fstream>
-#include <stb_image.h>
 
 #include "core/Document.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
 
+#include <gtest/gtest.h>
+
 using namespace std;
 
-class EpgTest : public ::testing::Test {
+class EpgTest : public ::testing::Test
+{
    protected:
     ZipEpgStorage storage;
 

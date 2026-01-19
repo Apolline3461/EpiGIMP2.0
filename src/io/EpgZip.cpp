@@ -21,6 +21,7 @@
 #include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
 #include "io/EpgJson.hpp"
+#include "io/EpgTypes.hpp"
 #include "io/Logger.hpp"
 
 #include <nlohmann/json.hpp>
@@ -187,7 +188,7 @@ ZipEpgStorage::Manifest ZipEpgStorage::createManifestFromDocument(const Document
     m.metadata.modifiedUtc = now;
 
     // Layers
-    for (size_t i = 0; i < doc.layerCount(); ++i)
+    for (int i = 0; i < doc.layerCount(); ++i)
     {
         std::string const layerId = formatLayerId(i);
         ManifestLayer L;
@@ -199,7 +200,7 @@ ZipEpgStorage::Manifest ZipEpgStorage::createManifestFromDocument(const Document
         L.opacity = doc.layerAt(i)->opacity();
         L.blendMode = BlendMode::Normal;
         L.path = "layers/" + layerId + ".png";
-        L.sha256 = "";  // sera remplie lors de la sauvegarde
+        L.sha256 = "";
         L.transform = Transform{};
         L.bounds.x = 0;
         L.bounds.y = 0;
