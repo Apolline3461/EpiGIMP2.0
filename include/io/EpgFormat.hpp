@@ -1,9 +1,6 @@
 #pragma once
 
-#include <openssl/sha.h>
-
 #include <memory>
-#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
 
@@ -11,6 +8,9 @@
 #include "core/ImageBuffer.hpp"
 #include "io/EpgTypes.hpp"
 #include "io/EpgZip.hpp"
+
+#include <nlohmann/json.hpp>
+#include <openssl/sha.h>
 using json = nlohmann::json;
 
 void pngWriteCallback(void* context, void* data, int size);

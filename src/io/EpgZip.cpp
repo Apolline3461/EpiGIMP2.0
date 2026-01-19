@@ -1,4 +1,5 @@
-#include <openssl/sha.h>
+#include <stb_image.h>
+#include <stb_image_write.h>
 #include <zip.h>
 #include <zipconf.h>
 
@@ -10,20 +11,20 @@
 #include <iomanip>
 #include <ios>
 #include <memory>
-#include <nlohmann/json.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
-#include <stb_image.h>
-#include <stb_image_write.h>
 
 #include "core/Document.hpp"
 #include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
 #include "io/EpgJson.hpp"
 #include "io/Logger.hpp"
+
+#include <nlohmann/json.hpp>
+#include <openssl/sha.h>
 
 using json = nlohmann::json;
 using namespace io::epg;
