@@ -1,11 +1,18 @@
 #pragma once
 
 #include <QAction>
+#include <QEvent>
 #include <QImage>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QMainWindow>
 #include <QMenu>
+#include <QObject>
+#include <QPoint>
 #include <QScrollArea>
+#include <QString>
+
+class ImageActions;
 
 class MainWindow : public QMainWindow
 {
@@ -29,6 +36,12 @@ class MainWindow : public QMainWindow
     void createMenus();
     void updateImageDisplay();
     void scaleImage(double factor);
+    void setScaleAndCenter(double newScale);
+
+    // évènements et panning
+    bool eventFilter(QObject* watched, QEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
+    void keyReleaseEvent(QKeyEvent* event) override;
 
     // Membres internes
     QLabel* m_imageLabel;
@@ -48,6 +61,13 @@ class MainWindow : public QMainWindow
     QAction* m_zoomInAct;
     QAction* m_zoomOutAct;
     QAction* m_resetZoomAct;
+    QAction* m_zoom05Act;
+    QAction* m_zoom1Act;
+    QAction* m_zoom2Act;
+    // panning state
+    bool m_handMode{false};
+    bool m_panningActive{false};
+    QPoint m_lastPanPos;
     QAction* m_openEpgAct;
     QAction* m_saveEpgAct;
 };

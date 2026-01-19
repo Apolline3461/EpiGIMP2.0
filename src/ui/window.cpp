@@ -1,18 +1,24 @@
 #include "ui/window.hpp"
 
+#include <QCursor>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QKeyEvent>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QStandardPaths>
 #include <QStatusBar>
 
 #include <string>
 
-#include "core/ImageBuffer.h"
+#include "core/ImageBuffer.hpp"
+#include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
+#include "io/EpgJson.hpp"
 #include "ui/image.hpp"
 
 MainWindow::MainWindow(QWidget* parent)
@@ -40,6 +46,8 @@ MainWindow::MainWindow(QWidget* parent)
     // Création de l'interface
     createActions();
     createMenus();
+    // panning: capter les événements de la zone de viewport
+    m_scrollArea->viewport()->installEventFilter(this);
 
     // Barre de statut
     statusBar()->showMessage(tr("Prêt"));
@@ -101,6 +109,22 @@ void MainWindow::createActions()
     m_resetZoomAct->setShortcut(tr("Ctrl+0"));
     m_resetZoomAct->setStatusTip(tr("Afficher l'image à 100%"));
     connect(m_resetZoomAct, &QAction::triggered, this, &MainWindow::resetZoom);
+
+    // Zoom presets ×0.5, ×1, ×2
+    m_zoom05Act = new QAction(tr("Zoom ×0.5"), this);
+    m_zoom05Act->setShortcut(QKeySequence("Ctrl+1"));
+    m_zoom05Act->setStatusTip(tr("Zoom 0.5x"));
+    connect(m_zoom05Act, &QAction::triggered, [this]() { setScaleAndCenter(0.5); });
+
+    m_zoom1Act = new QAction(tr("Zoom ×1"), this);
+    m_zoom1Act->setShortcut(QKeySequence("Ctrl+2"));
+    m_zoom1Act->setStatusTip(tr("Zoom 1x"));
+    connect(m_zoom1Act, &QAction::triggered, [this]() { setScaleAndCenter(1.0); });
+
+    m_zoom2Act = new QAction(tr("Zoom ×2"), this);
+    m_zoom2Act->setShortcut(QKeySequence("Ctrl+3"));
+    m_zoom2Act->setStatusTip(tr("Zoom 2x"));
+    connect(m_zoom2Act, &QAction::triggered, [this]() { setScaleAndCenter(2.0); });
 }
 
 void MainWindow::createMenus()
@@ -121,6 +145,10 @@ void MainWindow::createMenus()
     m_viewMenu->addAction(m_zoomInAct);
     m_viewMenu->addAction(m_zoomOutAct);
     m_viewMenu->addAction(m_resetZoomAct);
+    m_viewMenu->addSeparator();
+    m_viewMenu->addAction(m_zoom05Act);
+    m_viewMenu->addAction(m_zoom1Act);
+    m_viewMenu->addAction(m_zoom2Act);
 }
 
 void MainWindow::zoomIn()
@@ -153,14 +181,136 @@ void MainWindow::updateImageDisplay()
     }
 }
 
+bool MainWindow::eventFilter(QObject* watched, QEvent* event)
+{
+    if (watched == m_scrollArea->viewport())
+    {
+        if (event->type() == QEvent::MouseButtonPress)
+        {
+            QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::LeftButton && m_handMode)
+            {
+                m_panningActive = true;
+                m_lastPanPos = me->pos();
+                m_scrollArea->viewport()->setCursor(Qt::ClosedHandCursor);
+                return true;
+            }
+        }
+        else if (event->type() == QEvent::MouseMove)
+        {
+            if (m_panningActive)
+            {
+                QMouseEvent* me = static_cast<QMouseEvent*>(event);
+                QPoint delta = me->pos() - m_lastPanPos;
+                m_lastPanPos = me->pos();
+                m_scrollArea->horizontalScrollBar()->setValue(
+                    m_scrollArea->horizontalScrollBar()->value() - delta.x());
+                m_scrollArea->verticalScrollBar()->setValue(
+                    m_scrollArea->verticalScrollBar()->value() - delta.y());
+                return true;
+            }
+        }
+        else if (event->type() == QEvent::MouseButtonRelease)
+        {
+            QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::LeftButton && m_panningActive)
+            {
+                m_panningActive = false;
+                m_scrollArea->viewport()->setCursor(Qt::OpenHandCursor);
+                return true;
+            }
+        }
+    }
+
+    return QMainWindow::eventFilter(watched, event);
+}
+
+void MainWindow::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Space && !event->isAutoRepeat())
+    {
+        m_handMode = true;
+        m_scrollArea->viewport()->setCursor(Qt::OpenHandCursor);
+        event->accept();
+        return;
+    }
+    QMainWindow::keyPressEvent(event);
+}
+
+void MainWindow::keyReleaseEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Space && !event->isAutoRepeat())
+    {
+        m_handMode = false;
+        m_panningActive = false;
+        m_scrollArea->viewport()->setCursor(Qt::ArrowCursor);
+        event->accept();
+        return;
+    }
+    QMainWindow::keyReleaseEvent(event);
+}
+
 void MainWindow::scaleImage(double factor)
 {
     if (m_currentImage.isNull())
         return;
 
-    m_scaleFactor *= factor;
-    m_scaleFactor = qBound(0.1, m_scaleFactor, 5.0);
+    const double target = qBound(0.1, m_scaleFactor * factor, 5.0);
+    setScaleAndCenter(target);
+}
+
+void MainWindow::setScaleAndCenter(double newScale)
+{
+    if (m_currentImage.isNull())
+        return;
+
+    QPixmap pixmap = QPixmap::fromImage(m_currentImage);
+
+    // taille avant
+    QSize oldSize = pixmap.size() * m_scaleFactor;
+
+    // position du curseur dans le viewport
+    QPoint vpPos = m_scrollArea->viewport()->mapFromGlobal(QCursor::pos());
+    QRect vpRect(QPoint(0, 0), m_scrollArea->viewport()->size());
+
+    int hVal = m_scrollArea->horizontalScrollBar()->value();
+    int vVal = m_scrollArea->verticalScrollBar()->value();
+
+    double relX = 0.5;
+    double relY = 0.5;
+    bool hasFocusPoint = false;
+
+    if (vpRect.contains(vpPos) && oldSize.width() > 0 && oldSize.height() > 0)
+    {
+        hasFocusPoint = true;
+        relX = (hVal + vpPos.x()) / static_cast<double>(oldSize.width());
+        relY = (vVal + vpPos.y()) / static_cast<double>(oldSize.height());
+    }
+
+    m_scaleFactor = qBound(0.1, newScale, 5.0);
+
+    // mise à jour de l'affichage
     updateImageDisplay();
+
+    // nouvelle taille
+    QSize newSize = pixmap.size() * m_scaleFactor;
+
+    // ajuster les scrollbars pour conserver le point centré sous le curseur
+    if (hasFocusPoint)
+    {
+        int newH = static_cast<int>(relX * newSize.width()) - vpPos.x();
+        int newV = static_cast<int>(relY * newSize.height()) - vpPos.y();
+        m_scrollArea->horizontalScrollBar()->setValue(newH);
+        m_scrollArea->verticalScrollBar()->setValue(newV);
+    }
+    else
+    {
+        // centrer l'image
+        m_scrollArea->horizontalScrollBar()->setValue(
+            (newSize.width() - m_scrollArea->viewport()->width()) / 2);
+        m_scrollArea->verticalScrollBar()->setValue(
+            (newSize.height() - m_scrollArea->viewport()->height()) / 2);
+    }
 }
 
 void MainWindow::saveAsEpg()
@@ -171,10 +321,9 @@ void MainWindow::saveAsEpg()
         return;
     }
 
-    QString picturesPath =
-        QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + "/untitled.epg";
+    const QString currentPath = QDir::currentPath() + "/untitled.epg";
     QString fileName = QFileDialog::getSaveFileName(this, tr("Enregistrer au format EpiGimp"),
-                                                    picturesPath, tr("EpiGimp (*.epg)"));
+                                                    currentPath, tr("EpiGimp (*.epg)"));
 
     if (fileName.isEmpty())
         fileName = "untitled.epg";
@@ -182,33 +331,43 @@ void MainWindow::saveAsEpg()
     if (!fileName.endsWith(".epg", Qt::CaseInsensitive))
         fileName += ".epg";
 
-    // convert QImage -> ImageBuffer and call core IO
-    ImageBuffer buf = [&]()
+    // convert QImage -> ImageBuffer
+    ImageBuffer buf(m_currentImage.width(), m_currentImage.height());
+    for (int y = 0; y < m_currentImage.height(); ++y)
     {
-        ImageBuffer b(m_currentImage.width(), m_currentImage.height());
-        for (int y = 0; y < m_currentImage.height(); ++y)
+        for (int x = 0; x < m_currentImage.width(); ++x)
         {
-            for (int x = 0; x < m_currentImage.width(); ++x)
-            {
-                const QRgb p = m_currentImage.pixel(x, y);
-                const uint8_t r = qRed(p);
-                const uint8_t g = qGreen(p);
-                const uint8_t bch = qBlue(p);
-                const uint8_t a = qAlpha(p);
-                const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
-                                      (static_cast<uint32_t>(g) << 16) |
-                                      (static_cast<uint32_t>(bch) << 8) | static_cast<uint32_t>(a);
-                b.setPixel(x, y, rgba);
-            }
+            const QRgb p = m_currentImage.pixel(x, y);
+            const uint8_t r = qRed(p);
+            const uint8_t g = qGreen(p);
+            const uint8_t bch = qBlue(p);
+            const uint8_t a = qAlpha(p);
+            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
+                                  (static_cast<uint32_t>(g) << 16) |
+                                  (static_cast<uint32_t>(bch) << 8) | static_cast<uint32_t>(a);
+            buf.setPixel(x, y, rgba);
         }
-        return b;
-    }();
+    }
 
-    if (!EpgFormat::save(fileName.toStdString(), buf))
+    // Build a Document with a single layer and save using ZipEpgStorage
+    Document doc(buf.width(), buf.height(), 72.f);
+
+    try
+    {
+        auto imgPtr = std::make_shared<ImageBuffer>(buf);
+        auto layer =
+            std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
+        doc.addLayer(layer);
+
+        ZipEpgStorage storage;
+        storage.save(doc, fileName.toStdString());
+    }
+    catch (const std::exception& e)
     {
         QMessageBox::critical(this, tr("Erreur"),
-                              tr("Impossible de sauvegarder le fichier EPG %1.")
-                                  .arg(QDir::toNativeSeparators(fileName)));
+                              tr("Impossible de sauvegarder le fichier EPG %1.\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(QString::fromLocal8Bit(e.what())));
         return;
     }
 
@@ -218,30 +377,48 @@ void MainWindow::saveAsEpg()
 
 void MainWindow::openEpg()
 {
-    QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
-    QString fileName =
-        QFileDialog::getOpenFileName(this, tr("Ouvrir un fichier EpiGimp"), picturesPath,
+    QString currentPath = QDir::currentPath();
+    const QString fileName =
+        QFileDialog::getOpenFileName(this, tr("Ouvrir un fichier EpiGimp"), currentPath,
                                      tr("EpiGimp (*.epg);;Tous les fichiers (*)"));
 
     if (fileName.isEmpty())
         return;
 
-    ImageBuffer buf(1, 1);
-    if (!EpgFormat::load(fileName.toStdString(), buf))
+    ZipEpgStorage storage;
+    const auto res = storage.open(fileName.toStdString());
+    if (!res.success || !res.document)
     {
-        QMessageBox::critical(
-            this, tr("Erreur"),
-            tr("Impossible de charger le fichier EPG %1\nLe fichier est peut-être corrompu.")
-                .arg(QDir::toNativeSeparators(fileName)));
+        const QString err = QString::fromLocal8Bit(
+            res.errorMessage.empty() ? "Erreur inconnue" : res.errorMessage.c_str());
+        QMessageBox::critical(this, tr("Erreur"),
+                              tr("Impossible de charger le fichier EPG %1\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(err));
         return;
     }
-    // convert ImageBuffer -> QImage
-    QImage img(buf.width(), buf.height(), QImage::Format_ARGB32);
-    for (int y = 0; y < buf.height(); ++y)
+
+    const Document& doc = *res.document;
+    if (doc.layerCount() == 0)
     {
-        for (int x = 0; x < buf.width(); ++x)
+        QMessageBox::critical(this, tr("Erreur"), tr("Le document ne contient pas d'image."));
+        return;
+    }
+
+    const auto firstLayer = doc.layerAt(0);
+    if (!firstLayer || !firstLayer->image())
+    {
+        QMessageBox::critical(this, tr("Erreur"), tr("Le document ne contient pas d'image."));
+        return;
+    }
+    const ImageBuffer& ib = *firstLayer->image();
+
+    QImage img(ib.width(), ib.height(), QImage::Format_ARGB32);
+    for (int y = 0; y < ib.height(); ++y)
+    {
+        for (int x = 0; x < ib.width(); ++x)
         {
-            const uint32_t rgba = buf.getPixel(x, y);
+            const uint32_t rgba = ib.getPixel(x, y);
             const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
             const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
             const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);

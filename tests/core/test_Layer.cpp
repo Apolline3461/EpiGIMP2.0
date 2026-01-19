@@ -3,8 +3,11 @@
 //
 
 #include <gtest/gtest.h>
-#include "core/ImageBuffer.h"
-#include "core/Layer.h"
+#include "core/ImageBuffer.hpp"
+#include "core/Layer.hpp"
+
+using std::make_shared;
+using std::string;
 
 TEST(LayerTest, DefaultState)
 {
