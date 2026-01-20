@@ -32,6 +32,19 @@ using namespace io::epg;
 
 // ----------------- ZIP helpers --------------------------------------------
 
+struct FreeDeleter
+{
+    void operator()(void* p) const noexcept { std::free(p); }
+};
+
+struct ZipSourceDeleter
+{
+    void operator()(zip_source_t* zip) const noexcept
+    {
+        if (zip) zip_source_free(zip);
+    }
+};
+
 std::vector<unsigned char> ZipEpgStorage::readFileFromZip(zip_t* zip,
                                                           const std::string& filename) const
 {
@@ -87,28 +100,26 @@ void ZipEpgStorage::writeFileToZip(zip_t* zip, const std::string& filename, cons
         }
     }
 
-    // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
-    void* buffer_copy = malloc(size);
-    if (!buffer_copy)
+    std::unique_ptr<void, FreeDeleter> bufferCopy(std::malloc(size));
+    if (!bufferCopy)
         throw std::runtime_error("Échec d'allocation mémoire pour " + filename);
 
-    std::memcpy(buffer_copy, data, size);
+    std::memcpy(bufferCopy.get(), data, size);
 
-    // zip_source_buffer avec freep=1 : libzip libérera le buffer via free()
-    zip_source_t* source = zip_source_buffer(zip, buffer_copy, size, 1);
+    std::unique_ptr<zip_source_t, ZipSourceDeleter> source(
+        zip_source_buffer(zip, bufferCopy.get(), size, 1)
+    );
     if (!source)
-    {
-        free(buffer_copy);
         throw std::runtime_error("zip_source_buffer failed: " + std::string(zip_strerror(zip)));
-    }
+    (void)bufferCopy.release();
 
-    zip_int64_t const index = zip_file_add(zip, filename.c_str(), source, ZIP_FL_ENC_UTF_8);
+    zip_int64_t const index = zip_file_add(zip, filename.c_str(), source.get(), ZIP_FL_ENC_UTF_8);
     if (index < 0)
     {
-        zip_source_free(source);
         throw std::runtime_error("Impossible d'ajouter le fichier dans le ZIP: " + filename +
                                  " - " + std::string(zip_strerror(zip)));
     }
+    (void)source.release();
 }
 
 // ----------------- SHA256 -------------------------------------------------
@@ -484,7 +495,7 @@ ZipEpgStorage::OpenResult ZipEpgStorage::open(const std::string& path)
     {
         return {false, "Impossible d'ouvrir le ZIP (code: " + std::to_string(err) + ")", nullptr};
     }
-    ZipHandle zip(raw);
+    ZipHandle const zip(raw);
 
     ZipEpgStorage::OpenResult res;
     try

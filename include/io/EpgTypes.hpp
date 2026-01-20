@@ -45,7 +45,7 @@ struct TextData
 };
 
 // Enums for layer type and blend mode
-enum class LayerType
+enum class LayerType : std::uint8_t
 {
     Raster,
     Text,
