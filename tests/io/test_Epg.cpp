@@ -343,24 +343,28 @@ TEST(EpgHelpers, WritePreviewToZipCreatesEntry)
     std::error_code ec;
     std::filesystem::remove(path, ec);
 
-    int err = 0;
-    zip_t* z = zip_open(path.c_str(), ZIP_TRUNCATE | ZIP_CREATE, &err);
-    ASSERT_NE(z, nullptr);
+    {
+        int err = 0;
+        zip_t* z = zip_open(path.c_str(), ZIP_TRUNCATE | ZIP_CREATE, &err);
+        ASSERT_NE(z, nullptr);
 
-    // write preview
-    EXPECT_NO_THROW(storage.writePreviewToZip(z, png));
-
-    zip_close(z);
+        io::epg::ZipHandle zipHandle(z);
+        // write preview
+        EXPECT_NO_THROW(storage.writePreviewToZip(zipHandle, png));
+    } // Zip_close automatically
 
     // reopen and check
-    int err2 = 0;
-    zip_t* zr = zip_open(path.c_str(), ZIP_RDONLY, &err2);
-    ASSERT_NE(zr, nullptr);
-    zip_int64_t idx = zip_name_locate(zr, "preview.png", 0);
-    EXPECT_GE(idx, 0);
-    zip_close(zr);
+    {
+        int err2 = 0;
+        zip_t* zr = zip_open(path.c_str(), ZIP_RDONLY, &err2);
+        ASSERT_NE(zr, nullptr);
 
+        io::epg::ZipHandle zipHandle(zr);
+        zip_int64_t idx = zip_name_locate(zipHandle.get(), "preview.png", 0);
+        EXPECT_GE(idx, 0);
+    }
     std::filesystem::remove(path, ec);
+
 }
 
 TEST(EpgHelpers, ComposeFlattenedRGBAMatchesExpectedComposition)
@@ -408,33 +412,33 @@ TEST(EpgHelpers, WriteAndLoadManifestAndLayers)
     std::error_code ec;
     std::filesystem::remove(path, ec);
 
-    int err = 0;
-    zip_t* z = zip_open(path.c_str(), ZIP_TRUNCATE | ZIP_CREATE, &err);
-    ASSERT_NE(z, nullptr);
-
-    // write layers and manifest
-    EXPECT_NO_THROW(storage.writeLayersToZip(z, m, doc));
-    EXPECT_NO_THROW(storage.writeManifestToZip(z, m));
-
-    zip_close(z);
+    {
+        int err = 0;
+        zip_t* z = zip_open(path.c_str(), ZIP_TRUNCATE | ZIP_CREATE, &err);
+        ASSERT_NE(z, nullptr);
+        io::epg::ZipHandle zip(z);
+        // write layers and manifest
+        EXPECT_NO_THROW(storage.writeLayersToZip(zip, m, doc));
+        EXPECT_NO_THROW(storage.writeManifestToZip(zip, m));
+    } // zip_close automatically
 
     // reopen and load via storage helper
-    int err2 = 0;
-    zip_t* zr = zip_open(path.c_str(), ZIP_RDONLY, &err2);
-    ASSERT_NE(zr, nullptr);
-
-    auto loaded = storage.loadManifestFromZip(zr);
-    EXPECT_EQ(loaded.layers.size(), m.layers.size());
-    for (const auto& L : loaded.layers)
     {
-        EXPECT_FALSE(L.sha256.empty());
+        int err2 = 0;
+        zip_t* zr = zip_open(path.c_str(), ZIP_RDONLY, &err2);
+        ASSERT_NE(zr, nullptr);
+
+        io::epg::ZipHandle const zipHandle(zr);
+        auto loaded = storage.loadManifestFromZip(zipHandle.get());
+        EXPECT_EQ(loaded.layers.size(), m.layers.size());
+        for (const auto& L : loaded.layers)
+            EXPECT_FALSE(L.sha256.empty());
+
+        // ensure layer file exists in zip
+        zip_int64_t const idxLayer = zip_name_locate(zr, "layers/0001.png", 0);
+        EXPECT_GE(idxLayer, 0);
     }
 
-    // ensure layer file exists in zip
-    zip_int64_t idxLayer = zip_name_locate(zr, "layers/0001.png", 0);
-    EXPECT_GE(idxLayer, 0);
-
-    zip_close(zr);
     std::filesystem::remove(path, ec);
 }
 

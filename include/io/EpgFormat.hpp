@@ -47,14 +47,16 @@ class ZipEpgStorage : public IStorage
 
     // Helpers (made public for unit testing)
     Manifest loadManifestFromZip(zip_t* zipHandle) const;
-    void writeLayersToZip(zip_t* zipHandle, Manifest& m, const Document& doc) const;
-    void writeManifestToZip(zip_t* zipHandle, const Manifest& m) const;
+    void writeLayersToZip(io::epg::ZipHandle& zipHandle, Manifest& m, const Document& doc) const;
+    void writeManifestToZip(io::epg::ZipHandle& zipHandle, const Manifest& m) const;
+    void writePreviewToZip(io::epg::ZipHandle& zipHandle,
+                           const std::vector<unsigned char>& pngData) const;
+    void generatePreview(const Document& doc, io::epg::ZipHandle& zipHandle) const;
+
     Manifest createManifestFromDocument(const Document& doc) const;
     std::vector<unsigned char> composePreviewRGBA(const Document& doc, int& outW, int& outH) const;
     std::vector<unsigned char> encodePngToVector(const unsigned char* rgba, int w, int h,
                                                  int channels, int stride) const;
-    void writePreviewToZip(zip_t* zipHandle, const std::vector<unsigned char>& pngData) const;
-    void generatePreview(const Document& doc, zip_t* zipHandle) const;
     std::vector<unsigned char> composeFlattenedRGBA(const Document& doc) const;
 
    private:
@@ -63,7 +65,7 @@ class ZipEpgStorage : public IStorage
 
     // ZIP helpers
     std::vector<unsigned char> readFileFromZip(zip_t* zipHandle, const std::string& filename) const;
-    void writeFileToZip(zip_t* zipHandle, const std::string& filename, const void* data,
+    void writeFileToZip(io::epg::ZipHandle& zip, const std::string& filename, const void* data,
                         size_t size) const;
 
     // Checksums

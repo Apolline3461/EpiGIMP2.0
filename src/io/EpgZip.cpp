@@ -32,23 +32,6 @@ using namespace io::epg;
 
 // ----------------- ZIP helpers --------------------------------------------
 
-struct FreeDeleter
-{
-    void operator()(void* p) const noexcept
-    {
-        std::free(p);
-    }
-};
-
-struct ZipSourceDeleter
-{
-    void operator()(zip_source_t* zip) const noexcept
-    {
-        if (zip)
-            zip_source_free(zip);
-    }
-};
-
 std::vector<unsigned char> ZipEpgStorage::readFileFromZip(zip_t* zip,
                                                           const std::string& filename) const
 {
@@ -86,12 +69,20 @@ std::vector<unsigned char> ZipEpgStorage::readFileFromZip(zip_t* zip,
     return data;
 }
 
-void ZipEpgStorage::writeFileToZip(zip_t* zip, const std::string& filename, const void* data,
+struct ZipSourceDeleter
+{
+    void operator()(zip_source_t* zip) const noexcept
+    {
+        if (zip)
+            zip_source_free(zip);
+    }
+};
+
+void ZipEpgStorage::writeFileToZip(ZipHandle& zip, const std::string& filename, const void* data,
                                    size_t size) const
 {
-    if (!zip)
+    if (!zip.get())
         throw std::runtime_error("Handle ZIP invalide");
-
     if (!data || size == 0)
         throw std::runtime_error("Données invalides pour " + filename);
 
@@ -104,17 +95,17 @@ void ZipEpgStorage::writeFileToZip(zip_t* zip, const std::string& filename, cons
         }
     }
 
-    std::unique_ptr<void, FreeDeleter> bufferCopy(std::malloc(size));
+    io::epg::MallocPtr bufferCopy(std::malloc(size));
     if (!bufferCopy)
         throw std::runtime_error("Échec d'allocation mémoire pour " + filename);
 
     std::memcpy(bufferCopy.get(), data, size);
 
+    // IMPORTANT: freep = 0 car c’est ZipHandle qui garde le buffer (pas libzip)
     std::unique_ptr<zip_source_t, ZipSourceDeleter> source(
-        zip_source_buffer(zip, bufferCopy.get(), size, 1));
+        zip_source_buffer(zip, bufferCopy.get(), size, 0));
     if (!source)
         throw std::runtime_error("zip_source_buffer failed: " + std::string(zip_strerror(zip)));
-    (void)bufferCopy.release();
 
     zip_int64_t const index = zip_file_add(zip, filename.c_str(), source.get(), ZIP_FL_ENC_UTF_8);
     if (index < 0)
@@ -122,7 +113,12 @@ void ZipEpgStorage::writeFileToZip(zip_t* zip, const std::string& filename, cons
         throw std::runtime_error("Impossible d'ajouter le fichier dans le ZIP: " + filename +
                                  " - " + std::string(zip_strerror(zip)));
     }
-    (void)source.release();
+    // zip_file_add prend ownership du zip_source -> on release proprement
+    zip_source_t* const ownedSource = source.release();
+    (void)ownedSource;
+
+    // On garde le buffer vivant jusqu’au zip_close (destructeur de ZipHandle)
+    zip.keep(std::move(bufferCopy));
 }
 
 // ----------------- SHA256 -------------------------------------------------
@@ -280,9 +276,10 @@ ZipEpgStorage::Manifest ZipEpgStorage::loadManifestFromZip(zip_t* zipHandle) con
 }
 
 // Write each layer PNG into ZIP and update the manifest's layers' sha256 and manifest_info.entries
-void ZipEpgStorage::writeLayersToZip(zip_t* zipHandle, Manifest& m, const Document& doc) const
+void ZipEpgStorage::writeLayersToZip(ZipHandle& zipHandle, Manifest& m, const Document& doc) const
+
 {
-    if (!zipHandle)
+    if (!zipHandle.get())
         throw std::runtime_error("Handle ZIP invalide");
 
     // Keep generated PNG buffers alive until written into zip
@@ -333,9 +330,9 @@ void ZipEpgStorage::writeLayersToZip(zip_t* zipHandle, Manifest& m, const Docume
     m.manifestInfo.entries = manifestEntries;
 }
 
-void ZipEpgStorage::writeManifestToZip(zip_t* zipHandle, const Manifest& m) const
+void ZipEpgStorage::writeManifestToZip(ZipHandle& zipHandle, const Manifest& m) const
 {
-    if (!zipHandle)
+    if (!zipHandle.get())
         throw std::runtime_error("Handle ZIP invalide");
 
     const json j = m;
@@ -343,7 +340,7 @@ void ZipEpgStorage::writeManifestToZip(zip_t* zipHandle, const Manifest& m) cons
     writeFileToZip(zipHandle, "project.json", pj.data(), pj.size());
 }
 
-void ZipEpgStorage::generatePreview(const Document& doc, zip_t* handle) const
+void ZipEpgStorage::generatePreview(const Document& doc, ZipHandle& handle) const
 {
     if (doc.layerCount() == 0)
         return;
@@ -470,7 +467,7 @@ std::vector<unsigned char> ZipEpgStorage::encodePngToVector(const unsigned char*
     return out;
 }
 
-void ZipEpgStorage::writePreviewToZip(zip_t* zipHandle,
+void ZipEpgStorage::writePreviewToZip(ZipHandle& zipHandle,
                                       const std::vector<unsigned char>& pngData) const
 {
     if (pngData.size() < 8 || memcmp(pngData.data(), kPngSignature, 8) != 0)
@@ -532,15 +529,15 @@ void ZipEpgStorage::save(const Document& doc, const std::string& path)
         Manifest m = createManifestFromDocument(doc);
 
         // Write layers and update manifest with computed SHA256s
-        writeLayersToZip(zip.get(), m, doc);
+        writeLayersToZip(zip, m, doc);
 
         m.metadata.modifiedUtc = getCurrentTimestampUTC();
         m.manifestInfo.fileCount = static_cast<int>(1 + m.manifestInfo.entries.size());
         m.manifestInfo.generatedUtc = getCurrentTimestampUTC();
 
         // Write manifest file
-        writeManifestToZip(zip.get(), m);
-        generatePreview(doc, zip.get());
+        writeManifestToZip(zip, m);
+        generatePreview(doc, zip);
     }
     catch (...)
     {
