@@ -149,10 +149,19 @@ jobs:
           done < cpp_files.bin
           exit $failed
 
+      - name: Restore cppcheck cache
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: cppcheck-cache
+          key: ${{runner.os}}-cppcheck-${{hashFiles('build/compile_commands.json')}}
+          restore-keys: ${{runner.os}}-cppcheck-
+
       - name: Cppcheck (from compile database, filtered)
         if: ${{ steps.scope.outputs.has_cpp == 'true' }}
         run: |
           set -euo pipefail
+          mkdir -p cppcheck-cache
           args=()
           while IFS= read -r -d '' f; do
             args+=( "--file-filter=$f" )
