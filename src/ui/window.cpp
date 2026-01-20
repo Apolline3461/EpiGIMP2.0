@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QIcon>
 #include <QKeyEvent>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -139,11 +140,13 @@ void MainWindow::createActions()
     // Sélection rectangulaire
     m_clearSelectionAct = new QAction(tr("Effacer la sélection"), this);
     m_clearSelectionAct->setStatusTip(tr("Supprimer la sélection active"));
+    m_clearSelectionAct->setIcon(QIcon(":/icons/clear_selection.svg"));
     connect(m_clearSelectionAct, &QAction::triggered, this, &MainWindow::clearSelection);
 
     m_selectToggleAct = new QAction(tr("Mode sélection"), this);
     m_selectToggleAct->setCheckable(true);
     m_selectToggleAct->setStatusTip(tr("Activer le mode sélection par souris"));
+    m_selectToggleAct->setIcon(QIcon(":/icons/selection.svg"));
     connect(m_selectToggleAct, &QAction::toggled, this, &MainWindow::toggleSelectionMode);
 }
 
@@ -469,12 +472,16 @@ void MainWindow::onMouseSelection(const QRect& rect)
 
     auto ref = std::make_shared<ImageBuffer>(m_currentImage.width(), m_currentImage.height());
     m_selection_.addRect(rect.x(), rect.y(), rect.width(), rect.height(), ref);
+    if (m_imageLabel)
+        m_imageLabel->setSelectionRect(rect);
     updateImageDisplay();
 }
 
 void MainWindow::clearSelection()
 {
     m_selection_.clear();
+    if (m_imageLabel)
+        m_imageLabel->clearSelectionRect();
     updateImageDisplay();
 }
 

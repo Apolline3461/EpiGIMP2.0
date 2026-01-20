@@ -11,6 +11,8 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QPainter>
+#include <QPaintEvent>
 #include <QRubberBand>
 #include <QSpinBox>
 #include <QStandardPaths>
@@ -197,6 +199,7 @@ ImageLabel::ImageLabel(QWidget* parent)
     : QLabel(parent), m_rubberBand_(new QRubberBand(QRubberBand::Rectangle, this))
 {
     setMouseTracking(true);
+    m_hasSelection_ = false;
 }
 
 void ImageLabel::mousePressEvent(QMouseEvent* event)
@@ -242,12 +245,33 @@ void ImageLabel::mouseReleaseEvent(QMouseEvent* event)
 
     if (event->button() == Qt::LeftButton && m_rubberBand_->isVisible())
     {
-        m_rubberBand_->hide();
         QRect rect(m_origin_, event->pos());
         rect = rect.normalized();
         // ensure non-empty
         if (rect.width() > 0 && rect.height() > 0)
+        {
+            m_selectionRect_ = rect;
+            m_hasSelection_ = true;
+            m_rubberBand_->hide();
+            update();
             emit selectionFinished(rect);
+        }
     }
     QLabel::mouseReleaseEvent(event);
+}
+
+void ImageLabel::paintEvent(QPaintEvent* event)
+{
+    QLabel::paintEvent(event);
+
+    if (m_hasSelection_)
+    {
+        QPainter painter(this);
+        QPen pen(Qt::red);
+        pen.setStyle(Qt::DotLine);
+        pen.setWidth(2);
+        painter.setPen(pen);
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRect(m_selectionRect_);
+    }
 }

@@ -6,6 +6,7 @@
 class MainWindow;
 class QMouseEvent;
 class QRubberBand;
+class QPaintEvent;
 
 class ImageActions
 {
@@ -25,6 +26,17 @@ class ImageLabel : public QLabel
     {
         m_selectionEnabled_ = enabled;
     }
+    void clearSelectionRect()
+    {
+        m_hasSelection_ = false;
+        update();
+    }
+    void setSelectionRect(const QRect& rect)
+    {
+        m_selectionRect_ = rect;
+        m_hasSelection_ = true;
+        update();
+    }
 
    signals:
     void selectionFinished(const QRect& rect);
@@ -33,9 +45,12 @@ class ImageLabel : public QLabel
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
 
    private:
     QPoint m_origin_;
     QRubberBand* m_rubberBand_ = nullptr;
     bool m_selectionEnabled_ = true;
+    QRect m_selectionRect_;
+    bool m_hasSelection_ = false;
 };
