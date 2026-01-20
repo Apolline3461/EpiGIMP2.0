@@ -194,10 +194,20 @@ jobs:
               --export-fixes="$out" || true
           done < cpp_files.bin
 
+      - name: Compute artifact name (safe)
+        id: art
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref="${{ github.ref }}"
+          safe_ref="$(echo "$ref" | tr '/\\:*?"<>|\r\n' '-' )"
+          sha="${{ github.sha }}"
+          echo "name=clang-tidy-fixes-${{ runner.os }}-${safe_ref}-${sha}" >> "$GITHUB_OUTPUT"
+
       - name: Upload clang-tidy fixes
         if: ${{ steps.scope.outputs.has_cpp == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: clang-tidy-fixes-${{ github.ref_name }}-${{ github.sha }}
+          name: ${{steps.art.outputs.name}}
           path: tidy-fixes/
           retention-days: 7
