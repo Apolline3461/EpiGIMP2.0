@@ -34,14 +34,18 @@ using namespace io::epg;
 
 struct FreeDeleter
 {
-    void operator()(void* p) const noexcept { std::free(p); }
+    void operator()(void* p) const noexcept
+    {
+        std::free(p);
+    }
 };
 
 struct ZipSourceDeleter
 {
     void operator()(zip_source_t* zip) const noexcept
     {
-        if (zip) zip_source_free(zip);
+        if (zip)
+            zip_source_free(zip);
     }
 };
 
@@ -107,8 +111,7 @@ void ZipEpgStorage::writeFileToZip(zip_t* zip, const std::string& filename, cons
     std::memcpy(bufferCopy.get(), data, size);
 
     std::unique_ptr<zip_source_t, ZipSourceDeleter> source(
-        zip_source_buffer(zip, bufferCopy.get(), size, 1)
-    );
+        zip_source_buffer(zip, bufferCopy.get(), size, 1));
     if (!source)
         throw std::runtime_error("zip_source_buffer failed: " + std::string(zip_strerror(zip)));
     (void)bufferCopy.release();
