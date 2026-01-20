@@ -30,6 +30,7 @@ target_link_libraries(epigimp
         Qt6::Gui
         Qt6::Widgets
         Qt6::Svg
+        epigimp_warnings
 )
 
 if(WIN32)

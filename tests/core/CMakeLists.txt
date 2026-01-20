@@ -1,6 +1,8 @@
 set(EPIGIMP_CORE_TEST_SOURCES
         test_ImageBuffer.cpp
         test_Layer.cpp
+        test_Document.cpp
+        test_Compositor.cpp
 )
 
 add_executable(test_core

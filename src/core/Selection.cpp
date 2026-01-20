@@ -9,7 +9,7 @@
 
 #include <cassert>
 
-#include "core/ImageBuffer.h"
+#include "core/ImageBuffer.hpp"
 
 uint8_t Selection::t_at(const int x, const int y) const
 {

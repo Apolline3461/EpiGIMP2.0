@@ -1,45 +1,26 @@
 #include "ui/window.hpp"
 
+#include <QCursor>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QInputDialog>
+#include <QKeyEvent>
 #include <QMenuBar>
 #include <QMessageBox>
-#include <QPainter>
+#include <QMouseEvent>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QToolBar>
 
 #include <string>
 
-#include "core/ImageBuffer.h"
-#include "core/Selection.hpp"
+#include "core/ImageBuffer.hpp"
+#include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
+#include "io/EpgJson.hpp"
 #include "ui/image.hpp"
-
-// Helpers: convert current QImage to a shared ImageBuffer
-static std::shared_ptr<ImageBuffer> qimageToImageBuffer(const QImage& img)
-{
-    auto buf = std::make_shared<ImageBuffer>(img.width(), img.height());
-    for (int y = 0; y < img.height(); ++y)
-    {
-        for (int x = 0; x < img.width(); ++x)
-        {
-            const QRgb p = img.pixel(x, y);
-            const uint8_t r = qRed(p);
-            const uint8_t g = qGreen(p);
-            const uint8_t b = qBlue(p);
-            const uint8_t a = qAlpha(p);
-            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
-                                  (static_cast<uint32_t>(g) << 16) |
-                                  (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
-            buf->setPixel(x, y, rgba);
-        }
-    }
-    return buf;
-}
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -55,8 +36,6 @@ MainWindow::MainWindow(QWidget* parent)
     m_imageLabel->setScaledContents(true);
     m_imageLabel->setAlignment(Qt::AlignCenter);
 
-    connect(m_imageLabel, &ImageLabel::selectionFinished, this, &MainWindow::onMouseSelection);
-
     // Configuration de la zone de défilement
     m_scrollArea->setBackgroundRole(QPalette::Dark);
     m_scrollArea->setWidget(m_imageLabel);
@@ -68,6 +47,17 @@ MainWindow::MainWindow(QWidget* parent)
     // Création de l'interface
     createActions();
     createMenus();
+    // commande: barre d'outils pour sélection
+    QToolBar* cmd = addToolBar(tr("Commande"));
+    if (m_selectToggleAct)
+        cmd->addAction(m_selectToggleAct);
+    if (m_clearSelectionAct)
+        cmd->addAction(m_clearSelectionAct);
+    m_cmdMenu = nullptr;
+    // connect selection signal
+    connect(m_imageLabel, &ImageLabel::selectionFinished, this, &MainWindow::onMouseSelection);
+    // panning: capter les événements de la zone de viewport
+    m_scrollArea->viewport()->installEventFilter(this);
 
     // Barre de statut
     statusBar()->showMessage(tr("Prêt"));
@@ -130,46 +120,30 @@ void MainWindow::createActions()
     m_resetZoomAct->setStatusTip(tr("Afficher l'image à 100%"));
     connect(m_resetZoomAct, &QAction::triggered, this, &MainWindow::resetZoom);
 
+    // Zoom presets ×0.5, ×1, ×2
+    m_zoom05Act = new QAction(tr("Zoom ×0.5"), this);
+    m_zoom05Act->setShortcut(QKeySequence("Ctrl+1"));
+    m_zoom05Act->setStatusTip(tr("Zoom 0.5x"));
+    connect(m_zoom05Act, &QAction::triggered, [this]() { setScaleAndCenter(0.5); });
+
+    m_zoom1Act = new QAction(tr("Zoom ×1"), this);
+    m_zoom1Act->setShortcut(QKeySequence("Ctrl+2"));
+    m_zoom1Act->setStatusTip(tr("Zoom 1x"));
+    connect(m_zoom1Act, &QAction::triggered, [this]() { setScaleAndCenter(1.0); });
+
+    m_zoom2Act = new QAction(tr("Zoom ×2"), this);
+    m_zoom2Act->setShortcut(QKeySequence("Ctrl+3"));
+    m_zoom2Act->setStatusTip(tr("Zoom 2x"));
+    connect(m_zoom2Act, &QAction::triggered, [this]() { setScaleAndCenter(2.0); });
+
     // Sélection rectangulaire
     m_clearSelectionAct = new QAction(tr("Effacer la sélection"), this);
     m_clearSelectionAct->setStatusTip(tr("Supprimer la sélection active"));
-    // set icon for clear selection with fallback
-    QIcon clearIcon;
-    if (QFile::exists(":/icons/clear_selection.svg"))
-    {
-        clearIcon = QIcon(":/icons/clear_selection.svg");
-    }
-    else if (QFile::exists("../src/ui/icons/clear_selection.svg"))
-    {
-        clearIcon = QIcon("../src/ui/icons/clear_selection.svg");
-    }
-    else if (QFile::exists("src/ui/icons/clear_selection.svg"))
-    {
-        clearIcon = QIcon("src/ui/icons/clear_selection.svg");
-    }
-    if (!clearIcon.isNull())
-        m_clearSelectionAct->setIcon(clearIcon);
     connect(m_clearSelectionAct, &QAction::triggered, this, &MainWindow::clearSelection);
 
     m_selectToggleAct = new QAction(tr("Mode sélection"), this);
     m_selectToggleAct->setCheckable(true);
     m_selectToggleAct->setStatusTip(tr("Activer le mode sélection par souris"));
-    // set icon from resources with fallbacks to source file if resource missing
-    QIcon selIcon;
-    if (QFile::exists(":/icons/selection.svg"))
-    {
-        selIcon = QIcon(":/icons/selection.svg");
-    }
-    else if (QFile::exists("../src/ui/icons/selection.svg"))
-    {
-        selIcon = QIcon("../src/ui/icons/selection.svg");
-    }
-    else if (QFile::exists("src/ui/icons/selection.svg"))
-    {
-        selIcon = QIcon("src/ui/icons/selection.svg");
-    }
-    if (!selIcon.isNull())
-        m_selectToggleAct->setIcon(selIcon);
     connect(m_selectToggleAct, &QAction::toggled, this, &MainWindow::toggleSelectionMode);
 }
 
@@ -191,71 +165,10 @@ void MainWindow::createMenus()
     m_viewMenu->addAction(m_zoomInAct);
     m_viewMenu->addAction(m_zoomOutAct);
     m_viewMenu->addAction(m_resetZoomAct);
-
-    // Menu Commandes (selection actions)
-    m_cmdMenu = menuBar()->addMenu(tr("&Commandes"));
-    if (m_selectRectAct)
-        m_cmdMenu->addAction(m_selectRectAct);
-    if (m_selectToggleAct)
-        m_cmdMenu->addAction(m_selectToggleAct);
-    if (m_clearSelectionAct)
-        m_cmdMenu->addAction(m_clearSelectionAct);
-
-    // Toolbar: add selection toggle and clear
-    QToolBar* tb = addToolBar(tr("Outils"));
-    if (m_selectToggleAct)
-        tb->addAction(m_selectToggleAct);
-    if (m_clearSelectionAct)
-        tb->addAction(m_clearSelectionAct);
-}
-
-void MainWindow::clearSelection()
-{
-    m_selection_.clear();
-    updateImageDisplay();
-}
-
-void MainWindow::onMouseSelection(const QRect& rect)
-{
-    if (m_currentImage.isNull())
-        return;
-
-    // ignore if selection mode not enabled
-    if (!m_selectToggleAct || !m_selectToggleAct->isChecked())
-        return;
-
-    // Convert widget coords to image coords using current scale factor
-    const double scale = m_scaleFactor;
-    int x = static_cast<int>(std::floor(rect.x() / scale));
-    int y = static_cast<int>(std::floor(rect.y() / scale));
-    int w = static_cast<int>(std::ceil(rect.width() / scale));
-    int h = static_cast<int>(std::ceil(rect.height() / scale));
-
-    // Clamp
-    x = std::max(0, x);
-    y = std::max(0, y);
-    if (x + w > m_currentImage.width())
-        w = m_currentImage.width() - x;
-    if (y + h > m_currentImage.height())
-        h = m_currentImage.height() - y;
-    if (w <= 0 || h <= 0)
-        return;
-
-    // single selection: clear previous
-    m_selection_.clear();
-    auto ref = qimageToImageBuffer(m_currentImage);
-    m_selection_.addRect(x, y, w, h, ref);
-    updateImageDisplay();
-
-    // keep selection mode enabled (do not auto-disable)
-}
-
-void MainWindow::toggleSelectionMode(bool enabled)
-{
-    if (enabled)
-        m_imageLabel->setCursor(Qt::CrossCursor);
-    else
-        m_imageLabel->setCursor(Qt::ArrowCursor);
+    m_viewMenu->addSeparator();
+    m_viewMenu->addAction(m_zoom05Act);
+    m_viewMenu->addAction(m_zoom1Act);
+    m_viewMenu->addAction(m_zoom2Act);
 }
 
 void MainWindow::zoomIn()
@@ -278,36 +191,7 @@ void MainWindow::updateImageDisplay()
 {
     if (!m_currentImage.isNull())
     {
-        // Prepare image to display and overlay selection if present
-        QImage display = m_currentImage;
-        if (m_selection_.hasMask())
-        {
-            const auto& mask = m_selection_.mask();
-            if (mask && mask->width() == display.width() && mask->height() == display.height())
-            {
-                QImage overlay(display.size(), QImage::Format_ARGB32);
-                overlay.fill(Qt::transparent);
-                for (int y = 0; y < display.height(); ++y)
-                {
-                    for (int x = 0; x < display.width(); ++x)
-                    {
-                        const uint8_t t = m_selection_.t_at(x, y);
-                        if (t != 0)
-                        {
-                            // semi-transparent red highlight
-                            overlay.setPixel(x, y, qRgba(255, 0, 0, 100));
-                        }
-                    }
-                }
-
-                QPainter p(&display);
-                p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-                p.drawImage(0, 0, overlay);
-                p.end();
-            }
-        }
-
-        QPixmap pixmap = QPixmap::fromImage(display);
+        QPixmap pixmap = QPixmap::fromImage(m_currentImage);
         QSize scaledSize = pixmap.size() * m_scaleFactor;
         m_imageLabel->setPixmap(
             pixmap.scaled(scaledSize, Qt::KeepAspectRatio, Qt::SmoothTransformation));
@@ -317,14 +201,136 @@ void MainWindow::updateImageDisplay()
     }
 }
 
+bool MainWindow::eventFilter(QObject* watched, QEvent* event)
+{
+    if (watched == m_scrollArea->viewport())
+    {
+        if (event->type() == QEvent::MouseButtonPress)
+        {
+            QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::LeftButton && m_handMode)
+            {
+                m_panningActive = true;
+                m_lastPanPos = me->pos();
+                m_scrollArea->viewport()->setCursor(Qt::ClosedHandCursor);
+                return true;
+            }
+        }
+        else if (event->type() == QEvent::MouseMove)
+        {
+            if (m_panningActive)
+            {
+                QMouseEvent* me = static_cast<QMouseEvent*>(event);
+                QPoint delta = me->pos() - m_lastPanPos;
+                m_lastPanPos = me->pos();
+                m_scrollArea->horizontalScrollBar()->setValue(
+                    m_scrollArea->horizontalScrollBar()->value() - delta.x());
+                m_scrollArea->verticalScrollBar()->setValue(
+                    m_scrollArea->verticalScrollBar()->value() - delta.y());
+                return true;
+            }
+        }
+        else if (event->type() == QEvent::MouseButtonRelease)
+        {
+            QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            if (me->button() == Qt::LeftButton && m_panningActive)
+            {
+                m_panningActive = false;
+                m_scrollArea->viewport()->setCursor(Qt::OpenHandCursor);
+                return true;
+            }
+        }
+    }
+
+    return QMainWindow::eventFilter(watched, event);
+}
+
+void MainWindow::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Space && !event->isAutoRepeat())
+    {
+        m_handMode = true;
+        m_scrollArea->viewport()->setCursor(Qt::OpenHandCursor);
+        event->accept();
+        return;
+    }
+    QMainWindow::keyPressEvent(event);
+}
+
+void MainWindow::keyReleaseEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Space && !event->isAutoRepeat())
+    {
+        m_handMode = false;
+        m_panningActive = false;
+        m_scrollArea->viewport()->setCursor(Qt::ArrowCursor);
+        event->accept();
+        return;
+    }
+    QMainWindow::keyReleaseEvent(event);
+}
+
 void MainWindow::scaleImage(double factor)
 {
     if (m_currentImage.isNull())
         return;
 
-    m_scaleFactor *= factor;
-    m_scaleFactor = qBound(0.1, m_scaleFactor, 5.0);
+    const double target = qBound(0.1, m_scaleFactor * factor, 5.0);
+    setScaleAndCenter(target);
+}
+
+void MainWindow::setScaleAndCenter(double newScale)
+{
+    if (m_currentImage.isNull())
+        return;
+
+    QPixmap pixmap = QPixmap::fromImage(m_currentImage);
+
+    // taille avant
+    QSize oldSize = pixmap.size() * m_scaleFactor;
+
+    // position du curseur dans le viewport
+    QPoint vpPos = m_scrollArea->viewport()->mapFromGlobal(QCursor::pos());
+    QRect vpRect(QPoint(0, 0), m_scrollArea->viewport()->size());
+
+    int hVal = m_scrollArea->horizontalScrollBar()->value();
+    int vVal = m_scrollArea->verticalScrollBar()->value();
+
+    double relX = 0.5;
+    double relY = 0.5;
+    bool hasFocusPoint = false;
+
+    if (vpRect.contains(vpPos) && oldSize.width() > 0 && oldSize.height() > 0)
+    {
+        hasFocusPoint = true;
+        relX = (hVal + vpPos.x()) / static_cast<double>(oldSize.width());
+        relY = (vVal + vpPos.y()) / static_cast<double>(oldSize.height());
+    }
+
+    m_scaleFactor = qBound(0.1, newScale, 5.0);
+
+    // mise à jour de l'affichage
     updateImageDisplay();
+
+    // nouvelle taille
+    QSize newSize = pixmap.size() * m_scaleFactor;
+
+    // ajuster les scrollbars pour conserver le point centré sous le curseur
+    if (hasFocusPoint)
+    {
+        int newH = static_cast<int>(relX * newSize.width()) - vpPos.x();
+        int newV = static_cast<int>(relY * newSize.height()) - vpPos.y();
+        m_scrollArea->horizontalScrollBar()->setValue(newH);
+        m_scrollArea->verticalScrollBar()->setValue(newV);
+    }
+    else
+    {
+        // centrer l'image
+        m_scrollArea->horizontalScrollBar()->setValue(
+            (newSize.width() - m_scrollArea->viewport()->width()) / 2);
+        m_scrollArea->verticalScrollBar()->setValue(
+            (newSize.height() - m_scrollArea->viewport()->height()) / 2);
+    }
 }
 
 void MainWindow::saveAsEpg()
@@ -335,10 +341,9 @@ void MainWindow::saveAsEpg()
         return;
     }
 
-    QString picturesPath =
-        QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + "/untitled.epg";
+    const QString currentPath = QDir::currentPath() + "/untitled.epg";
     QString fileName = QFileDialog::getSaveFileName(this, tr("Enregistrer au format EpiGimp"),
-                                                    picturesPath, tr("EpiGimp (*.epg)"));
+                                                    currentPath, tr("EpiGimp (*.epg)"));
 
     if (fileName.isEmpty())
         fileName = "untitled.epg";
@@ -346,83 +351,94 @@ void MainWindow::saveAsEpg()
     if (!fileName.endsWith(".epg", Qt::CaseInsensitive))
         fileName += ".epg";
 
-    // convert QImage -> ImageBuffer and call core IO
-    ImageBuffer buf = [&]()
+    // convert QImage -> ImageBuffer
+    ImageBuffer buf(m_currentImage.width(), m_currentImage.height());
+    for (int y = 0; y < m_currentImage.height(); ++y)
     {
-        ImageBuffer b(m_currentImage.width(), m_currentImage.height());
-        for (int y = 0; y < m_currentImage.height(); ++y)
+        for (int x = 0; x < m_currentImage.width(); ++x)
         {
-            for (int x = 0; x < m_currentImage.width(); ++x)
-            {
-                const QRgb p = m_currentImage.pixel(x, y);
-                const uint8_t r = qRed(p);
-                const uint8_t g = qGreen(p);
-                const uint8_t bch = qBlue(p);
-                const uint8_t a = qAlpha(p);
-                const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
-                                      (static_cast<uint32_t>(g) << 16) |
-                                      (static_cast<uint32_t>(bch) << 8) | static_cast<uint32_t>(a);
-                b.setPixel(x, y, rgba);
-            }
+            const QRgb p = m_currentImage.pixel(x, y);
+            const uint8_t r = qRed(p);
+            const uint8_t g = qGreen(p);
+            const uint8_t bch = qBlue(p);
+            const uint8_t a = qAlpha(p);
+            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
+                                  (static_cast<uint32_t>(g) << 16) |
+                                  (static_cast<uint32_t>(bch) << 8) | static_cast<uint32_t>(a);
+            buf.setPixel(x, y, rgba);
         }
-        return b;
-    }();
+    }
 
-    if (!EpgFormat::save(fileName.toStdString(), buf))
+    // Build a Document with a single layer and save using ZipEpgStorage
+    Document doc(buf.width(), buf.height(), 72.f);
+
+    try
+    {
+        auto imgPtr = std::make_shared<ImageBuffer>(buf);
+        auto layer =
+            std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
+        doc.addLayer(layer);
+
+        ZipEpgStorage storage;
+        storage.save(doc, fileName.toStdString());
+    }
+    catch (const std::exception& e)
     {
         QMessageBox::critical(this, tr("Erreur"),
-                              tr("Impossible de sauvegarder le fichier EPG %1.")
-                                  .arg(QDir::toNativeSeparators(fileName)));
+                              tr("Impossible de sauvegarder le fichier EPG %1.\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(QString::fromLocal8Bit(e.what())));
         return;
     }
 
     m_currentFileName = fileName;
     statusBar()->showMessage(tr("Fichier EPG sauvegardé: %1").arg(fileName), 3000);
-
-    // If a selection mask exists, save it alongside the EPG as "<file>.sel"
-    if (m_selection_.hasMask())
-    {
-        const auto& mask = m_selection_.mask();
-        if (mask)
-        {
-            const std::string selName = fileName.toStdString() + ".sel";
-            if (!EpgFormat::save(selName, *mask))
-            {
-                QMessageBox::warning(
-                    this, tr("Attention"),
-                    tr("Impossible de sauvegarder la sélection: %1")
-                        .arg(QDir::toNativeSeparators(QString::fromStdString(selName))));
-            }
-        }
-    }
 }
 
 void MainWindow::openEpg()
 {
-    QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
-    QString fileName =
-        QFileDialog::getOpenFileName(this, tr("Ouvrir un fichier EpiGimp"), picturesPath,
+    QString currentPath = QDir::currentPath();
+    const QString fileName =
+        QFileDialog::getOpenFileName(this, tr("Ouvrir un fichier EpiGimp"), currentPath,
                                      tr("EpiGimp (*.epg);;Tous les fichiers (*)"));
 
     if (fileName.isEmpty())
         return;
 
-    ImageBuffer buf(1, 1);
-    if (!EpgFormat::load(fileName.toStdString(), buf))
+    ZipEpgStorage storage;
+    const auto res = storage.open(fileName.toStdString());
+    if (!res.success || !res.document)
     {
-        QMessageBox::critical(
-            this, tr("Erreur"),
-            tr("Impossible de charger le fichier EPG %1\nLe fichier est peut-être corrompu.")
-                .arg(QDir::toNativeSeparators(fileName)));
+        const QString err = QString::fromLocal8Bit(
+            res.errorMessage.empty() ? "Erreur inconnue" : res.errorMessage.c_str());
+        QMessageBox::critical(this, tr("Erreur"),
+                              tr("Impossible de charger le fichier EPG %1\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(err));
         return;
     }
-    // convert ImageBuffer -> QImage
-    QImage img(buf.width(), buf.height(), QImage::Format_ARGB32);
-    for (int y = 0; y < buf.height(); ++y)
+
+    const Document& doc = *res.document;
+    if (doc.layerCount() == 0)
     {
-        for (int x = 0; x < buf.width(); ++x)
+        QMessageBox::critical(this, tr("Erreur"), tr("Le document ne contient pas d'image."));
+        return;
+    }
+
+    const auto firstLayer = doc.layerAt(0);
+    if (!firstLayer || !firstLayer->image())
+    {
+        QMessageBox::critical(this, tr("Erreur"), tr("Le document ne contient pas d'image."));
+        return;
+    }
+    const ImageBuffer& ib = *firstLayer->image();
+
+    QImage img(ib.width(), ib.height(), QImage::Format_ARGB32);
+    for (int y = 0; y < ib.height(); ++y)
+    {
+        for (int x = 0; x < ib.width(); ++x)
         {
-            const uint32_t rgba = buf.getPixel(x, y);
+            const uint32_t rgba = ib.getPixel(x, y);
             const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
             const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
             const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
@@ -436,20 +452,6 @@ void MainWindow::openEpg()
     updateImageDisplay();
     m_scrollArea->setVisible(true);
 
-    // Try to load an accompanying selection file "<file>.sel"
-    {
-        ImageBuffer maskBuf(buf.width(), buf.height());
-        const std::string selName = fileName.toStdString() + ".sel";
-        if (EpgFormat::load(selName, maskBuf))
-        {
-            m_selection_.setMask(std::make_shared<ImageBuffer>(maskBuf));
-        }
-        else
-        {
-            m_selection_.clear();
-        }
-    }
-
     const QString message = tr("Fichier EPG chargé: %1 (%2x%3)")
                                 .arg(QFileInfo(fileName).fileName())
                                 .arg(m_currentImage.width())
@@ -457,4 +459,29 @@ void MainWindow::openEpg()
 
     statusBar()->showMessage(message);
     setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
+}
+
+void MainWindow::onMouseSelection(const QRect& rect)
+{
+    // Add rect to selection using image dimensions as reference
+    if (m_currentImage.isNull())
+        return;
+
+    auto ref = std::make_shared<ImageBuffer>(m_currentImage.width(), m_currentImage.height());
+    m_selection_.addRect(rect.x(), rect.y(), rect.width(), rect.height(), ref);
+    updateImageDisplay();
+}
+
+void MainWindow::clearSelection()
+{
+    m_selection_.clear();
+    updateImageDisplay();
+}
+
+void MainWindow::toggleSelectionMode(bool enabled)
+{
+    if (m_imageLabel)
+        m_imageLabel->setSelectionEnabled(enabled);
+    m_selectToggleAct->setChecked(enabled);
+    m_scrollArea->viewport()->setCursor(enabled ? Qt::CrossCursor : Qt::ArrowCursor);
 }

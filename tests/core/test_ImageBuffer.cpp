@@ -2,7 +2,7 @@
 // Created by apolline on 17/11/2025.
 //
 #include <gtest/gtest.h>
-#include "core/ImageBuffer.h"
+#include "core/ImageBuffer.hpp"
 
 TEST(ImageBufferTest, HasCorrectDimensions)
 {

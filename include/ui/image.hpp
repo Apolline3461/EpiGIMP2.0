@@ -21,6 +21,10 @@ class ImageLabel : public QLabel
     Q_OBJECT
    public:
     explicit ImageLabel(QWidget* parent = nullptr);
+    void setSelectionEnabled(bool enabled)
+    {
+        m_selectionEnabled_ = enabled;
+    }
 
    signals:
     void selectionFinished(const QRect& rect);
@@ -33,4 +37,5 @@ class ImageLabel : public QLabel
    private:
     QPoint m_origin_;
     QRubberBand* m_rubberBand_ = nullptr;
+    bool m_selectionEnabled_ = true;
 };

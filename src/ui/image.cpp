@@ -2,6 +2,7 @@
 
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QHBoxLayout>
@@ -200,6 +201,12 @@ ImageLabel::ImageLabel(QWidget* parent)
 
 void ImageLabel::mousePressEvent(QMouseEvent* event)
 {
+    if (!m_selectionEnabled_)
+    {
+        QLabel::mousePressEvent(event);
+        return;
+    }
+
     if (event->button() == Qt::LeftButton)
     {
         m_origin_ = event->pos();
@@ -211,6 +218,12 @@ void ImageLabel::mousePressEvent(QMouseEvent* event)
 
 void ImageLabel::mouseMoveEvent(QMouseEvent* event)
 {
+    if (!m_selectionEnabled_)
+    {
+        QLabel::mouseMoveEvent(event);
+        return;
+    }
+
     if (m_rubberBand_->isVisible())
     {
         QRect rect(m_origin_, event->pos());
@@ -221,6 +234,12 @@ void ImageLabel::mouseMoveEvent(QMouseEvent* event)
 
 void ImageLabel::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (!m_selectionEnabled_)
+    {
+        QLabel::mouseReleaseEvent(event);
+        return;
+    }
+
     if (event->button() == Qt::LeftButton && m_rubberBand_->isVisible())
     {
         m_rubberBand_->hide();
