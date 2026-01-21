@@ -206,7 +206,7 @@ jobs:
 
       - name: Upload clang-tidy fixes
         if: ${{ steps.scope.outputs.has_cpp == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{steps.art.outputs.name}}
           path: tidy-fixes/
