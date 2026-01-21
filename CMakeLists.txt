@@ -15,15 +15,12 @@ project(EpiGimp2.0
     LANGUAGES CXX
 )
 
-# ------------------------------------------------------------
-# Global CMake behavior
-# ------------------------------------------------------------
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
 
-# ------------------------------------------------------------
-# C++ Configuration
-# ------------------------------------------------------------
+# ============================================================
+# Configuration du standard C++
+# ============================================================
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -49,6 +46,10 @@ endif()
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
 
 find_package(Qt6 REQUIRED COMPONENTS
     Core
@@ -85,25 +86,37 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(stb)
-
-# ------------------------------------------------------------
-# Project structure
-# ------------------------------------------------------------
+add_library(stb_headers INTERFACE)
+target_include_directories(stb_headers SYSTEM INTERFACE ${stb_SOURCE_DIR})
+# ============================================================
+# Configuration par couche
+# ============================================================
 set(EPIGIMP_ROOT_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 
 add_subdirectory(src/core)
 add_subdirectory(src/io)
 add_subdirectory(src/app)
 add_subdirectory(src/render)
-add_subdirectory(src/ui)
+add_subdirectory(src/ui) # Ici qu'on crée l'exe
 
+# ============================================================
 # Tests
+# ============================================================
 option(BUILD_TESTING "Build unit tests" ON)
+
 if(BUILD_TESTING)
     include(CTest)
     enable_testing()
     add_subdirectory(tests)
 endif()
 
-# Lint
+option(ENABLE_COVERAGE "Enable coverage flags" OFF)
+if(ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-O0 -g --coverage)
+    add_link_options(--coverage)
+endif()
+
+# ============================================================
+# Cibles de lint
+# ============================================================
 include(${CMAKE_SOURCE_DIR}/lint.cmake)
