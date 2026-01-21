@@ -2,7 +2,7 @@
 # 🖼️ EpiGimp2.0 — Clang-Format Configuration
 # ============================================================
 # Style de base inspiré de Google avec adaptations Epitech
-# Compatible avec C++17
+# Compatible avec C++20
 # ============================================================
 
 BasedOnStyle: Google
@@ -20,7 +20,7 @@ ConstructorInitializerIndentWidth: 4
 # Limites de longueur
 # ============================================================
 ColumnLimit: 100
-ReflowComments: true
+ReflowComments: false
 
 # ============================================================
 # Espacement
@@ -93,17 +93,26 @@ SortIncludes: CaseInsensitive
 IncludeBlocks: Regroup
 IncludeCategories:
   # Qt headers en premier
-  - Regex: '^<Q.*'
+  - Regex: '^<Q[^>]*>'
     Priority: 1
-  # Headers système C++
-  - Regex: '^<.*\.h>'
+  - Regex: '^<Qt[^>]*>'
+    Priority: 1
+
+  # Headers C (xxx.h)
+  - Regex: '^<[^/]+\.h>'
     Priority: 2
-  # Headers système C++
-  - Regex: '^<.*'
+
+  # STL / système (sans slash)
+  - Regex: '^<[^/]+>'
     Priority: 3
-  # Headers locaux du projet
-  - Regex: '.*'
+
+  # Projet (includes en "")
+  - Regex: '^".*"'
     Priority: 4
+
+  # Catch-all
+  - Regex: '.*'
+    Priority: 5
 
 # ============================================================
 # Divers
@@ -119,4 +128,4 @@ SortUsingDeclarations: true
 # ============================================================
 # Standards
 # ============================================================
-Standard: c++17
+Standard: c++20

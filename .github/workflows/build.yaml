@@ -1,0 +1,111 @@
+name: Build epigimp
+
+on:
+  pull_request:
+    branches: [ main, dev ]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+        build-type: [Release]
+        include:
+          - os: ubuntu-24.04
+            qt-arch: 'gcc_64'
+            generator: 'Ninja'
+          - os: windows-latest
+            qt-arch: 'win64_msvc2019_64'
+            generator: 'Visual Studio 17 2022'
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Disable Microsoft APT repos (workaround)
+        if: runner.os == 'Linux'
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/azure-cli.list \
+                    /etc/apt/sources.list.d/microsoft-prod.list || true
+
+      - name: Install deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-render-util0 libxcb-xinerama0 libxcb-cursor0
+
+      - name: Configure MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install deps (Windows via vcpkg)
+        if: runner.os == 'Windows'
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 'de51e6bfa96e1245f2a969a8cde249baac89f7be'
+          vcpkgJsonGlob: 'vcpkg.json'
+
+      - name: Install Qt6
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.5.0'
+          arch: ${{ matrix.qt-arch }}
+          cache: true
+
+      - name: Configure (Linux)
+        if: runner.os == 'linux'
+        run: >
+          cmake -B build
+          -G "${{ matrix.generator }}"
+          -DCMAKE_BUILD_TYPE=${{ matrix.build-type }}
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Configure (Windows)
+        if: runner.os == 'windows'
+        run: >
+          cmake -B build
+          -G "${{ matrix.generator }}"
+          -DCMAKE_BUILD_TYPE=${{ matrix.build-type }}
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+          
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build-type }} --parallel
+
+      - name: Test
+        run: |
+          if [ -f build/CTestTestfile.cmake ] || [ -d build/Testing ]; then
+            ctest --test-dir build --output-on-failure -C ${{ matrix.build-type }}
+          else
+            echo "No tests configured, skipping."
+          fi
+        shell: bash
+
+      - name: Upload artifacts
+        if: github.ref_name == 'main' || github.ref_name == 'dev'
+        uses: actions/upload-artifact@v4
+        with:
+          name: epigimp-${{ runner.os }}-${{ matrix.build-type }}
+          path: build/bin/**
+          retention-days: 7

@@ -1,0 +1,213 @@
+name: 🔍 Code Quality & Linting
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [ main, dev ]
+  workflow_dispatch:
+
+concurrency:
+  group: lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Compute scope (changed vs full)
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mode="changed"
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+          
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            base="$(git rev-parse HEAD~1)"
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "Selected lint mode: $mode"
+          echo "Event: ${{ github.event_name }} | Branch: ${{ github.ref_name }}"
+
+          rm -f format_files.bin cpp_files.bin
+          : > format_files.bin
+          : > cpp_files.bin
+
+          add_format() { printf '%s\0' "$1" >> format_files.bin; }
+          add_cpp()    { printf '%s\0' "$1" >> cpp_files.bin; }
+
+          if [[ "$mode" == "full" ]]; then
+            while IFS= read -r -d '' f; do add_format "$f"; done < <(
+              find src include -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -print0
+            )
+            while IFS= read -r -d '' f; do add_cpp "$f"; done < <(
+              find src -type f -name "*.cpp" -print0
+            )
+          else
+            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+              base="${{ github.event.pull_request.base.sha }}"
+              head="${{ github.sha }}"
+            else
+              base="${{ github.event.pull_request.base.sha }}"
+              head="${{ github.event.pull_request.head.sha }}"
+            fi
+
+            if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+              base="$(git rev-parse HEAD~1)"
+            fi
+
+            while IFS= read -r -d '' f; do
+              [[ -f "$f" ]] || continue
+              case "$f" in
+                src/*|include/*)
+                  case "$f" in
+                    *.cpp|*.hpp|*.h) add_format "$f" ;;
+                  esac
+                  if [[ "$f" == src/* && "$f" == *.cpp ]]; then
+                    add_cpp "$f"
+                  fi
+                ;;
+              esac
+            done < <(git diff --name-only -z "$base" "$head" -- src include || true)
+          fi
+
+          if [[ -s format_files.bin ]]; then echo "has_format=true" >> "$GITHUB_OUTPUT"; else echo "has_format=false" >> "$GITHUB_OUTPUT"; fi
+          if [[ -s cpp_files.bin ]]; then echo "has_cpp=true" >> "$GITHUB_OUTPUT"; else echo "has_cpp=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Disable Microsoft APT repos (workaround)
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/azure-cli.list \
+                    /etc/apt/sources.list.d/microsoft-prod.list || true
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format clang-tidy cppcheck cmake ninja-build
+
+      - name: Install Qt6
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.5.0'
+          cache: true
+
+      - name: Configure (compile_commands.json)
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Build (Qt moc/uic)
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
+        run: cmake --build build --parallel
+
+      - name: clang-format (check)
+        if: ${{ steps.scope.outputs.has_format == 'true' }}
+        run: |
+          set -euo pipefail
+          xargs -0 clang-format --dry-run --Werror --style=file < format_files.bin
+
+      - name: Line endings (LF only)
+        if: ${{ steps.scope.outputs.has_format == 'true' }}
+        run: |
+          set -euo pipefail
+          if xargs -0 file < format_files.bin | grep -q CRLF; then
+            echo "❌ CRLF detected. Please convert to LF."
+            exit 1
+          fi
+
+      - name: clang-tidy GATE (blocking)
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+
+          CFG="{Checks: 'clang-analyzer-*,bugprone-*,performance-*', WarningsAsErrors: 'clang-analyzer-*,bugprone-*,performance-*'}"
+
+          while IFS= read -r -d '' f; do
+            echo "::group::clang-tidy $f"
+            clang-tidy -p build "$f" \
+              -config="$CFG" \
+              -header-filter="^${GITHUB_WORKSPACE}/(src|include)/.*" || failed=1
+            echo "::endgroup::"
+          done < cpp_files.bin
+          exit $failed
+
+      - name: Restore cppcheck cache
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: cppcheck-cache
+          key: ${{runner.os}}-cppcheck-${{hashFiles('build/compile_commands.json')}}
+          restore-keys: ${{runner.os}}-cppcheck-
+
+      - name: Cppcheck (from compile database, filtered)
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
+        run: |
+          set -euo pipefail
+          mkdir -p cppcheck-cache
+          args=()
+          while IFS= read -r -d '' f; do
+            args+=( "--file-filter=$f" )
+          done < cpp_files.bin
+
+          cppcheck \
+            --enable=warning,style,performance,portability \
+            --inconclusive \
+            --inline-suppr \
+            --error-exitcode=1 \
+            --project=build/compile_commands.json \
+            --cppcheck-build-dir=cppcheck-cache \
+            "${args[@]}"
+
+      - name: clang-tidy advisory (export fixes)
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p tidy-fixes
+
+          while IFS= read -r -d '' f; do
+            out="tidy-fixes/$(echo "$f" | tr '/.' '__').yaml"
+            clang-tidy -p build "$f" \
+              -checks='modernize-*,readability-*,cppcoreguidelines-*,misc-*,portability-*' \
+              -header-filter='.*/(src|include)/.*' \
+              --export-fixes="$out" || true
+          done < cpp_files.bin
+
+      - name: Compute artifact name (safe)
+        id: art
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref="${{ github.ref }}"
+          safe_ref="$(echo "$ref" | tr '/\\:*?"<>|\r\n' '-' )"
+          sha="${{ github.sha }}"
+          echo "name=clang-tidy-fixes-${{ runner.os }}-${safe_ref}-${sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload clang-tidy fixes
+        if: ${{ steps.scope.outputs.has_cpp == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{steps.art.outputs.name}}
+          path: tidy-fixes/
+          retention-days: 7

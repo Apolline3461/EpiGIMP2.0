@@ -18,7 +18,7 @@
 void pngWriteCallback(void* context, void* data, int size)
 {
     auto* buffer = reinterpret_cast<std::vector<unsigned char>*>(context);
-    unsigned char* bytes = reinterpret_cast<unsigned char*>(data);
+    const auto* bytes = static_cast<const unsigned char*>(data);
     buffer->insert(buffer->end(), bytes, bytes + size);
 }
 
