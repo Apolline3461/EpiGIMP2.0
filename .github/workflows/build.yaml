@@ -104,7 +104,7 @@ jobs:
 
       - name: Upload artifacts
         if: github.ref_name == 'main' || github.ref_name == 'dev'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: epigimp-${{ runner.os }}-${{ matrix.build-type }}
           path: build/bin/**
