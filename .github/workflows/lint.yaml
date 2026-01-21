@@ -154,7 +154,7 @@ jobs:
 
       - name: Restore cppcheck cache
         if: ${{ steps.scope.outputs.has_cpp == 'true' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: cppcheck-cache
           key: ${{runner.os}}-cppcheck-${{hashFiles('build/compile_commands.json')}}
