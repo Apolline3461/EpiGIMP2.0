@@ -4,9 +4,10 @@
 #include "io/EpgZip.hpp"
 
 // JSON (de)serialization helpers for EPG structures
-#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 // This header is self-contained: it includes `io/EpgTypes.hpp` and provides

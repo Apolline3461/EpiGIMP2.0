@@ -26,14 +26,19 @@ add_library(epigimp_io STATIC
 target_include_directories(epigimp_io
         PUBLIC
         ${EPIGIMP_ROOT_INCLUDE_DIR}
-        ${stb_SOURCE_DIR}
 )
+#
+#target_include_directories(epigimp_io
+#        SYSTEM PRIVATE
+#        ${stb_SOURCE_DIR}
+#)
 
 target_link_libraries(epigimp_io
         PUBLIC
         epigimp_core
         nlohmann_json::nlohmann_json
         epigimp_warnings
+        stb_headers
 )
 
 

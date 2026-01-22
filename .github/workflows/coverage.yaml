@@ -1,0 +1,80 @@
+name: Coverage (Codecov)
+
+on:
+  pull_request:
+    branches: [ main, dev ]
+  workflow_dispatch:
+
+concurrency:
+  group: coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-24.04
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Disable Microsoft APT repos (workaround)
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/azure-cli.list \
+                    /etc/apt/sources.list.d/microsoft-prod.list || true
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake gcovr \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-render-util0 libxcb-xinerama0 libxcb-cursor0
+
+      - name: Install Qt6
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.5.0'
+          arch: 'gcc_64'
+          cache: true
+
+      - name: Configure (coverage)
+        run: |
+          cmake -B build-cov -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DENABLE_COVERAGE=ON
+
+      - name: Build
+        run: cmake --build build-cov --parallel
+
+      - name: Test
+        run: ctest --test-dir build-cov --output-on-failure
+
+      - name: Generate coverage (gcovr)
+        run: |
+          gcovr -r . \
+            --xml-pretty -o coverage.xml \
+            --print-summary \
+            --exclude 'build-cov/|cmake-build-|build/|_deps/|tests/'
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.sha }}
+          path: coverage.xml
+          retention-days: 7
+
+      - name: Upload to Codecov
+        if: ${{ env.CODECOV_TOKEN }}
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true

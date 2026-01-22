@@ -17,6 +17,16 @@ inline constexpr unsigned char kPngSignature[8] = {137, 80, 78, 71, 13, 10, 26, 
 namespace io::epg
 {
 
+struct FreeDeleter
+{
+    void operator()(void* p) const noexcept
+    {
+        std::free(p);
+    }
+};
+
+using MallocPtr = std::unique_ptr<void, FreeDeleter>;
+
 class ZipHandle
 {
    public:
@@ -60,9 +70,14 @@ class ZipHandle
         z_ = nullptr;
         return t;
     }
+    void keep(MallocPtr p)
+    {
+        keepAlive_.push_back(std::move(p));
+    }
 
    private:
     zip_t* z_{nullptr};
+    std::vector<MallocPtr> keepAlive_;
 };
 
 struct OpenResult
