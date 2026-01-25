@@ -14,6 +14,14 @@
 
 #include <core/Selection.hpp>
 
+// Définitions pour les analyseurs (clangd) qui ne connaissent pas la
+// macro `slots`. Ne pas redéfinir pour `moc`.
+#if !defined(Q_MOC_RUN)
+#if !defined(slots)
+#define slots
+#endif
+#endif
+
 class ImageActions;
 class ImageLabel;
 
