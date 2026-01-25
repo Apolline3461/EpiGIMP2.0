@@ -15,8 +15,6 @@
 #include <QStatusBar>
 #include <QToolBar>
 
-#include <string>
-
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
@@ -54,7 +52,6 @@ MainWindow::MainWindow(QWidget* parent)
         cmd->addAction(m_selectToggleAct);
     if (m_clearSelectionAct)
         cmd->addAction(m_clearSelectionAct);
-    m_cmdMenu = nullptr;
     // connect selection signal
     connect(m_imageLabel, &ImageLabel::selectionFinished, this, &MainWindow::onMouseSelection);
     // panning: capter les événements de la zone de viewport
@@ -466,12 +463,24 @@ void MainWindow::openEpg()
 
 void MainWindow::onMouseSelection(const QRect& rect)
 {
-    // Add rect to selection using image dimensions as reference
+    // rect is in widget space, need to transform to image space
     if (m_currentImage.isNull())
         return;
 
+    // Validate scale factor (should be between 0.1 and 5.0 as per scaleImage())
+    if (m_scaleFactor < 0.1)
+        return;
+
+    // Transform from widget space to image space by dividing by scale factor
+    // Use rounding for better precision instead of truncation
+    QRect imageSpaceRect(static_cast<int>(std::round(rect.x() / m_scaleFactor)),
+                         static_cast<int>(std::round(rect.y() / m_scaleFactor)),
+                         static_cast<int>(std::round(rect.width() / m_scaleFactor)),
+                         static_cast<int>(std::round(rect.height() / m_scaleFactor)));
+
     auto ref = std::make_shared<ImageBuffer>(m_currentImage.width(), m_currentImage.height());
-    m_selection_.addRect(rect.x(), rect.y(), rect.width(), rect.height(), ref);
+    m_selection.addRect(imageSpaceRect.x(), imageSpaceRect.y(), imageSpaceRect.width(),
+                        imageSpaceRect.height(), ref);
     if (m_imageLabel)
         m_imageLabel->setSelectionRect(rect);
     updateImageDisplay();
@@ -479,7 +488,7 @@ void MainWindow::onMouseSelection(const QRect& rect)
 
 void MainWindow::clearSelection()
 {
-    m_selection_.clear();
+    m_selection.clear();
     if (m_imageLabel)
         m_imageLabel->clearSelectionRect();
     updateImageDisplay();

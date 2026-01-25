@@ -79,10 +79,9 @@ class MainWindow : public QMainWindow
     QPoint m_lastPanPos;
     QAction* m_openEpgAct;
     QAction* m_saveEpgAct;
-    QAction* m_selectRectAct;
     QAction* m_clearSelectionAct;
     QAction* m_selectToggleAct;
 
     // Sélection active pour l'image
-    Selection m_selection_;
+    Selection m_selection;
 };

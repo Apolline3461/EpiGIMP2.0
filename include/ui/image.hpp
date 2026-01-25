@@ -50,7 +50,7 @@ class ImageLabel : public QLabel
    private:
     QPoint m_origin_;
     QRubberBand* m_rubberBand_ = nullptr;
-    bool m_selectionEnabled_ = true;
+    bool m_selectionEnabled_ = false;
     QRect m_selectionRect_;
     bool m_hasSelection_ = false;
 };

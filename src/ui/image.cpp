@@ -254,7 +254,7 @@ void ImageLabel::mouseReleaseEvent(QMouseEvent* event)
             m_hasSelection_ = true;
             m_rubberBand_->hide();
             update();
-            emit selectionFinished(rect);
+            emit this->selectionFinished(rect);
         }
     }
     QLabel::mouseReleaseEvent(event);
