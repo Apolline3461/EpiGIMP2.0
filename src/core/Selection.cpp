@@ -23,8 +23,10 @@ uint8_t Selection::t_at(const int x, const int y) const
     return static_cast<uint8_t>(px & 0xFF);
 }
 
-void Selection::addRect(const int x, const int y, const int w, const int h,
-                        std::shared_ptr<ImageBuffer> reference)
+void Selection::addRect(
+    const int x, const int y, const int w, const int h,
+    const std::shared_ptr<ImageBuffer>&
+        reference)  // NOLINT(bugprone-easily-swappable-parameters,performance-unnecessary-value-param)
 {
     if (!mask_)
     {
@@ -48,7 +50,8 @@ void Selection::addRect(const int x, const int y, const int w, const int h,
     }
 }
 
-void Selection::subtractRect(const int x, const int y, const int w, const int h)
+void Selection::subtractRect(const int x, const int y, const int w,
+                             const int h)  // NOLINT(bugprone-easily-swappable-parameters)
 {
     if (!mask_)
         return;

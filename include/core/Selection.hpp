@@ -23,8 +23,13 @@ class Selection
         return static_cast<bool>(mask_);
     }
     uint8_t t_at(int x, int y) const;
-    void addRect(int x, int y, int w, int h, std::shared_ptr<ImageBuffer> reference = nullptr);
-    void subtractRect(int x, int y, int w, int h);
+    void addRect(
+        int x, int y, int w, int h,
+        const std::shared_ptr<ImageBuffer>& reference =
+            std::shared_ptr<ImageBuffer>())  // NOLINT(bugprone-easily-swappable-parameters)
+        ;
+    void subtractRect(int x, int y, int w, int h)  // NOLINT(bugprone-easily-swappable-parameters)
+        ;
     void clear() noexcept
     {
         mask_.reset();
