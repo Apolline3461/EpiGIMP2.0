@@ -23,12 +23,22 @@ class Selection
         return static_cast<bool>(mask_);
     }
     uint8_t t_at(int x, int y) const;
+
+    // Use a small Rect type to avoid multiple adjacent primitive parameters
+    struct Rect
+    {
+        int x{};
+        int y{};
+        int w{};
+        int h{};
+    };
+
     void addRect(
-        int x, int y, int w, int h,
+        const Rect& rect,
         const std::shared_ptr<ImageBuffer>& reference =
             std::shared_ptr<ImageBuffer>())  // NOLINT(bugprone-easily-swappable-parameters)
         ;
-    void subtractRect(int x, int y, int w, int h)  // NOLINT(bugprone-easily-swappable-parameters)
+    void subtractRect(const Rect& rect)  // NOLINT(bugprone-easily-swappable-parameters)
         ;
     void clear() noexcept
     {

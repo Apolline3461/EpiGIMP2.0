@@ -479,8 +479,9 @@ void MainWindow::onMouseSelection(const QRect& rect)
                          static_cast<int>(std::round(rect.height() / m_scaleFactor)));
 
     auto ref = std::make_shared<ImageBuffer>(m_currentImage.width(), m_currentImage.height());
-    m_selection.addRect(imageSpaceRect.x(), imageSpaceRect.y(), imageSpaceRect.width(),
-                        imageSpaceRect.height(), ref);
+    Selection::Rect selRect{imageSpaceRect.x(), imageSpaceRect.y(), imageSpaceRect.width(),
+                            imageSpaceRect.height()};
+    m_selection.addRect(selRect, ref);
     if (m_imageLabel)
         m_imageLabel->setSelectionRect(rect);
     updateImageDisplay();
