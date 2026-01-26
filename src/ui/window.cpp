@@ -117,6 +117,7 @@ void MainWindow::createActions()
     m_undoAct->setShortcut(QKeySequence::Undo);
     m_undoAct->setStatusTip(tr("Annuler la dernière action"));
     m_undoAct->setIcon(QIcon(":/icons/undo.svg"));
+    m_undoAct->setEnabled(false);
     connect(m_undoAct, &QAction::triggered,
             [this]()
             {
@@ -125,6 +126,10 @@ void MainWindow::createActions()
                     m_history.undo();
                     updateImageDisplay();
                     statusBar()->showMessage(tr("Annuler"), 1000);
+                    if (m_undoAct)
+                        m_undoAct->setEnabled(m_history.canUndo());
+                    if (m_redoAct)
+                        m_redoAct->setEnabled(m_history.canRedo());
                 }
             });
 
@@ -132,6 +137,7 @@ void MainWindow::createActions()
     m_redoAct->setShortcut(QKeySequence::Redo);
     m_redoAct->setStatusTip(tr("Rétablir la dernière action annulée"));
     m_redoAct->setIcon(QIcon(":/icons/redo.svg"));
+    m_redoAct->setEnabled(false);
     connect(m_redoAct, &QAction::triggered,
             [this]()
             {
@@ -140,6 +146,10 @@ void MainWindow::createActions()
                     m_history.redo();
                     updateImageDisplay();
                     statusBar()->showMessage(tr("Rétablir"), 1000);
+                    if (m_undoAct)
+                        m_undoAct->setEnabled(m_history.canUndo());
+                    if (m_redoAct)
+                        m_redoAct->setEnabled(m_history.canRedo());
                 }
             });
 
@@ -731,6 +741,12 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
     auto cmd = std::make_unique<app::DataCommand>(0ull, std::move(changes), apply);
     cmd->redo();
     m_history.push(std::move(cmd));
+
+    // update undo/redo enabled state
+    if (m_undoAct)
+        m_undoAct->setEnabled(m_history.canUndo());
+    if (m_redoAct)
+        m_redoAct->setEnabled(m_history.canRedo());
 
     statusBar()->showMessage(tr("Remplissage effectué"), 2000);
 }

@@ -1,0 +1,778 @@
+11 error error generated generated.
+.
+Error while processing /home/godetl/EPITECH/PRO/EpiGIMP2.0/src/app/History.cpp.
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/app/History.cpp:9:10: error: 'app/History.hpp' file not found [clang-diagnostic-error]
+    9 | #include "app/History.hpp"
+      |          ^~~~~~~~~~~~~~~~~
+Found compiler error(s).
+Error while processing /home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Document.cpp.
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Document.cpp:4:10: error: 'core/Document.hpp' file not found [clang-diagnostic-error]
+    4 | #include "core/Document.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~
+Found compiler error(s).
+1 error generated.
+Error while processing /home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/ImageBuffer.cpp.
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/ImageBuffer.cpp:5:10: error: 'core/ImageBuffer.hpp' file not found [clang-diagnostic-error]
+    5 | #include "core/ImageBuffer.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~~
+Found compiler error(s).
+3093 warnings and 1 error generated.
+Error while processing /home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Layer.cpp.
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Layer.cpp:5:10: error: 'core/Layer.hpp' file not found [clang-diagnostic-error]
+    5 | #include "core/Layer.hpp"
+      |          ^~~~~~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Layer.cpp:8:1: warning: included header utility is not used directly [misc-include-cleaner]
+    8 | #include <utility>
+      | ^~~~~~~~~~~~~~~~~~
+    9 | 
+Suppressed 3092 warnings (3092 in non-user code).
+Use -header-filter=.* to display errors from all non-system headers. Use -system-headers to display errors from system headers as well.
+Found compiler error(s).
+1 error generated.
+Error while processing /home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/StbImpl.cpp.
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/StbImpl.cpp:9:10: error: 'stb_image.h' file not found [clang-diagnostic-error]
+    9 | #include <stb_image.h>
+      |          ^~~~~~~~~~~~~
+Found compiler error(s).
+10949 warnings and 1 error generated.
+Error while processing /home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Selection.cpp.
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Selection.cpp:8:10: error: 'core/Selection.hpp' file not found [clang-diagnostic-error]
+    8 | #include "core/Selection.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Selection.cpp:10:1: warning: included header algorithm is not used directly [misc-include-cleaner]
+   10 | #include <algorithm>
+      | ^~~~~~~~~~~~~~~~~~~~
+   11 | #include <cassert>
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Selection.cpp:12:1: warning: included header cstdint is not used directly [misc-include-cleaner]
+   12 | #include <cstdint>
+      | ^~~~~~~~~~~~~~~~~~
+   13 | 
+Suppressed 10947 warnings (10947 in non-user code).
+Use -header-filter=.* to display errors from all non-system headers. Use -system-headers to display errors from system headers as well.
+Found compiler error(s).
+10834 warnings and 1 error generated.
+Error while processing /home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp.
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:5:10: error: 'core/Compositor.hpp' file not found [clang-diagnostic-error]
+    5 | #include "core/Compositor.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:13:28: warning: function 'extractR' declared 'static', move to anonymous namespace instead [misc-use-anonymous-namespace]
+   13 | static inline std::uint8_t extractR(std::uint32_t rgba)
+      |                            ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:15:53: warning: integer literal has suffix 'u', which is not uppercase [readability-uppercase-literal-suffix]
+   15 |     return static_cast<std::uint8_t>((rgba >> 24) & 0xFFu);
+      |                                                     ^   ~
+      |                                                         U
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:18:28: warning: function 'extractG' declared 'static', move to anonymous namespace instead [misc-use-anonymous-namespace]
+   18 | static inline std::uint8_t extractG(std::uint32_t rgba)
+      |                            ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:20:53: warning: integer literal has suffix 'u', which is not uppercase [readability-uppercase-literal-suffix]
+   20 |     return static_cast<std::uint8_t>((rgba >> 16) & 0xFFu);
+      |                                                     ^   ~
+      |                                                         U
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:23:28: warning: function 'extractB' declared 'static', move to anonymous namespace instead [misc-use-anonymous-namespace]
+   23 | static inline std::uint8_t extractB(std::uint32_t rgba)
+      |                            ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:25:52: warning: integer literal has suffix 'u', which is not uppercase [readability-uppercase-literal-suffix]
+   25 |     return static_cast<std::uint8_t>((rgba >> 8) & 0xFFu);
+      |                                                    ^   ~
+      |                                                        U
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:28:28: warning: function 'extractA' declared 'static', move to anonymous namespace instead [misc-use-anonymous-namespace]
+   28 | static inline std::uint8_t extractA(std::uint32_t rgba)
+      |                            ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:30:45: warning: integer literal has suffix 'u', which is not uppercase [readability-uppercase-literal-suffix]
+   30 |     return static_cast<std::uint8_t>(rgba & 0xFFu);
+      |                                             ^   ~
+      |                                                 U
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:33:29: warning: function 'makePixel' declared 'static', move to anonymous namespace instead [misc-use-anonymous-namespace]
+   33 | static inline std::uint32_t makePixel(std::uint8_t r, std::uint8_t g, std::uint8_t b,
+      |                             ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:33:39: error: 4 adjacent parameters of 'makePixel' of similar type ('int') are easily swapped by mistake [bugprone-easily-swappable-parameters,-warnings-as-errors]
+   33 | static inline std::uint32_t makePixel(std::uint8_t r, std::uint8_t g, std::uint8_t b,
+      |                                       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   34 |                                       std::uint8_t a)
+      |                                       ~~~~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:33:52: note: the first parameter in the range is 'r'
+   33 | static inline std::uint32_t makePixel(std::uint8_t r, std::uint8_t g, std::uint8_t b,
+      |                                                    ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:34:52: note: the last parameter in the range is 'a'
+   34 |                                       std::uint8_t a)
+      |                                                    ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:33:52: warning: parameter name 'r' is too short, expected at least 3 characters [readability-identifier-length]
+   33 | static inline std::uint32_t makePixel(std::uint8_t r, std::uint8_t g, std::uint8_t b,
+      |                                                    ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:33:68: warning: parameter name 'g' is too short, expected at least 3 characters [readability-identifier-length]
+   33 | static inline std::uint32_t makePixel(std::uint8_t r, std::uint8_t g, std::uint8_t b,
+      |                                                                    ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:33:84: warning: parameter name 'b' is too short, expected at least 3 characters [readability-identifier-length]
+   33 | static inline std::uint32_t makePixel(std::uint8_t r, std::uint8_t g, std::uint8_t b,
+      |                                                                                    ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:34:52: warning: parameter name 'a' is too short, expected at least 3 characters [readability-identifier-length]
+   34 |                                       std::uint8_t a)
+      |                                                    ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:40:22: warning: function 'blendPixel' declared 'static', move to anonymous namespace instead [misc-use-anonymous-namespace]
+   40 | static std::uint32_t blendPixel(std::uint32_t src, std::uint32_t dst, float layerOpacity)
+      |                      ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:40:33: error: 3 adjacent parameters of 'blendPixel' of convertible types are easily swapped by mistake [bugprone-easily-swappable-parameters,-warnings-as-errors]
+   40 | static std::uint32_t blendPixel(std::uint32_t src, std::uint32_t dst, float layerOpacity)
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:40:47: note: the first parameter in the range is 'src'
+   40 | static std::uint32_t blendPixel(std::uint32_t src, std::uint32_t dst, float layerOpacity)
+      |                                               ^~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:40:77: note: the last parameter in the range is 'layerOpacity'
+   40 | static std::uint32_t blendPixel(std::uint32_t src, std::uint32_t dst, float layerOpacity)
+      |                                                                             ^~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:40:71: note: 'int' and 'float' may be implicitly converted
+   40 | static std::uint32_t blendPixel(std::uint32_t src, std::uint32_t dst, float layerOpacity)
+      |                                                                       ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:42:17: warning: variable 'srcR' is not initialized [cppcoreguidelines-init-variables]
+    6 |     const float srcR = extractR(src) / 255.0f;
+      |                 ^                            
+      |                                               = NAN
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:42:17: warning: invalid case style for variable 'srcR' [readability-identifier-naming]
+   42 |     const float srcR = extractR(src) / 255.0f;
+      |                 ^~~~
+      |                 src_r
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:43:17: warning: variable 'srcG' is not initialized [cppcoreguidelines-init-variables]
+   43 |     const float srcG = extractG(src) / 255.0f;
+      |                 ^                            
+      |                                               = NAN
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:43:17: warning: invalid case style for variable 'srcG' [readability-identifier-naming]
+   43 |     const float srcG = extractG(src) / 255.0f;
+      |                 ^~~~
+      |                 src_g
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:44:17: warning: variable 'srcB' is not initialized [cppcoreguidelines-init-variables]
+   44 |     const float srcB = extractB(src) / 255.0f;
+      |                 ^                            
+      |                                               = NAN
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:44:17: warning: invalid case style for variable 'srcB' [readability-identifier-naming]
+   44 |     const float srcB = extractB(src) / 255.0f;
+      |                 ^~~~
+      |                 src_b
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:45:17: warning: variable 'srcA' is not initialized [cppcoreguidelines-init-variables]
+   45 |     const float srcA = extractA(src) / 255.0f;
+      |                 ^                            
+      |                                               = NAN
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:45:17: warning: invalid case style for variable 'srcA' [readability-identifier-naming]
+   45 |     const float srcA = extractA(src) / 255.0f;
+      |                 ^~~~
+      |                 src_a
+   46 | 
+   47 |     const float dstR = extractR(dst) / 255.0f;
+   48 |     const float dstG = extractG(dst) / 255.0f;
+   49 |     const float dstB = extractB(dst) / 255.0f;
+   50 |     const float dstA = extractA(dst) / 255.0f;
+   51 | 
+   52 |     // On applique l'opacité du layer sur l'alpha source
+   53 |     const float effA = srcA * std::clamp(layerOpacity, 0.0f, 1.0f);
+      |                        ~~~~
+      |                        src_a
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:47:17: warning: variable 'dstR' is not initialized [cppcoreguidelines-init-variables]
+   47 |     const float dstR = extractR(dst) / 255.0f;
+      |                 ^                            
+      |                                               = NAN
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:47:17: warning: invalid case style for variable 'dstR' [readability-identifier-naming]
+   47 |     const float dstR = extractR(dst) / 255.0f;
+      |                 ^~~~
+      |                 dst_r
+   48 |     const float dstG = extractG(dst) / 255.0f;
+   49 |     const float dstB = extractB(dst) / 255.0f;
+   50 |     const float dstA = extractA(dst) / 255.0f;
+   51 | 
+   52 |     // On applique l'opacité du layer sur l'alpha source
+   53 |     const float effA = srcA * std::clamp(layerOpacity, 0.0f, 1.0f);
+   54 | 
+   55 |     // Alpha out (formule "src over dst")
+   56 |     const float outA = effA + dstA * (1.0f - effA);
+   57 | 
+   58 |     if (outA <= 0.0f)
+   59 |         return 0u;
+   60 | 
+   61 |     // RGB out, en "straight alpha"
+   62 |     const float outR = (srcR * effA + dstR * dstA * (1.0f - effA)) / outA;
+      |                                       ~~~~
+      |                                       dst_r
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:48:17: warning: variable 'dstG' is not initialized [cppcoreguidelines-init-variables]
+   48 |     const float dstG = extractG(dst) / 255.0f;
+      |                 ^                            
+      |                                               = NAN
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:48:17: warning: invalid case style for variable 'dstG' [readability-identifier-naming]
+   48 |     const float dstG = extractG(dst) / 255.0f;
+      |                 ^~~~
+      |                 dst_g
+   49 |     const float dstB = extractB(dst) / 255.0f;
+   50 |     const float dstA = extractA(dst) / 255.0f;
+   51 | 
+   52 |     // On applique l'opacité du layer sur l'alpha source
+   53 |     const float effA = srcA * std::clamp(layerOpacity, 0.0f, 1.0f);
+   54 | 
+   55 |     // Alpha out (formule "src over dst")
+   56 |     const float outA = effA + dstA * (1.0f - effA);
+   57 | 
+   58 |     if (outA <= 0.0f)
+   59 |         return 0u;
+   60 | 
+   61 |     // RGB out, en "straight alpha"
+   62 |     const float outR = (srcR * effA + dstR * dstA * (1.0f - effA)) / outA;
+   63 |     const float outG = (srcG * effA + dstG * dstA * (1.0f - effA)) / outA;
+      |                                       ~~~~
+      |                                       dst_g
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:49:17: warning: variable 'dstB' is not initialized [cppcoreguidelines-init-variables]
+   49 |     const float dstB = extractB(dst) / 255.0f;
+      |                 ^                            
+      |                                               = NAN
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:49:17: warning: invalid case style for variable 'dstB' [readability-identifier-naming]
+   49 |     const float dstB = extractB(dst) / 255.0f;
+      |                 ^~~~
+      |                 dst_b
+   50 |     const float dstA = extractA(dst) / 255.0f;
+   51 | 
+   52 |     // On applique l'opacité du layer sur l'alpha source
+   53 |     const float effA = srcA * std::clamp(layerOpacity, 0.0f, 1.0f);
+   54 | 
+   55 |     // Alpha out (formule "src over dst")
+   56 |     const float outA = effA + dstA * (1.0f - effA);
+   57 | 
+   58 |     if (outA <= 0.0f)
+   59 |         return 0u;
+   60 | 
+   61 |     // RGB out, en "straight alpha"
+   62 |     const float outR = (srcR * effA + dstR * dstA * (1.0f - effA)) / outA;
+   63 |     const float outG = (srcG * effA + dstG * dstA * (1.0f - effA)) / outA;
+   64 |     const float outB = (srcB * effA + dstB * dstA * (1.0f - effA)) / outA;
+      |                                       ~~~~
+      |                                       dst_b
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:50:17: warning: variable 'dstA' is not initialized [cppcoreguidelines-init-variables]
+   50 |     const float dstA = extractA(dst) / 255.0f;
+      |                 ^                            
+      |                                               = NAN
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:50:17: warning: invalid case style for variable 'dstA' [readability-identifier-naming]
+   50 |     const float dstA = extractA(dst) / 255.0f;
+      |                 ^~~~
+      |                 dst_a
+   51 | 
+   52 |     // On applique l'opacité du layer sur l'alpha source
+   53 |     const float effA = srcA * std::clamp(layerOpacity, 0.0f, 1.0f);
+   54 | 
+   55 |     // Alpha out (formule "src over dst")
+   56 |     const float outA = effA + dstA * (1.0f - effA);
+      |                               ~~~~
+      |                               dst_a
+   57 | 
+   58 |     if (outA <= 0.0f)
+   59 |         return 0u;
+   60 | 
+   61 |     // RGB out, en "straight alpha"
+   62 |     const float outR = (srcR * effA + dstR * dstA * (1.0f - effA)) / outA;
+      |                                              ~~~~
+      |                                              dst_a
+   63 |     const float outG = (srcG * effA + dstG * dstA * (1.0f - effA)) / outA;
+      |                                              ~~~~
+      |                                              dst_a
+   64 |     const float outB = (srcB * effA + dstB * dstA * (1.0f - effA)) / outA;
+      |                                              ~~~~
+      |                                              dst_a
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:53:17: warning: invalid case style for variable 'effA' [readability-identifier-naming]
+   53 |     const float effA = srcA * std::clamp(layerOpacity, 0.0f, 1.0f);
+      |                 ^~~~
+      |                 eff_a
+   54 | 
+   55 |     // Alpha out (formule "src over dst")
+   56 |     const float outA = effA + dstA * (1.0f - effA);
+      |                        ~~~~                  ~~~~
+      |                        eff_a                 eff_a
+   57 | 
+   58 |     if (outA <= 0.0f)
+   59 |         return 0u;
+   60 | 
+   61 |     // RGB out, en "straight alpha"
+   62 |     const float outR = (srcR * effA + dstR * dstA * (1.0f - effA)) / outA;
+      |                                ~~~~                         ~~~~
+      |                                eff_a                        eff_a
+   63 |     const float outG = (srcG * effA + dstG * dstA * (1.0f - effA)) / outA;
+      |                                ~~~~                         ~~~~
+      |                                eff_a                        eff_a
+   64 |     const float outB = (srcB * effA + dstB * dstA * (1.0f - effA)) / outA;
+      |                                ~~~~                         ~~~~
+      |                                eff_a                        eff_a
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:53:56: warning: floating point literal has suffix 'f', which is not uppercase [readability-uppercase-literal-suffix]
+   53 |     const float effA = srcA * std::clamp(layerOpacity, 0.0f, 1.0f);
+      |                                                        ^  ~
+      |                                                           F
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:53:62: warning: floating point literal has suffix 'f', which is not uppercase [readability-uppercase-literal-suffix]
+   53 |     const float effA = srcA * std::clamp(layerOpacity, 0.0f, 1.0f);
+      |                                                              ^  ~
+      |                                                                 F
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:56:17: warning: invalid case style for variable 'outA' [readability-identifier-naming]
+   56 |     const float outA = effA + dstA * (1.0f - effA);
+      |                 ^~~~
+      |                 out_a
+   57 | 
+   58 |     if (outA <= 0.0f)
+      |         ~~~~
+      |         out_a
+   59 |         return 0u;
+   60 | 
+   61 |     // RGB out, en "straight alpha"
+   62 |     const float outR = (srcR * effA + dstR * dstA * (1.0f - effA)) / outA;
+      |                                                                      ~~~~
+      |                                                                      out_a
+   63 |     const float outG = (srcG * effA + dstG * dstA * (1.0f - effA)) / outA;
+      |                                                                      ~~~~
+      |                                                                      out_a
+   64 |     const float outB = (srcB * effA + dstB * dstA * (1.0f - effA)) / outA;
+      |                                                                      ~~~~
+      |                                                                      out_a
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:56:31: warning: '*' has higher precedence than '+'; add parentheses to explicitly specify the order of operations [readability-math-missing-parentheses]
+   56 |     const float outA = effA + dstA * (1.0f - effA);
+      |                               ^~~~~~~~~~~~~~~~~~~~~
+      |                               (                   )
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:56:39: warning: floating point literal has suffix 'f', which is not uppercase [readability-uppercase-literal-suffix]
+   56 |     const float outA = effA + dstA * (1.0f - effA);
+      |                                       ^  ~
+      |                                          F
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:58:17: warning: floating point literal has suffix 'f', which is not uppercase [readability-uppercase-literal-suffix]
+   58 |     if (outA <= 0.0f)
+      |                 ^  ~
+      |                    F
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:58:22: warning: statement should be inside braces [readability-braces-around-statements]
+   58 |     if (outA <= 0.0f)
+      |                      ^
+      |                       {
+   59 |         return 0u;
+      |                   
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:59:16: warning: integer literal has suffix 'u', which is not uppercase [readability-uppercase-literal-suffix]
+   59 |         return 0u;
+      |                ^~
+      |                 U
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:62:17: warning: invalid case style for variable 'outR' [readability-identifier-naming]
+   62 |     const float outR = (srcR * effA + dstR * dstA * (1.0f - effA)) / outA;
+      |                 ^~~~
+      |                 out_r
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:62:54: warning: floating point literal has suffix 'f', which is not uppercase [readability-uppercase-literal-suffix]
+   62 |     const float outR = (srcR * effA + dstR * dstA * (1.0f - effA)) / outA;
+      |                                                      ^  ~
+      |                                                         F
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:63:17: warning: invalid case style for variable 'outG' [readability-identifier-naming]
+   63 |     const float outG = (srcG * effA + dstG * dstA * (1.0f - effA)) / outA;
+      |                 ^~~~
+      |                 out_g
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:63:54: warning: floating point literal has suffix 'f', which is not uppercase [readability-uppercase-literal-suffix]
+   63 |     const float outG = (srcG * effA + dstG * dstA * (1.0f - effA)) / outA;
+      |                                                      ^  ~
+      |                                                         F
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:64:17: warning: invalid case style for variable 'outB' [readability-identifier-naming]
+   64 |     const float outB = (srcB * effA + dstB * dstA * (1.0f - effA)) / outA;
+      |                 ^~~~
+      |                 out_b
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:64:54: warning: floating point literal has suffix 'f', which is not uppercase [readability-uppercase-literal-suffix]
+   64 |     const float outB = (srcB * effA + dstB * dstA * (1.0f - effA)) / outA;
+      |                                                      ^  ~
+      |                                                         F
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:66:16: warning: invalid case style for variable 'toByte' [readability-identifier-naming]
+   66 |     const auto toByte = [](float v) -> std::uint8_t
+      |                ^~~~~~
+      |                to_byte
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:82:13: warning: function 'composeRegion' declared 'static', move to anonymous namespace instead [misc-use-anonymous-namespace]
+   82 | static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, int roiH,
+      |             ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:82:27: error: 2 adjacent parameters of 'composeRegion' of similar type are easily swapped by mistake [bugprone-easily-swappable-parameters,-warnings-as-errors]
+   82 | static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, int roiH,
+      |                           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:82:43: note: the first parameter in the range is 'doc'
+   82 | static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, int roiH,
+      |                                           ^~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:82:52: note: the last parameter in the range is 'docX0'
+   82 | static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, int roiH,
+      |                                                    ^~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:82:48: note: 'const int &' and 'int' parameters accept and bind the same kind of values
+   82 | static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, int roiH,
+      |                                                ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:82:59: error: 2 adjacent parameters of 'composeRegion' of similar type ('int') are easily swapped by mistake [bugprone-easily-swappable-parameters,-warnings-as-errors]
+   82 | static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, int roiH,
+      |                                                           ^~~~~~~~~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:82:63: note: the first parameter in the range is 'docY0'
+   82 | static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, int roiH,
+      |                                                               ^~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:82:74: note: the last parameter in the range is 'roiW'
+   82 | static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, int roiH,
+      |                                                                          ^~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:85:32: warning: statement should be inside braces [readability-braces-around-statements]
+   85 |     if (roiW <= 0 || roiH <= 0)
+      |                                ^
+      |                                 {
+   86 |         return;
+      |                
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:87:15: warning: invalid case style for variable 'docW' [readability-identifier-naming]
+   87 |     const int docW = doc.width();
+      |               ^~~~
+      |               doc_w
+   88 |     const int docH = doc.height();
+   89 |     if (docW <= 0 || docH <= 0)
+      |         ~~~~
+      |         doc_w
+   90 |         return;
+   91 |     if (docX0 >= docW || docY0 >= docH)
+      |                  ~~~~
+      |                  doc_w
+   92 |         return;
+   93 |     const int maxW = std::min(roiW, docW - docX0);
+      |                                     ~~~~
+      |                                     doc_w
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:88:15: warning: invalid case style for variable 'docH' [readability-identifier-naming]
+   88 |     const int docH = doc.height();
+      |               ^~~~
+      |               doc_h
+   89 |     if (docW <= 0 || docH <= 0)
+      |                      ~~~~
+      |                      doc_h
+   90 |         return;
+   91 |     if (docX0 >= docW || docY0 >= docH)
+      |                                   ~~~~
+      |                                   doc_h
+   92 |         return;
+   93 |     const int maxW = std::min(roiW, docW - docX0);
+   94 |     const int maxH = std::min(roiH, docH - docY0);
+      |                                     ~~~~
+      |                                     doc_h
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:89:32: warning: statement should be inside braces [readability-braces-around-statements]
+   89 |     if (docW <= 0 || docH <= 0)
+      |                                ^
+      |                                 {
+   90 |         return;
+      |                
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:91:40: warning: statement should be inside braces [readability-braces-around-statements]
+   91 |     if (docX0 >= docW || docY0 >= docH)
+      |                                        ^
+      |                                         {
+   92 |         return;
+      |                
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:93:15: warning: invalid case style for variable 'maxW' [readability-identifier-naming]
+   93 |     const int maxW = std::min(roiW, docW - docX0);
+      |               ^~~~
+      |               max_w
+   94 |     const int maxH = std::min(roiH, docH - docY0);
+   95 |     if (maxW <= 0 || maxH <= 0)
+      |         ~~~~
+      |         max_w
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:94:15: warning: invalid case style for variable 'maxH' [readability-identifier-naming]
+   94 |     const int maxH = std::min(roiH, docH - docY0);
+      |               ^~~~
+      |               max_h
+   95 |     if (maxW <= 0 || maxH <= 0)
+      |                      ~~~~
+      |                      max_h
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:95:32: warning: statement should be inside braces [readability-braces-around-statements]
+   95 |     if (maxW <= 0 || maxH <= 0)
+      |                                ^
+      |                                 {
+   96 |         return;
+      |                
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:98:15: warning: invalid case style for variable 'layerCount' [readability-identifier-naming]
+   98 |     const int layerCount = doc.layerCount();
+      |               ^~~~~~~~~~
+      |               layer_count
+   99 |     if (layerCount == 0)
+      |         ~~~~~~~~~~
+      |         layer_count
+  100 |         return;
+  101 | 
+  102 |     for (int i = 0; i < layerCount; ++i)
+      |                         ~~~~~~~~~~
+      |                         layer_count
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:99:25: warning: statement should be inside braces [readability-braces-around-statements]
+   99 |     if (layerCount == 0)
+      |                         ^
+      |                          {
+  100 |         return;
+      |                
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:105:20: warning: statement should be inside braces [readability-braces-around-statements]
+  105 |         if (!layer)
+      |                    ^
+      |                     {
+  106 |             continue;
+      |                      
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:107:31: warning: statement should be inside braces [readability-braces-around-statements]
+  107 |         if (!layer->visible())
+      |                               ^
+      |                                {
+  108 |             continue;
+      |                      
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:109:21: warning: invalid case style for variable 'imgPtr' [readability-identifier-naming]
+  109 |         const auto& imgPtr = layer->image();
+      |                     ^~~~~~
+      |                     img_ptr
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:110:21: warning: statement should be inside braces [readability-braces-around-statements]
+  110 |         if (!imgPtr)
+      |                     ^
+      |                      {
+  111 |             continue;
+      |                      
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:114:24: warning: floating point literal has suffix 'f', which is not uppercase [readability-uppercase-literal-suffix]
+  114 |         if (opacity <= 0.0f)
+      |                        ^  ~
+      |                           F
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:114:29: warning: statement should be inside braces [readability-braces-around-statements]
+  114 |         if (opacity <= 0.0f)
+      |                             ^
+      |                              {
+  115 |             continue;
+      |                      
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:119:23: warning: invalid case style for variable 'docY' [readability-identifier-naming]
+  119 |             const int docY = docY0 + sy;
+      |                       ^~~~
+      |                       doc_y
+  120 |             for (int sx = 0; sx < maxW; ++sx)
+  121 |             {
+  122 |                 const int docX = docX0 + sx;
+  123 |                 const std::uint32_t src = imgPtr->getPixel(docX, docY);
+      |                                                                  ~~~~
+      |                                                                  doc_y
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/Compositor.cpp:122:27: warning: invalid case style for variable 'docX' [readability-identifier-naming]
+  122 |                 const int docX = docX0 + sx;
+      |                           ^~~~
+      |                           doc_x
+  123 |                 const std::uint32_t src = imgPtr->getPixel(docX, docY);
+      |                                                            ~~~~
+      |                                                            doc_x
+Suppressed 10765 warnings (10765 in non-user code).
+Use -header-filter=.* to display errors from all non-system headers. Use -system-headers to display errors from system headers as well.
+4 warnings treated as errors
+1 error generated.
+Error while processing /home/godetl/EPITECH/PRO/EpiGIMP2.0/src/ui/main.cpp.
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/ui/main.cpp:1:10: error: 'QApplication' file not found [clang-diagnostic-error]
+    1 | #include <QApplication>
+      |          ^~~~~~~~~~~~~~
+Found compiler error(s).
+1 error generated.
+Error while processing /home/godetl/EPITECH/PRO/EpiGIMP2.0/src/ui/image.cpp.
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/ui/image.cpp:1:10: error: 'ui/image.hpp' file not found [clang-diagnostic-error]
+    1 | #include "ui/image.hpp"
+      |          ^~~~~~~~~~~~~~
+Found compiler error(s).
+11270 warnings and 1 error generated.
+Error while processing /home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp.
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:8:10: error: 'core/BucketFill.hpp' file not found [clang-diagnostic-error]
+    8 | #include "core/BucketFill.hpp"
+      |          ^~~~~~~~~~~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:11:1: warning: included header vector is not used directly [misc-include-cleaner]
+   11 | #include <vector>
+      | ^~~~~~~~~~~~~~~~~
+   12 | 
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:17:6: warning: function 'floodFill' can be made static or moved into an anonymous namespace to enforce internal linkage [misc-use-internal-linkage]
+   17 | void floodFill(ImageBuffer& buf, int startX, int startY, uint32_t newColor)
+      |      ^
+      | static 
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:17:46: error: 2 adjacent parameters of 'floodFill' of similar type ('int') are easily swapped by mistake [bugprone-easily-swappable-parameters,-warnings-as-errors]
+   17 | void floodFill(ImageBuffer& buf, int startX, int startY, uint32_t newColor)
+      |                                              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:17:50: note: the first parameter in the range is 'startY'
+   17 | void floodFill(ImageBuffer& buf, int startX, int startY, uint32_t newColor)
+      |                                                  ^~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:17:67: note: the last parameter in the range is 'newColor'
+   17 | void floodFill(ImageBuffer& buf, int startX, int startY, uint32_t newColor)
+      |                                                                   ^~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:19:15: warning: variable name 'w' is too short, expected at least 3 characters [readability-identifier-length]
+   19 |     const int w = buf.width();
+      |               ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:20:15: warning: variable name 'h' is too short, expected at least 3 characters [readability-identifier-length]
+   20 |     const int h = buf.height();
+      |               ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:21:64: warning: statement should be inside braces [readability-braces-around-statements]
+   21 |     if (startX < 0 || startX >= w || startY < 0 || startY >= h)
+      |                                                                ^
+      |                                                                 {
+   22 |         return;
+      |                
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:25:28: warning: statement should be inside braces [readability-braces-around-statements]
+   25 |     if (target == newColor)
+      |                            ^
+      |                             {
+   26 |         return;
+      |                
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:36:48: warning: statement should be inside braces [readability-braces-around-statements]
+   36 |         if (x < 0 || x >= w || y < 0 || y >= h)
+      |                                                ^
+      |                                                 {
+   37 |             continue;
+      |                      
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:39:42: warning: statement should be inside braces [readability-braces-around-statements]
+   39 |         if (buf.getPixel(x, y) != target)
+      |                                          ^
+      |                                           {
+   40 |             continue;
+      |                      
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:51:6: warning: function 'floodFillWithinMask' can be made static or moved into an anonymous namespace to enforce internal linkage [misc-use-internal-linkage]
+   51 | void floodFillWithinMask(ImageBuffer& buf, const ImageBuffer& mask, int startX, int startY,
+      |      ^
+      | static 
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:51:81: error: 2 adjacent parameters of 'floodFillWithinMask' of similar type ('int') are easily swapped by mistake [bugprone-easily-swappable-parameters,-warnings-as-errors]
+   51 | void floodFillWithinMask(ImageBuffer& buf, const ImageBuffer& mask, int startX, int startY,
+      |                                                                                 ^~~~~~~~~~~
+   52 |                          uint32_t newColor)
+      |                          ~~~~~~~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:51:85: note: the first parameter in the range is 'startY'
+   51 | void floodFillWithinMask(ImageBuffer& buf, const ImageBuffer& mask, int startX, int startY,
+      |                                                                                     ^~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:52:35: note: the last parameter in the range is 'newColor'
+   52 |                          uint32_t newColor)
+      |                                   ^~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:54:15: warning: variable name 'w' is too short, expected at least 3 characters [readability-identifier-length]
+   54 |     const int w = buf.width();
+      |               ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:55:15: warning: variable name 'h' is too short, expected at least 3 characters [readability-identifier-length]
+   55 |     const int h = buf.height();
+      |               ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:57:64: warning: statement should be inside braces [readability-braces-around-statements]
+   57 |     if (startX < 0 || startX >= w || startY < 0 || startY >= h)
+      |                                                                ^
+      |                                                                 {
+   58 |         return;
+      |                
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:60:53: warning: statement should be inside braces [readability-braces-around-statements]
+   60 |     if ((mask.getPixel(startX, startY) & 0xFF) == 0)
+      |                                                     ^
+      |                                                      {
+   61 |         return;
+      |                
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:64:28: warning: statement should be inside braces [readability-braces-around-statements]
+   64 |     if (target == newColor)
+      |                            ^
+      |                             {
+   65 |         return;
+      |                
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:75:48: warning: statement should be inside braces [readability-braces-around-statements]
+   75 |         if (x < 0 || x >= w || y < 0 || y >= h)
+      |                                                ^
+      |                                                 {
+   76 |             continue;
+      |                      
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:78:47: warning: statement should be inside braces [readability-braces-around-statements]
+   78 |         if ((mask.getPixel(x, y) & 0xFF) == 0)
+      |                                               ^
+      |                                                {
+   79 |             continue;
+      |                      
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/core/BucketFill.cpp:81:42: warning: statement should be inside braces [readability-braces-around-statements]
+   81 |         if (buf.getPixel(x, y) != target)
+      |                                          ^
+      |                                           {
+   82 |             continue;
+      |                      
+Suppressed 11251 warnings (11251 in non-user code).
+Use -header-filter=.* to display errors from all non-system headers. Use -system-headers to display errors from system headers as well.
+2 warnings treated as errors
+11232 warnings and 1 error generated.
+Error while processing /home/godetl/EPITECH/PRO/EpiGIMP2.0/src/ui/window.cpp.
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/ui/window.cpp:1:10: error: 'ui/window.hpp' file not found [clang-diagnostic-error]
+    1 | #include "ui/window.hpp"
+      |          ^~~~~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/ui/window.cpp:21:1: warning: included header vector is not used directly [misc-include-cleaner]
+   21 | #include <vector>
+      | ^~~~~~~~~~~~~~~~~
+   22 | 
+Suppressed 11231 warnings (11231 in non-user code).
+Use -header-filter=.* to display errors from all non-system headers. Use -system-headers to display errors from system headers as well.
+Found compiler error(s).
+15848 warnings and 1 error generated.
+Error while processing /home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgZip.cpp.
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgZip.cpp:1:10: error: 'stb_image.h' file not found [clang-diagnostic-error]
+    1 | #include <stb_image.h>
+      |          ^~~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgZip.cpp:5:1: warning: included header string is not used directly [misc-include-cleaner]
+    5 | #include <string>
+      | ^~~~~~~~~~~~~~~~~
+    6 | 
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgZip.cpp:63:17: warning: statement should be inside braces [readability-braces-around-statements]
+   63 |         if (zip)
+      |                 ^
+      |                  {
+   64 |             zip_source_free(zip);
+      |                                  
+Suppressed 15846 warnings (15846 in non-user code).
+Use -header-filter=.* to display errors from all non-system headers. Use -system-headers to display errors from system headers as well.
+Found compiler error(s).
+26916 warnings and 1 error generated.
+Error while processing /home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp.
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:1:10: error: 'io/EpgFormat.hpp' file not found [clang-diagnostic-error]
+    1 | #include "io/EpgFormat.hpp"
+      |          ^~~~~~~~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:8:1: warning: included header fstream is not used directly [misc-include-cleaner]
+    8 | #include <fstream>
+      | ^~~~~~~~~~~~~~~~~~
+    9 | #include <iomanip>
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:10:1: warning: included header iostream is not used directly [misc-include-cleaner]
+   10 | #include <iostream>
+      | ^~~~~~~~~~~~~~~~~~~
+   11 | #include <sstream>
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:18:6: warning: function 'pngWriteCallback' can be made static or moved into an anonymous namespace to enforce internal linkage [misc-use-internal-linkage]
+   18 | void pngWriteCallback(void* context, void* data, int size)
+      |      ^
+      | static 
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:22:48: warning: do not use pointer arithmetic [cppcoreguidelines-pro-bounds-pointer-arithmetic]
+   22 |     buffer->insert(buffer->end(), bytes, bytes + size);
+      |                                                ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:25:6: warning: no header providing "std::string" is directly included [misc-include-cleaner]
+   13 | 
+   14 | #include "io/EpgJson.hpp"
+   15 | 
+   16 | // Callback used by stb_image_write to collect the encoded PNG bytes.
+   17 | // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+   18 | void pngWriteCallback(void* context, void* data, int size)
+   19 | {
+   20 |     auto* buffer = reinterpret_cast<std::vector<unsigned char>*>(context);
+   21 |     const auto* bytes = static_cast<const unsigned char*>(data);
+   22 |     buffer->insert(buffer->end(), bytes, bytes + size);
+   23 | }
+   24 | 
+   25 | std::string getCurrentTimestampUTC()
+      |      ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:25:13: warning: function 'getCurrentTimestampUTC' can be made static or moved into an anonymous namespace to enforce internal linkage [misc-use-internal-linkage]
+   25 | std::string getCurrentTimestampUTC()
+      |             ^
+      | static 
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:28:23: warning: variable name 't' is too short, expected at least 3 characters [readability-identifier-length]
+   28 |     std::time_t const t = std::chrono::system_clock::to_time_t(now);
+      |                       ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:29:19: warning: variable name 'tm' is too short, expected at least 3 characters [readability-identifier-length]
+   29 |     std::tm const tm = *std::gmtime(&t);
+      |                   ^
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:30:24: warning: variable 'oss' is not initialized [cppcoreguidelines-init-variables]
+   30 |     std::ostringstream oss;
+      |                        ^  
+      |                            = 0
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:35:13: warning: function 'formatLayerId' can be made static or moved into an anonymous namespace to enforce internal linkage [misc-use-internal-linkage]
+   35 | std::string formatLayerId(size_t index)
+      |             ^
+      | static 
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:37:24: warning: variable 'oss' is not initialized [cppcoreguidelines-init-variables]
+   37 |     std::ostringstream oss;
+      |                        ^  
+      |                            = 0
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:42:30: warning: function 'decodePngToImageBuffer' can be made static or moved into an anonymous namespace to enforce internal linkage [misc-use-internal-linkage]
+   42 | std::unique_ptr<ImageBuffer> decodePngToImageBuffer(const std::vector<unsigned char>& pngData)
+      |                              ^
+      | static 
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:45:77: warning: statement should be inside braces [readability-braces-around-statements]
+   45 |     if (pngData.size() < 8 || memcmp(pngData.data(), kPngSignature, 8) != 0)
+      |                                                                             ^
+      |                                                                              {
+   46 |         throw std::runtime_error("Not a PNG file (too small)");
+      |                                                                
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:48:5: warning: multiple declarations in a single statement reduces readability [readability-isolate-declaration]
+   48 |     int width = 0, height = 0, channels = 0;
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:52:18: warning: statement should be inside braces [readability-braces-around-statements]
+   52 |     if (!decoded)
+      |                  ^
+      |                   {
+   53 |         throw std::runtime_error(
+   54 |             std::string("stb_image: impossible de décoder le PNG en mémoire: ") +
+   55 |             stbi_failure_reason());
+      |                                    
+/home/godetl/EPITECH/PRO/EpiGIMP2.0/src/io/EpgFormat.cpp:58:85: warning: integer literal has suffix 'u', which is not uppercase [readability-uppercase-literal-suffix]
+   58 |     size_t const bytes = static_cast<size_t>(width) * static_cast<size_t>(height) * 4u;
+      |                                                                                     ^~
+      |                                                                                      U
+Suppressed 26901 warnings (26900 in non-user code, 1 NOLINT).
+Use -header-filter=.* to display errors from all non-system headers. Use -system-headers to display errors from system headers as well.
+Found compiler error(s).
