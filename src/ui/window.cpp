@@ -242,8 +242,6 @@ void MainWindow::createActions()
 
 void MainWindow::createMenus()
 {
-    // set initial colored icon
-    updateColorPickerIcon();
     // Menu Fichier
     m_fileMenu = menuBar()->addMenu(tr("&Fichier"));
     m_fileMenu->addAction(m_newAct);
@@ -270,6 +268,8 @@ void MainWindow::createMenus()
         m_viewMenu->addAction(m_undoAct);
     if (m_redoAct)
         m_viewMenu->addAction(m_redoAct);
+    // set initial colored icon
+    updateColorPickerIcon();
 }
 
 void MainWindow::zoomIn()
@@ -650,8 +650,8 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
     if (imgX < 0 || imgX >= m_currentImage.width() || imgY < 0 || imgY >= m_currentImage.height())
         return;
 
-    // Build two buffers: original and filled result, then compute pixel diffs
-    ImageBuffer orig(m_currentImage.width(), m_currentImage.height());
+    // Build working buffer directly from current image
+    ImageBuffer workingBuffer(m_currentImage.width(), m_currentImage.height());
     for (int y = 0; y < m_currentImage.height(); ++y)
     {
         for (int x = 0; x < m_currentImage.width(); ++x)
@@ -664,22 +664,23 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
             const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
                                   (static_cast<uint32_t>(g) << 16) |
                                   (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
-            orig.setPixel(x, y, rgba);
+            workingBuffer.setPixel(x, y, rgba);
         }
     }
-
-    ImageBuffer filled = orig;  // copy
 
     const uint32_t newColor = (static_cast<uint32_t>(m_bucketColor.red()) << 24) |
                               (static_cast<uint32_t>(m_bucketColor.green()) << 16) |
                               (static_cast<uint32_t>(m_bucketColor.blue()) << 8) |
                               static_cast<uint32_t>(m_bucketColor.alpha());
 
+    // Perform flood fill and get changed pixels directly
+    std::vector<std::tuple<int, int, uint32_t>> changedPixels;
     if (m_selection.hasMask())
     {
         if (m_selection.t_at(imgX, imgY) != 0)
         {
-            core::floodFillWithinMask(filled, *m_selection.mask(), imgX, imgY, newColor);
+            changedPixels = core::floodFillWithinMaskTracked(workingBuffer, *m_selection.mask(),
+                                                             imgX, imgY, newColor);
         }
         else
         {
@@ -689,34 +690,26 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
     }
     else
     {
-        core::floodFill(filled, imgX, imgY, newColor);
+        changedPixels = core::floodFillTracked(workingBuffer, imgX, imgY, newColor);
     }
 
-    // compute pixel changes
-    std::vector<app::PixelChange> changes;
-    changes.reserve(static_cast<size_t>(m_currentImage.width() * m_currentImage.height() / 8));
-    for (int y = 0; y < m_currentImage.height(); ++y)
-    {
-        for (int x = 0; x < m_currentImage.width(); ++x)
-        {
-            const uint32_t b4 = orig.getPixel(x, y);
-            const uint32_t b5 = filled.getPixel(x, y);
-            if (b4 != b5)
-            {
-                app::PixelChange pc;
-                pc.x = x;
-                pc.y = y;
-                pc.before = b4;
-                pc.after = b5;
-                changes.push_back(pc);
-            }
-        }
-    }
-
-    if (changes.empty())
+    if (changedPixels.empty())
     {
         statusBar()->showMessage(tr("Aucun pixel modifié"), 1000);
         return;
+    }
+
+    // Build PixelChange vector from tracked changes
+    std::vector<app::PixelChange> changes;
+    changes.reserve(changedPixels.size());
+    for (const auto& [x, y, oldColor] : changedPixels)
+    {
+        app::PixelChange pc;
+        pc.x = x;
+        pc.y = y;
+        pc.before = oldColor;
+        pc.after = newColor;
+        changes.push_back(pc);
     }
 
     // apply function updates the QImage from the given pixel changes
