@@ -1,7 +1,9 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
   <qresource prefix="/">
-    <file>icons/selection.svg</file>
-    <file>icons/clear_selection.svg</file>
+  <file>icons/selection.svg</file>
+  <file>icons/clear_selection.svg</file>
+  <file>icons/bucket.svg</file>
+  <file>icons/color_picker.svg</file>
   </qresource>
 </RCC>

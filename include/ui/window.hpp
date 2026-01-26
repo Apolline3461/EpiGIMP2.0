@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QAction>
+#include <QColor>
 #include <QEvent>
 #include <QImage>
 #include <QKeyEvent>
@@ -9,6 +10,7 @@
 #include <QMenu>
 #include <QObject>
 #include <QPoint>
+#include <QRect>
 #include <QScrollArea>
 #include <QString>
 
@@ -89,7 +91,14 @@ class MainWindow : public QMainWindow
     QAction* m_saveEpgAct;
     QAction* m_clearSelectionAct;
     QAction* m_selectToggleAct;
+    QAction* m_bucketAct;
+    bool m_bucketMode{false};
+    QAction* m_colorPickerAct;
+    QColor m_bucketColor{Qt::black};
 
     // Sélection active pour l'image
     Selection m_selection;
+    // remplissage pot de peinture
+    void bucketFillAt(const QPoint& viewportPos);
+    void updateColorPickerIcon();
 };

@@ -1,5 +1,6 @@
 #include "ui/window.hpp"
 
+#include <QColorDialog>
 #include <QCursor>
 #include <QDir>
 #include <QFileDialog>
@@ -9,12 +10,17 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QPainter>
+#include <QPixmap>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QToolBar>
 
+#include <vector>
+
+#include "core/FloodFill.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
@@ -52,6 +58,10 @@ MainWindow::MainWindow(QWidget* parent)
         cmd->addAction(m_selectToggleAct);
     if (m_clearSelectionAct)
         cmd->addAction(m_clearSelectionAct);
+    if (m_bucketAct)
+        cmd->addAction(m_bucketAct);
+    if (m_colorPickerAct)
+        cmd->addAction(m_colorPickerAct);
     // connect selection signal
     connect(m_imageLabel, &ImageLabel::selectionFinished, this, &MainWindow::onMouseSelection);
     // panning: capter les événements de la zone de viewport
@@ -145,10 +155,46 @@ void MainWindow::createActions()
     m_selectToggleAct->setStatusTip(tr("Activer le mode sélection par souris"));
     m_selectToggleAct->setIcon(QIcon(":/icons/selection.svg"));
     connect(m_selectToggleAct, &QAction::toggled, this, &MainWindow::toggleSelectionMode);
+
+    m_bucketAct = new QAction(tr("Pot de peinture"), this);
+    m_bucketAct->setCheckable(true);
+    m_bucketAct->setStatusTip(tr("Activer l'outil pot de peinture"));
+    m_bucketAct->setIcon(QIcon(":/icons/bucket.svg"));
+    connect(m_bucketAct, &QAction::toggled, this,
+            [this](bool enabled)
+            {
+                m_bucketMode = enabled;
+                // désactiver le mode sélection si on active le pot
+                if (enabled && m_selectToggleAct)
+                {
+                    m_selectToggleAct->setChecked(false);
+                    if (m_imageLabel)
+                        m_imageLabel->setSelectionEnabled(false);
+                }
+                m_scrollArea->viewport()->setCursor(enabled ? Qt::CrossCursor : Qt::ArrowCursor);
+            });
+
+    // action pour choisir la couleur séparément
+    m_colorPickerAct = new QAction(tr("Couleur de remplissage"), this);
+    m_colorPickerAct->setStatusTip(tr("Choisir la couleur utilisée par le pot de peinture"));
+    m_colorPickerAct->setIcon(QIcon(":/icons/color_picker.svg"));
+    connect(m_colorPickerAct, &QAction::triggered, this,
+            [this]()
+            {
+                QColor chosen =
+                    QColorDialog::getColor(m_bucketColor, this, tr("Choisir la couleur"));
+                if (chosen.isValid())
+                {
+                    m_bucketColor = chosen;
+                    updateColorPickerIcon();
+                }
+            });
 }
 
 void MainWindow::createMenus()
 {
+    // set initial colored icon
+    updateColorPickerIcon();
     // Menu Fichier
     m_fileMenu = menuBar()->addMenu(tr("&Fichier"));
     m_fileMenu->addAction(m_newAct);
@@ -208,6 +254,12 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
         if (event->type() == QEvent::MouseButtonPress)
         {
             QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            // Pot de peinture: clic gauche remplit
+            if (me->button() == Qt::LeftButton && m_bucketMode)
+            {
+                bucketFillAt(me->pos());
+                return true;
+            }
             if (me->button() == Qt::LeftButton && m_handMode)
             {
                 m_panningActive = true;
@@ -479,12 +531,31 @@ void MainWindow::onMouseSelection(const QRect& rect)
                          static_cast<int>(std::round(rect.height() / m_scaleFactor)));
 
     auto ref = std::make_shared<ImageBuffer>(m_currentImage.width(), m_currentImage.height());
+    // Replace previous selection by default (don't accumulate multiple rects)
+    m_selection.clear();
     Selection::Rect selRect{imageSpaceRect.x(), imageSpaceRect.y(), imageSpaceRect.width(),
                             imageSpaceRect.height()};
     m_selection.addRect(selRect, ref);
     if (m_imageLabel)
         m_imageLabel->setSelectionRect(rect);
     updateImageDisplay();
+}
+
+void MainWindow::updateColorPickerIcon()
+{
+    if (!m_colorPickerAct)
+        return;
+
+    const int sz = 16;
+    QPixmap pix(sz, sz);
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setBrush(QBrush(m_bucketColor));
+    p.setPen(Qt::black);
+    p.drawRect(0, 0, sz - 1, sz - 1);
+    p.end();
+    m_colorPickerAct->setIcon(QIcon(pix));
 }
 
 void MainWindow::clearSelection()
@@ -501,4 +572,83 @@ void MainWindow::toggleSelectionMode(bool enabled)
         m_imageLabel->setSelectionEnabled(enabled);
     m_selectToggleAct->setChecked(enabled);
     m_scrollArea->viewport()->setCursor(enabled ? Qt::CrossCursor : Qt::ArrowCursor);
+    // si on active la sélection, désactiver le pot de peinture
+    if (enabled && m_bucketAct)
+    {
+        m_bucketAct->setChecked(false);
+        m_bucketMode = false;
+    }
+}
+
+void MainWindow::bucketFillAt(const QPoint& viewportPos)
+{
+    if (m_currentImage.isNull())
+        return;
+
+    // Calculer la position dans l'image en tenant compte du zoom et des scrollbars
+    int hVal = m_scrollArea->horizontalScrollBar()->value();
+    int vVal = m_scrollArea->verticalScrollBar()->value();
+
+    const int imgX = static_cast<int>(std::round((hVal + viewportPos.x()) / m_scaleFactor));
+    const int imgY = static_cast<int>(std::round((vVal + viewportPos.y()) / m_scaleFactor));
+
+    if (imgX < 0 || imgX >= m_currentImage.width() || imgY < 0 || imgY >= m_currentImage.height())
+        return;
+
+    // Convert QImage -> ImageBuffer
+    ImageBuffer buf(m_currentImage.width(), m_currentImage.height());
+    for (int y = 0; y < m_currentImage.height(); ++y)
+    {
+        for (int x = 0; x < m_currentImage.width(); ++x)
+        {
+            const QRgb p = m_currentImage.pixel(x, y);
+            const uint8_t r = qRed(p);
+            const uint8_t g = qGreen(p);
+            const uint8_t b = qBlue(p);
+            const uint8_t a = qAlpha(p);
+            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
+                                  (static_cast<uint32_t>(g) << 16) |
+                                  (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
+            buf.setPixel(x, y, rgba);
+        }
+    }
+
+    const uint32_t newColor = (static_cast<uint32_t>(m_bucketColor.red()) << 24) |
+                              (static_cast<uint32_t>(m_bucketColor.green()) << 16) |
+                              (static_cast<uint32_t>(m_bucketColor.blue()) << 8) |
+                              static_cast<uint32_t>(m_bucketColor.alpha());
+
+    if (m_selection.hasMask())
+    {
+        // If selection exists, only fill when clicking inside selection
+        if (m_selection.t_at(imgX, imgY) != 0)
+        {
+            core::floodFillWithinMask(buf, *m_selection.mask(), imgX, imgY, newColor);
+        }
+        else
+        {
+            statusBar()->showMessage(tr("Clic hors de la sélection — aucun remplissage"), 2000);
+            return;
+        }
+    }
+    else
+    {
+        core::floodFill(buf, imgX, imgY, newColor);
+    }
+
+    // Convert ImageBuffer -> QImage
+    for (int y = 0; y < m_currentImage.height(); ++y)
+    {
+        for (int x = 0; x < m_currentImage.width(); ++x)
+        {
+            const uint32_t rgba = buf.getPixel(x, y);
+            const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
+            const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
+            const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
+            const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
+            m_currentImage.setPixel(x, y, qRgba(r, g, b, a));
+        }
+    }
+    updateImageDisplay();
+    statusBar()->showMessage(tr("Remplissage effectué"), 2000);
 }
