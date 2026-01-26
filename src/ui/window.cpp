@@ -55,6 +55,9 @@ MainWindow::MainWindow(QWidget* parent)
     createMenus();
     // commande: barre d'outils pour sélection
     QToolBar* cmd = addToolBar(tr("Commande"));
+    // show icons only and set a reasonable icon size
+    cmd->setIconSize(QSize(20, 20));
+    cmd->setToolButtonStyle(Qt::ToolButtonIconOnly);
     if (m_selectToggleAct)
         cmd->addAction(m_selectToggleAct);
     if (m_clearSelectionAct)
@@ -63,6 +66,11 @@ MainWindow::MainWindow(QWidget* parent)
         cmd->addAction(m_bucketAct);
     if (m_colorPickerAct)
         cmd->addAction(m_colorPickerAct);
+    // Add undo/redo to the command toolbar as icons
+    if (m_undoAct)
+        cmd->addAction(m_undoAct);
+    if (m_redoAct)
+        cmd->addAction(m_redoAct);
     // connect selection signal
     connect(m_imageLabel, &ImageLabel::selectionFinished, this, &MainWindow::onMouseSelection);
     // panning: capter les événements de la zone de viewport
@@ -108,6 +116,7 @@ void MainWindow::createActions()
     m_undoAct = new QAction(tr("&Annuler"), this);
     m_undoAct->setShortcut(QKeySequence::Undo);
     m_undoAct->setStatusTip(tr("Annuler la dernière action"));
+    m_undoAct->setIcon(QIcon(":/icons/undo.svg"));
     connect(m_undoAct, &QAction::triggered,
             [this]()
             {
@@ -122,6 +131,7 @@ void MainWindow::createActions()
     m_redoAct = new QAction(tr("&Rétablir"), this);
     m_redoAct->setShortcut(QKeySequence::Redo);
     m_redoAct->setStatusTip(tr("Rétablir la dernière action annulée"));
+    m_redoAct->setIcon(QIcon(":/icons/redo.svg"));
     connect(m_redoAct, &QAction::triggered,
             [this]()
             {
@@ -150,7 +160,6 @@ void MainWindow::createActions()
 
     m_zoomOutAct = new QAction(tr("Zoom A&rrière"), this);
     m_zoomOutAct->setShortcut(QKeySequence::ZoomOut);
-    m_zoomOutAct->setStatusTip(tr("Réduire l'image"));
     connect(m_zoomOutAct, &QAction::triggered, this, &MainWindow::zoomOut);
 
     m_resetZoomAct = new QAction(tr("&Taille réelle"), this);
