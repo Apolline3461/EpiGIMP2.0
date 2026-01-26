@@ -1,4 +1,4 @@
-#include "core/FloodFill.hpp"
+#include "core/BucketFill.hpp"
 #include "core/ImageBuffer.hpp"
 
 #include <gtest/gtest.h>

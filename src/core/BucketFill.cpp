@@ -1,4 +1,11 @@
-#include "core/FloodFill.hpp"
+/*
+** EPITECH PROJECT, 2026
+** EpiGIMP2.0
+** File description:
+** BucketFill
+*/
+
+#include "core/BucketFill.hpp"
 
 #include <cassert>
 #include <vector>

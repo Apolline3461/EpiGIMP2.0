@@ -14,6 +14,8 @@
 #include <QScrollArea>
 #include <QString>
 
+#include "app/History.hpp"
+
 #include <core/Selection.hpp>
 
 // Définitions pour les analyseurs (clangd) qui ne connaissent pas la
@@ -101,4 +103,8 @@ class MainWindow : public QMainWindow
     // remplissage pot de peinture
     void bucketFillAt(const QPoint& viewportPos);
     void updateColorPickerIcon();
+    // Historique des commandes (undo/redo)
+    app::History m_history{128};
+    QAction* m_undoAct{nullptr};
+    QAction* m_redoAct{nullptr};
 };

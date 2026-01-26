@@ -20,7 +20,8 @@
 
 #include <vector>
 
-#include "core/FloodFill.hpp"
+#include "app/Command.hpp"
+#include "core/BucketFill.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
@@ -102,6 +103,35 @@ void MainWindow::createActions()
     m_exitAct->setShortcut(QKeySequence::Quit);
     m_exitAct->setStatusTip(tr("Quitter l'application"));
     connect(m_exitAct, &QAction::triggered, this, &QWidget::close);
+
+    // Undo / Redo actions
+    m_undoAct = new QAction(tr("&Annuler"), this);
+    m_undoAct->setShortcut(QKeySequence::Undo);
+    m_undoAct->setStatusTip(tr("Annuler la dernière action"));
+    connect(m_undoAct, &QAction::triggered,
+            [this]()
+            {
+                if (m_history.canUndo())
+                {
+                    m_history.undo();
+                    updateImageDisplay();
+                    statusBar()->showMessage(tr("Annuler"), 1000);
+                }
+            });
+
+    m_redoAct = new QAction(tr("&Rétablir"), this);
+    m_redoAct->setShortcut(QKeySequence::Redo);
+    m_redoAct->setStatusTip(tr("Rétablir la dernière action annulée"));
+    connect(m_redoAct, &QAction::triggered,
+            [this]()
+            {
+                if (m_history.canRedo())
+                {
+                    m_history.redo();
+                    updateImageDisplay();
+                    statusBar()->showMessage(tr("Rétablir"), 1000);
+                }
+            });
 
     // Fichiers EPG
     m_openEpgAct = new QAction(tr("Ouvrir un fichier &EPG..."), this);
@@ -215,6 +245,12 @@ void MainWindow::createMenus()
     m_viewMenu->addAction(m_zoom05Act);
     m_viewMenu->addAction(m_zoom1Act);
     m_viewMenu->addAction(m_zoom2Act);
+    // Undo/Redo in view menu for now
+    m_viewMenu->addSeparator();
+    if (m_undoAct)
+        m_viewMenu->addAction(m_undoAct);
+    if (m_redoAct)
+        m_viewMenu->addAction(m_redoAct);
 }
 
 void MainWindow::zoomIn()
@@ -595,8 +631,8 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
     if (imgX < 0 || imgX >= m_currentImage.width() || imgY < 0 || imgY >= m_currentImage.height())
         return;
 
-    // Convert QImage -> ImageBuffer
-    ImageBuffer buf(m_currentImage.width(), m_currentImage.height());
+    // Build two buffers: original and filled result, then compute pixel diffs
+    ImageBuffer orig(m_currentImage.width(), m_currentImage.height());
     for (int y = 0; y < m_currentImage.height(); ++y)
     {
         for (int x = 0; x < m_currentImage.width(); ++x)
@@ -609,9 +645,11 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
             const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
                                   (static_cast<uint32_t>(g) << 16) |
                                   (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
-            buf.setPixel(x, y, rgba);
+            orig.setPixel(x, y, rgba);
         }
     }
+
+    ImageBuffer filled = orig;  // copy
 
     const uint32_t newColor = (static_cast<uint32_t>(m_bucketColor.red()) << 24) |
                               (static_cast<uint32_t>(m_bucketColor.green()) << 16) |
@@ -620,10 +658,9 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
 
     if (m_selection.hasMask())
     {
-        // If selection exists, only fill when clicking inside selection
         if (m_selection.t_at(imgX, imgY) != 0)
         {
-            core::floodFillWithinMask(buf, *m_selection.mask(), imgX, imgY, newColor);
+            core::floodFillWithinMask(filled, *m_selection.mask(), imgX, imgY, newColor);
         }
         else
         {
@@ -633,22 +670,58 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
     }
     else
     {
-        core::floodFill(buf, imgX, imgY, newColor);
+        core::floodFill(filled, imgX, imgY, newColor);
     }
 
-    // Convert ImageBuffer -> QImage
+    // compute pixel changes
+    std::vector<app::PixelChange> changes;
+    changes.reserve(static_cast<size_t>(m_currentImage.width() * m_currentImage.height() / 8));
     for (int y = 0; y < m_currentImage.height(); ++y)
     {
         for (int x = 0; x < m_currentImage.width(); ++x)
         {
-            const uint32_t rgba = buf.getPixel(x, y);
-            const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
-            const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
-            const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
-            const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
-            m_currentImage.setPixel(x, y, qRgba(r, g, b, a));
+            const uint32_t b4 = orig.getPixel(x, y);
+            const uint32_t b5 = filled.getPixel(x, y);
+            if (b4 != b5)
+            {
+                app::PixelChange pc;
+                pc.x = x;
+                pc.y = y;
+                pc.before = b4;
+                pc.after = b5;
+                changes.push_back(pc);
+            }
         }
     }
-    updateImageDisplay();
+
+    if (changes.empty())
+    {
+        statusBar()->showMessage(tr("Aucun pixel modifié"), 1000);
+        return;
+    }
+
+    // apply function updates the QImage from the given pixel changes
+    app::ApplyFn apply =
+        [this](std::uint64_t /*layerId*/, const std::vector<app::PixelChange>& ch, bool useBefore)
+    {
+        for (const auto& c : ch)
+        {
+            const uint32_t v = useBefore ? c.before : c.after;
+            const uint8_t r = static_cast<uint8_t>((v >> 24) & 0xFF);
+            const uint8_t g = static_cast<uint8_t>((v >> 16) & 0xFF);
+            const uint8_t b = static_cast<uint8_t>((v >> 8) & 0xFF);
+            const uint8_t a = static_cast<uint8_t>(v & 0xFF);
+            if (c.x >= 0 && c.x < m_currentImage.width() && c.y >= 0 &&
+                c.y < m_currentImage.height())
+                m_currentImage.setPixel(c.x, c.y, qRgba(r, g, b, a));
+        }
+        updateImageDisplay();
+    };
+
+    // create command, execute redo and push to history
+    auto cmd = std::make_unique<app::DataCommand>(0ull, std::move(changes), apply);
+    cmd->redo();
+    m_history.push(std::move(cmd));
+
     statusBar()->showMessage(tr("Remplissage effectué"), 2000);
 }
