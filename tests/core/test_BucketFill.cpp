@@ -18,7 +18,7 @@ TEST(FloodFillTest, SimpleFillRegion)
     buf.setPixel(1, 0, B);
     buf.setPixel(0, 1, B);
     // run flood fill on (0,0) to change B -> A
-    floodFill(buf, 0, 0, A);
+    floodFill(buf, 0, 0, Color{A});
 
     EXPECT_EQ(buf.getPixel(0, 0), A);
     EXPECT_EQ(buf.getPixel(1, 0), A);
@@ -42,7 +42,7 @@ TEST(FloodFillTest, RespectMask)
     // change center to C
     buf.setPixel(1, 1, C);
     // attempt to flood fill C -> A within mask
-    floodFillWithinMask(buf, mask, 1, 1, A);
+    floodFillWithinMask(buf, mask, 1, 1, Color{A});
 
     EXPECT_EQ(buf.getPixel(1, 1), A);
     // neighbors should remain A (they were A originally)

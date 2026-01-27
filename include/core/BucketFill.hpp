@@ -12,7 +12,7 @@ namespace core
 struct Color
 {
     uint32_t value;
-    constexpr Color(uint32_t v = 0u) noexcept : value(v) {}
+    explicit constexpr Color(uint32_t v = 0u) noexcept : value(v) {}
 };
 
 void floodFill(ImageBuffer& buf, int startX, int startY, Color newColor);

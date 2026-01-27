@@ -680,7 +680,7 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
         if (m_selection.t_at(imgX, imgY) != 0)
         {
             changedPixels = core::floodFillWithinMaskTracked(workingBuffer, *m_selection.mask(),
-                                                             imgX, imgY, newColor);
+                                                             imgX, imgY, core::Color{newColor});
         }
         else
         {
@@ -690,7 +690,7 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
     }
     else
     {
-        changedPixels = core::floodFillTracked(workingBuffer, imgX, imgY, newColor);
+        changedPixels = core::floodFillTracked(workingBuffer, imgX, imgY, core::Color{newColor});
     }
 
     if (changedPixels.empty())

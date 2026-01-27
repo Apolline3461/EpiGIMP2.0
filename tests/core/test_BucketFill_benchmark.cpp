@@ -20,7 +20,7 @@ static void measureFill(const ImageBuffer& base, int startX, int startY, uint32_
     {
         ImageBuffer tmp = base;  // copy baseline
         auto t0 = clk::now();
-        floodFill(tmp, startX, startY, newColor);
+        floodFill(tmp, startX, startY, Color{newColor});
         auto t1 = clk::now();
         total += (t1 - t0);
     }
