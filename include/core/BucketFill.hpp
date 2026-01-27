@@ -9,15 +9,25 @@ class ImageBuffer;
 
 namespace core
 {
-void floodFill(ImageBuffer& buf, int startX, int startY, uint32_t newColor);
+struct Color
+{
+    uint32_t value;
+    constexpr Color(uint32_t v = 0u) noexcept : value(v) {}
+    constexpr operator uint32_t() const noexcept
+    {
+        return value;
+    }
+};
+
+void floodFill(ImageBuffer& buf, int startX, int startY, Color newColor);
 void floodFillWithinMask(ImageBuffer& buf, const ImageBuffer& mask, int startX, int startY,
-                         uint32_t newColor);
+                         Color newColor);
 
 // Optimized versions that return changed pixels (x, y, oldColor)
 std::vector<std::tuple<int, int, uint32_t>> floodFillTracked(ImageBuffer& buf, int startX,
-                                                             int startY, uint32_t newColor);
+                                                             int startY, Color newColor);
 std::vector<std::tuple<int, int, uint32_t>> floodFillWithinMaskTracked(ImageBuffer& buf,
                                                                        const ImageBuffer& mask,
                                                                        int startX, int startY,
-                                                                       uint32_t newColor);
+                                                                       Color newColor);
 }  // namespace core
