@@ -22,6 +22,7 @@ class Document
     int addLayer(std::shared_ptr<Layer> layer, int idx);
     void removeLayer(int idx);
     void reorderLayer(int from, int to);
+    void setLayers(std::vector<std::shared_ptr<Layer>> layers);
     void mergeDown(int from);
 
     [[nodiscard]] int layerCount() const noexcept;

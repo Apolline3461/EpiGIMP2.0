@@ -3,6 +3,9 @@
 //
 #include "core/Document.hpp"
 
+#include <algorithm>
+
+#include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 
 Document::Document(const int width, const int height, const float dpi)
@@ -85,5 +88,69 @@ void Document::mergeDown(int from)
 
     if (from <= 0 || from >= size)
         return;
+    // Merge layer 'from' onto layer 'from-1' (src over dst)
+    auto srcLayer = layers_[static_cast<std::size_t>(from)];
+    auto dstLayer = layers_[static_cast<std::size_t>(from - 1)];
+    if (srcLayer && dstLayer && srcLayer->image() && dstLayer->image())
+    {
+        auto srcImg = srcLayer->image();
+        auto dstImg = dstLayer->image();
+        const int maxW = std::min(srcImg->width(), dstImg->width());
+        const int maxH = std::min(srcImg->height(), dstImg->height());
+
+        auto blendPixel = [](std::uint32_t src, std::uint32_t dst,
+                             float layerOpacity) -> std::uint32_t
+        {
+            auto extract = [](std::uint32_t px, int shift) -> std::uint8_t
+            { return static_cast<std::uint8_t>((px >> shift) & 0xFFu); };
+            const float srcR = extract(src, 24) / 255.0f;
+            const float srcG = extract(src, 16) / 255.0f;
+            const float srcB = extract(src, 8) / 255.0f;
+            const float srcA = extract(src, 0) / 255.0f;
+
+            const float dstR = extract(dst, 24) / 255.0f;
+            const float dstG = extract(dst, 16) / 255.0f;
+            const float dstB = extract(dst, 8) / 255.0f;
+            const float dstA = extract(dst, 0) / 255.0f;
+
+            const float effA = srcA * std::clamp(layerOpacity, 0.0f, 1.0f);
+            const float outA = effA + dstA * (1.0f - effA);
+            if (outA <= 0.0f)
+                return 0u;
+
+            const float outR = (srcR * effA + dstR * dstA * (1.0f - effA)) / outA;
+            const float outG = (srcG * effA + dstG * dstA * (1.0f - effA)) / outA;
+            const float outB = (srcB * effA + dstB * dstA * (1.0f - effA)) / outA;
+
+            auto toByte = [](float v) -> std::uint8_t
+            {
+                float clamped = std::clamp(v, 0.0f, 1.0f);
+                return static_cast<std::uint8_t>(clamped * 255.0f + 0.5f);
+            };
+
+            return (static_cast<std::uint32_t>(toByte(outR)) << 24) |
+                   (static_cast<std::uint32_t>(toByte(outG)) << 16) |
+                   (static_cast<std::uint32_t>(toByte(outB)) << 8) |
+                   static_cast<std::uint32_t>(toByte(outA));
+        };
+
+        const float opacity = srcLayer->opacity();
+        for (int y = 0; y < maxH; ++y)
+        {
+            for (int x = 0; x < maxW; ++x)
+            {
+                const std::uint32_t s = srcImg->getPixel(x, y);
+                const std::uint32_t d = dstImg->getPixel(x, y);
+                const std::uint32_t blended = blendPixel(s, d, opacity);
+                dstImg->setPixel(x, y, blended);
+            }
+        }
+    }
+
     layers_.erase(layers_.begin() + from);
+}
+
+void Document::setLayers(std::vector<std::shared_ptr<Layer>> layers)
+{
+    layers_ = std::move(layers);
 }

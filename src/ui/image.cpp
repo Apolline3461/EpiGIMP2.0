@@ -15,6 +15,10 @@
 #include <QStatusBar>
 #include <QVBoxLayout>
 
+#include "core/Document.hpp"
+#include "core/ImageBuffer.hpp"
+#include "core/Layer.hpp"
+
 void ImageActions::newImage(MainWindow* window)
 {
     QDialog dialog(window);
@@ -57,12 +61,34 @@ void ImageActions::newImage(MainWindow* window)
     {
         int width = widthSpinBox->value();
         int height = heightSpinBox->value();
-
         window->m_currentImage = QImage(width, height, QImage::Format_ARGB32);
         window->m_currentImage.fill(Qt::white);
         window->m_currentFileName.clear();
 
-        window->updateImageDisplay();
+        // create a Document and a base layer from the created image
+        ImageBuffer buf(width, height);
+        for (int y = 0; y < height; ++y)
+        {
+            for (int x = 0; x < width; ++x)
+            {
+                const QRgb p = window->m_currentImage.pixel(x, y);
+                const uint8_t r = qRed(p);
+                const uint8_t g = qGreen(p);
+                const uint8_t b = qBlue(p);
+                const uint8_t a = qAlpha(p);
+                const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
+                                      (static_cast<uint32_t>(g) << 16) |
+                                      (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
+                buf.setPixel(x, y, rgba);
+            }
+        }
+        window->m_document = std::make_unique<Document>(width, height, 72.f);
+        auto imgPtr = std::make_shared<ImageBuffer>(buf);
+        auto layer =
+            std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
+        window->m_document->addLayer(layer);
+        window->populateLayersList();
+        window->updateImageFromDocument();
         window->m_scrollArea->setVisible(true);
 
         QString message = QObject::tr("Nouvelle image créée: %1x%2").arg(width).arg(height);
@@ -99,7 +125,31 @@ void ImageActions::openImage(MainWindow* window)
     window->m_currentImage = image;
     window->m_currentFileName = fileName;
 
-    window->updateImageDisplay();
+    // create a Document and base layer from the loaded image
+    const int width = window->m_currentImage.width();
+    const int height = window->m_currentImage.height();
+    ImageBuffer buf(width, height);
+    for (int y = 0; y < height; ++y)
+    {
+        for (int x = 0; x < width; ++x)
+        {
+            const QRgb p = window->m_currentImage.pixel(x, y);
+            const uint8_t r = qRed(p);
+            const uint8_t g = qGreen(p);
+            const uint8_t b = qBlue(p);
+            const uint8_t a = qAlpha(p);
+            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
+                                  (static_cast<uint32_t>(g) << 16) |
+                                  (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
+            buf.setPixel(x, y, rgba);
+        }
+    }
+    window->m_document = std::make_unique<Document>(width, height, 72.f);
+    auto imgPtr = std::make_shared<ImageBuffer>(buf);
+    auto layer = std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
+    window->m_document->addLayer(layer);
+    window->populateLayersList();
+    window->updateImageFromDocument();
     window->m_scrollArea->setVisible(true);
 
     QString message = QObject::tr("Image chargée: %1 (%2x%3)")

@@ -1,16 +1,24 @@
 #pragma once
 
 #include <QAction>
+#include <QDockWidget>
 #include <QEvent>
 #include <QImage>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QListWidget>
 #include <QMainWindow>
 #include <QMenu>
+#include <QModelIndex>
 #include <QObject>
+#include <QPixmap>
 #include <QPoint>
 #include <QScrollArea>
 #include <QString>
+
+#include <memory>
+
+#include "core/Document.hpp"
 
 class ImageActions;
 
@@ -30,13 +38,26 @@ class MainWindow : public QMainWindow
 
     void openEpg();
     void saveAsEpg();
+    void addNewLayer();
+    void onLayerItemChanged(QListWidgetItem* item);
+    void onLayerDoubleClicked(QListWidgetItem* item);
+    void onLayersRowsMoved(const QModelIndex& parent, int start, int end,
+                           const QModelIndex& destination, int row);
+    void onShowLayerContextMenu(const QPoint& pos);
+    void onMergeDown();
 
    private:
     void createActions();
     void createMenus();
+    void createLayersPanel();
     void updateImageDisplay();
     void scaleImage(double factor);
     void setScaleAndCenter(double newScale);
+
+    void populateLayersList();
+    void updateImageFromDocument();
+    QPixmap createLayerThumbnail(const std::shared_ptr<class Layer>& layer,
+                                 const QSize& size) const;
 
     // évènements et panning
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -70,4 +91,10 @@ class MainWindow : public QMainWindow
     QPoint m_lastPanPos;
     QAction* m_openEpgAct;
     QAction* m_saveEpgAct;
+    QAction* m_addLayerAct{nullptr};
+
+    // Document and layers UI
+    std::unique_ptr<Document> m_document;
+    QDockWidget* m_layersDock{nullptr};
+    QListWidget* m_layersList{nullptr};
 };

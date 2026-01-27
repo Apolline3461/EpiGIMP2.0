@@ -1,20 +1,34 @@
 #include "ui/window.hpp"
 
+#include <QColor>
+#include <QContextMenuEvent>
 #include <QCursor>
+#include <QDateTime>
 #include <QDir>
+#include <QDockWidget>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QHBoxLayout>
 #include <QKeyEvent>
+#include <QLineEdit>
+#include <QListWidget>
+#include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QPainter>
+#include <QPixmap>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QSlider>
 #include <QStandardPaths>
 #include <QStatusBar>
 
 #include <string>
 
+#include "core/Compositor.hpp"
+#include "core/Document.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
@@ -46,6 +60,7 @@ MainWindow::MainWindow(QWidget* parent)
     // Création de l'interface
     createActions();
     createMenus();
+    createLayersPanel();
     // panning: capter les événements de la zone de viewport
     m_scrollArea->viewport()->installEventFilter(this);
 
@@ -94,6 +109,10 @@ void MainWindow::createActions()
     m_saveEpgAct->setStatusTip(tr("Enregistrer l'image au format EpiGimp (.epg)"));
     connect(m_saveEpgAct, &QAction::triggered, this, &MainWindow::saveAsEpg);
 
+    m_addLayerAct = new QAction(tr("Ajouter un calque"), this);
+    m_addLayerAct->setStatusTip(tr("Ajouter un nouveau calque vide au document"));
+    connect(m_addLayerAct, &QAction::triggered, this, &MainWindow::addNewLayer);
+
     // Menu Vue
     m_zoomInAct = new QAction(tr("Zoom &Avant"), this);
     m_zoomInAct->setShortcut(QKeySequence::ZoomIn);
@@ -133,6 +152,7 @@ void MainWindow::createMenus()
     m_fileMenu = menuBar()->addMenu(tr("&Fichier"));
     m_fileMenu->addAction(m_newAct);
     m_fileMenu->addAction(m_openAct);
+    m_fileMenu->addAction(m_addLayerAct);
     m_fileMenu->addAction(m_openEpgAct);
     m_fileMenu->addAction(m_saveAct);
     m_fileMenu->addAction(m_saveEpgAct);
@@ -149,6 +169,310 @@ void MainWindow::createMenus()
     m_viewMenu->addAction(m_zoom05Act);
     m_viewMenu->addAction(m_zoom1Act);
     m_viewMenu->addAction(m_zoom2Act);
+}
+
+void MainWindow::addNewLayer()
+{
+    if (!m_document)
+    {
+        // If there's no Document but we have a current image, create a Document from it.
+        if (m_currentImage.isNull())
+            return;
+
+        const int width = m_currentImage.width();
+        const int height = m_currentImage.height();
+        ImageBuffer buf(width, height);
+        for (int y = 0; y < height; ++y)
+        {
+            for (int x = 0; x < width; ++x)
+            {
+                const QRgb p = m_currentImage.pixel(x, y);
+                const uint8_t r = qRed(p);
+                const uint8_t g = qGreen(p);
+                const uint8_t b = qBlue(p);
+                const uint8_t a = qAlpha(p);
+                const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
+                                      (static_cast<uint32_t>(g) << 16) |
+                                      (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
+                buf.setPixel(x, y, rgba);
+            }
+        }
+        m_document = std::make_unique<Document>(width, height, 72.f);
+        auto imgPtr = std::make_shared<ImageBuffer>(buf);
+        auto baseLayer =
+            std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
+        m_document->addLayer(baseLayer);
+    }
+    const int w = m_document->width();
+    const int h = m_document->height();
+    if (w <= 0 || h <= 0)
+        return;
+
+    auto img = std::make_shared<ImageBuffer>(w, h);
+    img->fill(0u);  // transparent
+
+    uint64_t id = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
+    const std::string name = "Layer " + std::to_string(m_document->layerCount() + 1);
+    auto layer = std::make_shared<Layer>(id, name, img, true, false, 1.0f);
+    m_document->addLayer(layer);
+    populateLayersList();
+    updateImageFromDocument();
+}
+
+void MainWindow::createLayersPanel()
+{
+    m_layersDock = new QDockWidget(tr("Calques"), this);
+    m_layersList = new QListWidget(m_layersDock);
+    m_layersList->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_layersList->setDragDropMode(QAbstractItemView::InternalMove);
+    m_layersList->setDefaultDropAction(Qt::MoveAction);
+    m_layersList->setContextMenuPolicy(Qt::CustomContextMenu);
+
+    connect(m_layersList, &QListWidget::itemDoubleClicked, this, &MainWindow::onLayerDoubleClicked);
+    connect(m_layersList, &QListWidget::customContextMenuRequested, this,
+            &MainWindow::onShowLayerContextMenu);
+    // detect reorder by monitoring the model signals
+    connect(m_layersList->model(), &QAbstractItemModel::rowsMoved, this,
+            &MainWindow::onLayersRowsMoved);
+
+    m_layersDock->setWidget(m_layersList);
+    addDockWidget(Qt::RightDockWidgetArea, m_layersDock);
+}
+
+void MainWindow::populateLayersList()
+{
+    if (!m_document)
+        return;
+    m_layersList->clear();
+    // Display layers with top-most first in the list (visual order)
+    for (int i = m_document->layerCount() - 1; i >= 0; --i)
+    {
+        auto layer = m_document->layerAt(i);
+        if (!layer)
+            continue;
+
+        QListWidgetItem* item = new QListWidgetItem(m_layersList);
+        // store the document index for this row
+        item->setData(Qt::UserRole, i);
+        item->setFlags(item->flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable |
+                       Qt::ItemIsDragEnabled);
+        m_layersList->addItem(item);
+
+        // Create a custom widget for the layer row
+        QWidget* row = new QWidget();
+        QHBoxLayout* h = new QHBoxLayout(row);
+        h->setContentsMargins(4, 2, 4, 2);
+
+        QPushButton* eyeBtn = new QPushButton(row);
+        eyeBtn->setFlat(true);
+        // initial visibility glyph
+        eyeBtn->setText(layer->visible() ? QString::fromUtf8("👁") : QString::fromUtf8("⦻"));
+        QLabel* thumb = new QLabel(row);
+        thumb->setFixedSize(48, 48);
+        thumb->setAlignment(Qt::AlignCenter);
+
+        eyeBtn->setToolTip(tr("Basculer visibilité"));
+
+        QLineEdit* nameEdit = new QLineEdit(QString::fromStdString(layer->name()), row);
+        nameEdit->setFrame(false);
+        nameEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+        QSlider* opacitySlider = new QSlider(Qt::Horizontal, row);
+        opacitySlider->setRange(0, 100);
+        opacitySlider->setValue(static_cast<int>(layer->opacity() * 100.0f));
+        opacitySlider->setFixedWidth(100);
+
+        h->addWidget(eyeBtn);
+        h->addWidget(nameEdit);
+        h->addWidget(opacitySlider);
+        h->addWidget(thumb);
+
+        m_layersList->setItemWidget(item, row);
+
+        // initialize thumbnail
+        thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
+
+        // Connections
+        connect(eyeBtn, &QPushButton::clicked, this,
+                [this, layer, eyeBtn, thumb]()
+                {
+                    layer->setVisible(!layer->visible());
+                    eyeBtn->setText(layer->visible() ? QString::fromUtf8("👁")
+                                                     : QString::fromUtf8("⦻"));
+                    updateImageFromDocument();
+                    thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
+                });
+
+        connect(opacitySlider, &QSlider::valueChanged, this,
+                [this, layer, thumb](int v)
+                {
+                    layer->setOpacity(static_cast<float>(v) / 100.0f);
+                    updateImageFromDocument();
+                    thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
+                });
+
+        connect(nameEdit, &QLineEdit::editingFinished, this,
+                [this, layer, nameEdit]() { layer->setName(nameEdit->text().toStdString()); });
+    }
+}
+
+void MainWindow::onLayerItemChanged(QListWidgetItem* item)
+{
+    if (!m_document || !item)
+        return;
+    const int idx = item->data(Qt::UserRole).toInt();
+    auto layer = m_document->layerAt(idx);
+    if (!layer)
+        return;
+    const bool visible = (item->checkState() == Qt::Checked);
+    layer->setVisible(visible);
+    updateImageFromDocument();
+}
+
+void MainWindow::onLayerDoubleClicked(QListWidgetItem* item)
+{
+    // Toggle locked on double click
+    if (!m_document || !item)
+        return;
+    const int idx = item->data(Qt::UserRole).toInt();
+    auto layer = m_document->layerAt(idx);
+    if (!layer)
+        return;
+    layer->setLocked(!layer->locked());
+}
+
+void MainWindow::onShowLayerContextMenu(const QPoint& pos)
+{
+    QListWidgetItem* item = m_layersList->itemAt(pos);
+    QMenu menu(this);
+    QAction* mergeDownAct = menu.addAction(tr("Merge Down"));
+    QAction* act = menu.exec(m_layersList->mapToGlobal(pos));
+    if (act == mergeDownAct && item && m_document)
+    {
+        const int idx = item->data(Qt::UserRole).toInt();
+        m_document->mergeDown(idx);
+        populateLayersList();
+        updateImageFromDocument();
+    }
+}
+
+void MainWindow::onLayersRowsMoved(const QModelIndex& /*parent*/, int /*start*/, int /*end*/,
+                                   const QModelIndex& /*destination*/, int /*row*/)
+{
+    if (!m_document)
+        return;
+    const int cnt = m_layersList->count();
+    std::vector<std::shared_ptr<Layer>> oldLayers;
+    oldLayers.reserve(m_document->layerCount());
+    for (int i = 0; i < m_document->layerCount(); ++i)
+    {
+        oldLayers.push_back(m_document->layerAt(i));
+    }
+
+    // Rebuild document layers in bottom-to-top order. The visual list is top-first,
+    // so iterate the widget items from bottom to top to produce a bottom-first vector.
+    std::vector<std::shared_ptr<Layer>> newLayers;
+    newLayers.reserve(cnt);
+    for (int i = cnt - 1; i >= 0; --i)
+    {
+        QListWidgetItem* it = m_layersList->item(i);
+        if (!it)
+            continue;
+        const int oldIdx = it->data(Qt::UserRole).toInt();
+        if (oldIdx >= 0 && oldIdx < static_cast<int>(oldLayers.size()))
+            newLayers.push_back(oldLayers[static_cast<size_t>(oldIdx)]);
+    }
+
+    if (!newLayers.empty())
+    {
+        m_document->setLayers(std::move(newLayers));
+        populateLayersList();
+        updateImageFromDocument();
+    }
+}
+
+void MainWindow::updateImageFromDocument()
+{
+    if (!m_document || m_document->layerCount() == 0)
+        return;
+    // Compose document into an ImageBuffer
+    ImageBuffer outBuf(m_document->width(), m_document->height());
+    Compositor comp;
+    comp.compose(*m_document, outBuf);
+
+    QImage img(outBuf.width(), outBuf.height(), QImage::Format_ARGB32);
+    for (int y = 0; y < outBuf.height(); ++y)
+    {
+        for (int x = 0; x < outBuf.width(); ++x)
+        {
+            const uint32_t rgba = outBuf.getPixel(x, y);
+            const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
+            const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
+            const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
+            const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
+            img.setPixel(x, y, qRgba(r, g, b, a));
+        }
+    }
+    m_currentImage = img;
+    updateImageDisplay();
+}
+
+QPixmap MainWindow::createLayerThumbnail(const std::shared_ptr<Layer>& layer,
+                                         const QSize& size) const
+{
+    QPixmap out(size);
+    out.fill(Qt::transparent);
+
+    if (!layer || !layer->image())
+    {
+        QPainter p(&out);
+        p.fillRect(out.rect(), QColor(200, 200, 200));
+        p.end();
+        return out;
+    }
+
+    const ImageBuffer& lb = *layer->image();
+    if (lb.width() <= 0 || lb.height() <= 0)
+        return out;
+
+    QImage img(lb.width(), lb.height(), QImage::Format_ARGB32);
+    for (int y = 0; y < lb.height(); ++y)
+    {
+        for (int x = 0; x < lb.width(); ++x)
+        {
+            const uint32_t rgba = lb.getPixel(x, y);
+            const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
+            const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
+            const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
+            const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
+            img.setPixel(x, y, qRgba(r, g, b, a));
+        }
+    }
+
+    QPixmap px =
+        QPixmap::fromImage(img).scaled(size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    if (!layer->visible())
+    {
+        QImage dim = px.toImage();
+        QPainter p(&dim);
+        p.fillRect(dim.rect(), QColor(0, 0, 0, 120));
+        p.end();
+        px = QPixmap::fromImage(dim);
+    }
+
+    return px;
+}
+
+void MainWindow::onMergeDown()
+{
+    QListWidgetItem* item = m_layersList->currentItem();
+    if (!item || !m_document)
+        return;
+    const int idx = item->data(Qt::UserRole).toInt();
+    m_document->mergeDown(idx);
+    populateLayersList();
+    updateImageFromDocument();
 }
 
 void MainWindow::zoomIn()
@@ -386,7 +710,7 @@ void MainWindow::openEpg()
         return;
 
     ZipEpgStorage storage;
-    const auto res = storage.open(fileName.toStdString());
+    auto res = storage.open(fileName.toStdString());
     if (!res.success || !res.document)
     {
         const QString err = QString::fromLocal8Bit(
@@ -439,4 +763,9 @@ void MainWindow::openEpg()
 
     statusBar()->showMessage(message);
     setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
+
+    // take ownership of document for editing in UI
+    m_document = std::move(res.document);
+    populateLayersList();
+    updateImageFromDocument();
 }
