@@ -17,7 +17,7 @@ namespace core
 {
 void floodFill(ImageBuffer& buf, int startX, int startY, Color newColor)
 {
-    const uint32_t newCol = static_cast<uint32_t>(newColor);
+    const uint32_t newCol = newColor.value;
     const int w = buf.width();
     const int h = buf.height();
     if (startX < 0 || startX >= w || startY < 0 || startY >= h)
@@ -53,7 +53,7 @@ void floodFill(ImageBuffer& buf, int startX, int startY, Color newColor)
 void floodFillWithinMask(ImageBuffer& buf, const ImageBuffer& mask, int startX, int startY,
                          Color newColor)
 {
-    const uint32_t newCol = static_cast<uint32_t>(newColor);
+    const uint32_t newCol = newColor.value;
     const int w = buf.width();
     const int h = buf.height();
     assert(mask.width() == w && mask.height() == h);
@@ -100,7 +100,7 @@ std::vector<std::tuple<int, int, uint32_t>> floodFillTracked(ImageBuffer& buf, i
 
     const int w = buf.width();
     const int h = buf.height();
-    const uint32_t newCol = static_cast<uint32_t>(newColor);
+    const uint32_t newCol = newColor.value;
     if (startX < 0 || startX >= w || startY < 0 || startY >= h)
         return changes;
 
@@ -145,7 +145,7 @@ std::vector<std::tuple<int, int, uint32_t>> floodFillWithinMaskTracked(ImageBuff
     const int w = buf.width();
     const int h = buf.height();
     assert(mask.width() == w && mask.height() == h);
-    const uint32_t newCol = static_cast<uint32_t>(newColor);
+    const uint32_t newCol = newColor.value;
     if (startX < 0 || startX >= w || startY < 0 || startY >= h)
         return changes;
 

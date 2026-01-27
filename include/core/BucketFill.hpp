@@ -13,10 +13,6 @@ struct Color
 {
     uint32_t value;
     constexpr Color(uint32_t v = 0u) noexcept : value(v) {}
-    constexpr operator uint32_t() const noexcept
-    {
-        return value;
-    }
 };
 
 void floodFill(ImageBuffer& buf, int startX, int startY, Color newColor);
