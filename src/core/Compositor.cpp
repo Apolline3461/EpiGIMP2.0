@@ -38,6 +38,7 @@ static inline std::uint32_t makePixel(std::uint8_t r, std::uint8_t g, std::uint8
            (static_cast<std::uint32_t>(b) << 8) | static_cast<std::uint32_t>(a);
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 static std::uint32_t blendPixel(std::uint32_t src, std::uint32_t dst,
                                 float layerOpacity)  // NOLINT(bugprone-easily-swappable-parameters)
 {
@@ -81,6 +82,7 @@ static std::uint32_t blendPixel(std::uint32_t src, std::uint32_t dst,
 // out          : image de sortie (roiW x roiH)
 // On assume que roi est dans les bornes du document (sinon on peut clamp).
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, int roiH,
                           ImageBuffer& out)  // NOLINT(bugprone-easily-swappable-parameters)
 {
