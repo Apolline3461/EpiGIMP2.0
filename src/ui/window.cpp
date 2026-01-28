@@ -35,6 +35,7 @@
 #include "io/EpgFormat.hpp"
 #include "io/EpgJson.hpp"
 #include "ui/image.hpp"
+#include "ui/ImageConversion.hpp"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -188,22 +189,7 @@ void MainWindow::addNewLayer()
 
         const int width = m_currentImage.width();
         const int height = m_currentImage.height();
-        ImageBuffer buf(width, height);
-        for (int y = 0; y < height; ++y)
-        {
-            for (int x = 0; x < width; ++x)
-            {
-                const QRgb p = m_currentImage.pixel(x, y);
-                const uint8_t r = qRed(p);
-                const uint8_t g = qGreen(p);
-                const uint8_t b = qBlue(p);
-                const uint8_t a = qAlpha(p);
-                const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
-                                      (static_cast<uint32_t>(g) << 16) |
-                                      (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
-                buf.setPixel(x, y, rgba);
-            }
-        }
+        ImageBuffer buf = ImageConversion::qImageToImageBuffer(m_currentImage, width, height);
         m_document = std::make_unique<Document>(width, height, 72.f);
         auto imgPtr = std::make_shared<ImageBuffer>(buf);
         auto baseLayer =
@@ -219,7 +205,7 @@ void MainWindow::addNewLayer()
     img->fill(0u);  // transparent
 
     uint64_t id = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
-    const std::string name = "Layer" + std::to_string(m_document->layerCount());
+    const std::string name = "Layer " + std::to_string(m_document->layerCount());
     auto layer = std::make_shared<Layer>(id, name, img, true, false, 1.0f);
     m_document->addLayer(layer);
     populateLayersList();
@@ -258,22 +244,7 @@ void MainWindow::addImageAsLayer()
 
         const int width = m_currentImage.width();
         const int height = m_currentImage.height();
-        ImageBuffer buf(width, height);
-        for (int y = 0; y < height; ++y)
-        {
-            for (int x = 0; x < width; ++x)
-            {
-                const QRgb p = m_currentImage.pixel(x, y);
-                const uint8_t r = qRed(p);
-                const uint8_t g = qGreen(p);
-                const uint8_t b = qBlue(p);
-                const uint8_t a = qAlpha(p);
-                const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
-                                      (static_cast<uint32_t>(g) << 16) |
-                                      (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
-                buf.setPixel(x, y, rgba);
-            }
-        }
+        ImageBuffer buf = ImageConversion::qImageToImageBuffer(m_currentImage, width, height);
         m_document = std::make_unique<Document>(width, height, 72.f);
         auto imgPtr = std::make_shared<ImageBuffer>(buf);
         auto layer =
@@ -297,27 +268,8 @@ void MainWindow::addImageAsLayer()
     if (docW <= 0 || docH <= 0)
         return;
 
-    auto imgBuf = std::make_shared<ImageBuffer>(docW, docH);
-    imgBuf->fill(0u);  // transparent
-
-    // copy pixels from loaded image into the new layer (clamped to document bounds)
-    const int copyW = std::min(docW, image.width());
-    const int copyH = std::min(docH, image.height());
-    for (int y = 0; y < copyH; ++y)
-    {
-        for (int x = 0; x < copyW; ++x)
-        {
-            const QRgb p = image.pixel(x, y);
-            const uint8_t r = qRed(p);
-            const uint8_t g = qGreen(p);
-            const uint8_t b = qBlue(p);
-            const uint8_t a = qAlpha(p);
-            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
-                                  (static_cast<uint32_t>(g) << 16) |
-                                  (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
-            imgBuf->setPixel(x, y, rgba);
-        }
-    }
+    auto imgBuf =
+        std::make_shared<ImageBuffer>(ImageConversion::qImageToImageBuffer(image, docW, docH));
 
     uint64_t id = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
     const std::string name = "Layer " + std::to_string(m_document->layerCount() + 1);
@@ -511,8 +463,8 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
 {
     QListWidgetItem* item = m_layersList->itemAt(pos);
     QMenu menu(this);
-    QAction* const mergeDownAct = menu.addAction(tr("Merge Down"));
-    QAction* const act = menu.exec(m_layersList->mapToGlobal(pos));
+    const QAction* const mergeDownAct = menu.addAction(tr("Merge Down"));
+    const QAction* const act = menu.exec(m_layersList->mapToGlobal(pos));
     if (act == mergeDownAct && item && m_document)
     {
         const int idx = item->data(Qt::UserRole).toInt();

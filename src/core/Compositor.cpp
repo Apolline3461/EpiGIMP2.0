@@ -38,16 +38,9 @@ static inline std::uint32_t makePixel(std::uint8_t r, std::uint8_t g, std::uint8
            (static_cast<std::uint32_t>(b) << 8) | static_cast<std::uint32_t>(a);
 }
 
-// Small strong type to avoid clang-tidy easily-swappable-parameters false positives
-struct LayerOpacity
-{
-    explicit LayerOpacity(float v) : value(v) {}
-    float value;
-};
-
-static std::uint32_t blendPixel(
-    std::uint32_t src, std::uint32_t dst,
-    LayerOpacity layerOpacity)  // NOLINT(bugprone-easily-swappable-parameters)
+static std::uint32_t blendPixel(std::uint32_t src,
+                                std::uint32_t dst,  // NOLINT(bugprone-easily-swappable-parameters)
+                                float layerOpacity)
 {
     const float srcR = static_cast<float>(extractR(src)) / 255.0f;
     const float srcG = static_cast<float>(extractG(src)) / 255.0f;
@@ -60,7 +53,7 @@ static std::uint32_t blendPixel(
     const float dstA = static_cast<float>(extractA(dst)) / 255.0f;
 
     // On applique l'opacité du layer sur l'alpha source
-    const float effA = srcA * std::clamp(layerOpacity.value, 0.0f, 1.0f);
+    const float effA = srcA * std::clamp(layerOpacity, 0.0f, 1.0f);
 
     // Alpha out (formule "src over dst")
     const float outA = effA + dstA * (1.0f - effA);
@@ -89,10 +82,10 @@ static std::uint32_t blendPixel(
 // out          : image de sortie (roiW x roiH)
 // On assume que roi est dans les bornes du document (sinon on peut clamp).
 
-static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, int roiH,
-                          ImageBuffer& out)  // NOLINT(bugprone-easily-swappable-parameters)
+static void composeRegion(const Document& doc, int docX0, int docY0, int roiW,
+                          int roiH,  // NOLINT(bugprone-easily-swappable-parameters)
+                          ImageBuffer& out)
 {
-    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     if (roiW <= 0 || roiH <= 0)
         return;
     const int docW = doc.width();
@@ -146,7 +139,7 @@ static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, i
                 }
 
                 const std::uint32_t dst = out.getPixel(sx, sy);
-                const std::uint32_t blended = blendPixel(src, dst, LayerOpacity(opacity));
+                const std::uint32_t blended = blendPixel(src, dst, opacity);
                 out.setPixel(sx, sy, blended);
             }
         }

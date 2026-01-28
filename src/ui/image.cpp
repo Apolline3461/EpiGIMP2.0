@@ -18,6 +18,7 @@
 #include "core/Document.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
+#include "ui/ImageConversion.hpp"
 
 void ImageActions::newImage(MainWindow* window)
 {
@@ -66,22 +67,8 @@ void ImageActions::newImage(MainWindow* window)
         window->m_currentFileName.clear();
 
         // create a Document and a base layer from the created image
-        ImageBuffer buf(width, height);
-        for (int y = 0; y < height; ++y)
-        {
-            for (int x = 0; x < width; ++x)
-            {
-                const QRgb p = window->m_currentImage.pixel(x, y);
-                const uint8_t r = qRed(p);
-                const uint8_t g = qGreen(p);
-                const uint8_t b = qBlue(p);
-                const uint8_t a = qAlpha(p);
-                const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
-                                      (static_cast<uint32_t>(g) << 16) |
-                                      (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
-                buf.setPixel(x, y, rgba);
-            }
-        }
+        ImageBuffer buf =
+            ImageConversion::qImageToImageBuffer(window->m_currentImage, width, height);
         window->m_document = std::make_unique<Document>(width, height, 72.f);
         auto imgPtr = std::make_shared<ImageBuffer>(buf);
         auto layer =
@@ -128,22 +115,7 @@ void ImageActions::openImage(MainWindow* window)
     // create a Document and base layer from the loaded image
     const int width = window->m_currentImage.width();
     const int height = window->m_currentImage.height();
-    ImageBuffer buf(width, height);
-    for (int y = 0; y < height; ++y)
-    {
-        for (int x = 0; x < width; ++x)
-        {
-            const QRgb p = window->m_currentImage.pixel(x, y);
-            const uint8_t r = qRed(p);
-            const uint8_t g = qGreen(p);
-            const uint8_t b = qBlue(p);
-            const uint8_t a = qAlpha(p);
-            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
-                                  (static_cast<uint32_t>(g) << 16) |
-                                  (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
-            buf.setPixel(x, y, rgba);
-        }
-    }
+    ImageBuffer buf = ImageConversion::qImageToImageBuffer(window->m_currentImage, width, height);
     window->m_document = std::make_unique<Document>(width, height, 72.f);
     auto imgPtr = std::make_shared<ImageBuffer>(buf);
     auto layer =
