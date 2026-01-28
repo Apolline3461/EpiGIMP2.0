@@ -354,6 +354,13 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 
 void MainWindow::keyPressEvent(QKeyEvent* event)
 {
+    if (event->key() == Qt::Key_Escape && !event->isAutoRepeat())
+    {
+        clearSelection();
+        event->accept();
+        return;
+    }
+
     if (event->key() == Qt::Key_Space && !event->isAutoRepeat())
     {
         m_handMode = true;
