@@ -35,6 +35,10 @@ class Layer
     [[nodiscard]] const std::shared_ptr<ImageBuffer>& image() const noexcept;
     void setImageBuffer(std::shared_ptr<ImageBuffer> image);
 
+    [[nodiscard]] int offsetX() const noexcept;
+    [[nodiscard]] int offsetY() const noexcept;
+    void setOffset(int x, int y);
+
    private:
     const uint64_t id_;
     std::string name_;
@@ -42,4 +46,6 @@ class Layer
     bool locked_{false};
     float opacity_{1.0f};
     std::shared_ptr<ImageBuffer> image_;
+    int offsetX_{0};
+    int offsetY_{0};
 };

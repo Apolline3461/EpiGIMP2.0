@@ -12,7 +12,9 @@ class Layer;
 class Document
 {
    public:
-    explicit Document(int width, int height, float dpi = 72.f);
+    explicit Document(int width, int height,
+                      float dpi = 72.f)  // NOLINT(bugprone-easily-swappable-parameters)
+        ;
 
     [[nodiscard]] int width() const noexcept;
     [[nodiscard]] int height() const noexcept;
@@ -22,6 +24,7 @@ class Document
     int addLayer(std::shared_ptr<Layer> layer, int idx);
     void removeLayer(int idx);
     void reorderLayer(int from, int to);
+    void setLayers(std::vector<std::shared_ptr<Layer>> layers);
     void mergeDown(int from);
 
     [[nodiscard]] int layerCount() const noexcept;
