@@ -511,8 +511,8 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
 {
     QListWidgetItem* item = m_layersList->itemAt(pos);
     QMenu menu(this);
-    QAction* mergeDownAct = menu.addAction(tr("Merge Down"));
-    QAction* act = menu.exec(m_layersList->mapToGlobal(pos));
+    QAction* const mergeDownAct = menu.addAction(tr("Merge Down"));
+    QAction* const act = menu.exec(m_layersList->mapToGlobal(pos));
     if (act == mergeDownAct && item && m_document)
     {
         const int idx = item->data(Qt::UserRole).toInt();

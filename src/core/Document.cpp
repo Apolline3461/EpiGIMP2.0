@@ -100,9 +100,16 @@ void Document::mergeDown(int from)
         const int maxW = std::min(srcImg->width(), dstImg->width());
         const int maxH = std::min(srcImg->height(), dstImg->height());
 
-        auto blendPixel =
-            [](std::uint32_t src, std::uint32_t dst,
-               float layerOpacity) -> std::uint32_t  // NOLINT(bugprone-easily-swappable-parameters)
+        // Local strong type to avoid clang-tidy easily-swappable-parameters false positives
+        struct LayerOpacity
+        {
+            explicit LayerOpacity(float v) : value(v) {}
+            float value;
+        };
+
+        auto blendPixel = [](std::uint32_t src, std::uint32_t dst,
+                             LayerOpacity layerOpacity)
+            -> std::uint32_t  // NOLINT(bugprone-easily-swappable-parameters)
         {
             auto extract = [](std::uint32_t px, int shift) -> std::uint8_t
             { return static_cast<std::uint8_t>((px >> shift) & 0xFFu); };
@@ -116,7 +123,7 @@ void Document::mergeDown(int from)
             const float dstB = static_cast<float>(extract(dst, 8)) / 255.0f;
             const float dstA = static_cast<float>(extract(dst, 0)) / 255.0f;
 
-            const float effA = srcA * std::clamp(layerOpacity, 0.0f, 1.0f);
+            const float effA = srcA * std::clamp(layerOpacity.value, 0.0f, 1.0f);
             const float outA = effA + dstA * (1.0f - effA);
             if (outA <= 0.0f)
                 return 0u;
@@ -144,7 +151,7 @@ void Document::mergeDown(int from)
             {
                 const std::uint32_t s = srcImg->getPixel(x, y);
                 const std::uint32_t d = dstImg->getPixel(x, y);
-                const std::uint32_t blended = blendPixel(s, d, opacity);
+                const std::uint32_t blended = blendPixel(s, d, LayerOpacity(opacity));
                 dstImg->setPixel(x, y, blended);
             }
         }
