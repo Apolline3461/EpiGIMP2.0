@@ -146,7 +146,7 @@ static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, i
     }
 }
 
-void Compositor::compose(const Document& doc, ImageBuffer& out) const
+void Compositor::compose(const Document& doc, ImageBuffer& out)
 {
     const int width = doc.width();
     const int height = doc.height();
@@ -157,7 +157,7 @@ void Compositor::compose(const Document& doc, ImageBuffer& out) const
     composeRegion(doc, 0, 0, width, height, out);
 }
 
-void Compositor::composeROI(const Document& doc, int x, int y, int w, int h, ImageBuffer& out) const
+void Compositor::composeROI(const Document& doc, int x, int y, int w, int h, ImageBuffer& out)
 {
     if (w <= 0 || h <= 0)
         return;

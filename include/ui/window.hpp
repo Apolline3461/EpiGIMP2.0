@@ -31,6 +31,7 @@ class MainWindow : public QMainWindow
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() = default;
 
+    // NOLINTNEXTLINE(unknownMacro)
    private slots:
     void zoomIn();
     void zoomOut();
