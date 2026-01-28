@@ -3,6 +3,8 @@ set(EPIGIMP_CORE_TEST_SOURCES
         test_Layer.cpp
         test_Document.cpp
         test_Compositor.cpp
+        test_BucketFill.cpp
+        test_BucketFill_benchmark.cpp
 )
 
 add_executable(test_core

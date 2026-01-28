@@ -1,5 +1,6 @@
 #include "ui/window.hpp"
 
+#include <QColorDialog>
 #include <QCursor>
 #include <QDir>
 #include <QFileDialog>
@@ -9,12 +10,18 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QPainter>
+#include <QPixmap>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QToolBar>
 
+#include <vector>
+
+#include "app/Command.hpp"
+#include "core/BucketFill.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
@@ -48,10 +55,22 @@ MainWindow::MainWindow(QWidget* parent)
     createMenus();
     // commande: barre d'outils pour sélection
     QToolBar* cmd = addToolBar(tr("Commande"));
+    // show icons only and set a reasonable icon size
+    cmd->setIconSize(QSize(20, 20));
+    cmd->setToolButtonStyle(Qt::ToolButtonIconOnly);
     if (m_selectToggleAct)
         cmd->addAction(m_selectToggleAct);
     if (m_clearSelectionAct)
         cmd->addAction(m_clearSelectionAct);
+    if (m_bucketAct)
+        cmd->addAction(m_bucketAct);
+    if (m_colorPickerAct)
+        cmd->addAction(m_colorPickerAct);
+    // Add undo/redo to the command toolbar as icons
+    if (m_undoAct)
+        cmd->addAction(m_undoAct);
+    if (m_redoAct)
+        cmd->addAction(m_redoAct);
     // connect selection signal
     connect(m_imageLabel, &ImageLabel::selectionFinished, this, &MainWindow::onMouseSelection);
     // panning: capter les événements de la zone de viewport
@@ -93,6 +112,47 @@ void MainWindow::createActions()
     m_exitAct->setStatusTip(tr("Quitter l'application"));
     connect(m_exitAct, &QAction::triggered, this, &QWidget::close);
 
+    // Undo / Redo actions
+    m_undoAct = new QAction(tr("&Annuler"), this);
+    m_undoAct->setShortcut(QKeySequence::Undo);
+    m_undoAct->setStatusTip(tr("Annuler la dernière action"));
+    m_undoAct->setIcon(QIcon(":/icons/undo.svg"));
+    m_undoAct->setEnabled(false);
+    connect(m_undoAct, &QAction::triggered,
+            [this]()
+            {
+                if (m_history.canUndo())
+                {
+                    m_history.undo();
+                    updateImageDisplay();
+                    statusBar()->showMessage(tr("Annuler"), 1000);
+                    if (m_undoAct)
+                        m_undoAct->setEnabled(m_history.canUndo());
+                    if (m_redoAct)
+                        m_redoAct->setEnabled(m_history.canRedo());
+                }
+            });
+
+    m_redoAct = new QAction(tr("&Rétablir"), this);
+    m_redoAct->setShortcut(QKeySequence::Redo);
+    m_redoAct->setStatusTip(tr("Rétablir la dernière action annulée"));
+    m_redoAct->setIcon(QIcon(":/icons/redo.svg"));
+    m_redoAct->setEnabled(false);
+    connect(m_redoAct, &QAction::triggered,
+            [this]()
+            {
+                if (m_history.canRedo())
+                {
+                    m_history.redo();
+                    updateImageDisplay();
+                    statusBar()->showMessage(tr("Rétablir"), 1000);
+                    if (m_undoAct)
+                        m_undoAct->setEnabled(m_history.canUndo());
+                    if (m_redoAct)
+                        m_redoAct->setEnabled(m_history.canRedo());
+                }
+            });
+
     // Fichiers EPG
     m_openEpgAct = new QAction(tr("Ouvrir un fichier &EPG..."), this);
     m_openEpgAct->setStatusTip(tr("Ouvrir un fichier EpiGimp (.epg)"));
@@ -110,7 +170,6 @@ void MainWindow::createActions()
 
     m_zoomOutAct = new QAction(tr("Zoom A&rrière"), this);
     m_zoomOutAct->setShortcut(QKeySequence::ZoomOut);
-    m_zoomOutAct->setStatusTip(tr("Réduire l'image"));
     connect(m_zoomOutAct, &QAction::triggered, this, &MainWindow::zoomOut);
 
     m_resetZoomAct = new QAction(tr("&Taille réelle"), this);
@@ -145,6 +204,40 @@ void MainWindow::createActions()
     m_selectToggleAct->setStatusTip(tr("Activer le mode sélection par souris"));
     m_selectToggleAct->setIcon(QIcon(":/icons/selection.svg"));
     connect(m_selectToggleAct, &QAction::toggled, this, &MainWindow::toggleSelectionMode);
+
+    m_bucketAct = new QAction(tr("Pot de peinture"), this);
+    m_bucketAct->setCheckable(true);
+    m_bucketAct->setStatusTip(tr("Activer l'outil pot de peinture"));
+    m_bucketAct->setIcon(QIcon(":/icons/bucket.svg"));
+    connect(m_bucketAct, &QAction::toggled, this,
+            [this](bool enabled)
+            {
+                m_bucketMode = enabled;
+                // désactiver le mode sélection si on active le pot
+                if (enabled && m_selectToggleAct)
+                {
+                    m_selectToggleAct->setChecked(false);
+                    if (m_imageLabel)
+                        m_imageLabel->setSelectionEnabled(false);
+                }
+                m_scrollArea->viewport()->setCursor(enabled ? Qt::CrossCursor : Qt::ArrowCursor);
+            });
+
+    // action pour choisir la couleur séparément
+    m_colorPickerAct = new QAction(tr("Couleur de remplissage"), this);
+    m_colorPickerAct->setStatusTip(tr("Choisir la couleur utilisée par le pot de peinture"));
+    m_colorPickerAct->setIcon(QIcon(":/icons/color_picker.svg"));
+    connect(m_colorPickerAct, &QAction::triggered, this,
+            [this]()
+            {
+                QColor chosen =
+                    QColorDialog::getColor(m_bucketColor, this, tr("Choisir la couleur"));
+                if (chosen.isValid())
+                {
+                    m_bucketColor = chosen;
+                    updateColorPickerIcon();
+                }
+            });
 }
 
 void MainWindow::createMenus()
@@ -169,6 +262,14 @@ void MainWindow::createMenus()
     m_viewMenu->addAction(m_zoom05Act);
     m_viewMenu->addAction(m_zoom1Act);
     m_viewMenu->addAction(m_zoom2Act);
+    // Undo/Redo in view menu for now
+    m_viewMenu->addSeparator();
+    if (m_undoAct)
+        m_viewMenu->addAction(m_undoAct);
+    if (m_redoAct)
+        m_viewMenu->addAction(m_redoAct);
+    // set initial colored icon
+    updateColorPickerIcon();
 }
 
 void MainWindow::zoomIn()
@@ -208,6 +309,12 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
         if (event->type() == QEvent::MouseButtonPress)
         {
             QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            // Pot de peinture: clic gauche remplit
+            if (me->button() == Qt::LeftButton && m_bucketMode)
+            {
+                bucketFillAt(me->pos());
+                return true;
+            }
             if (me->button() == Qt::LeftButton && m_handMode)
             {
                 m_panningActive = true;
@@ -247,6 +354,13 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 
 void MainWindow::keyPressEvent(QKeyEvent* event)
 {
+    if (event->key() == Qt::Key_Escape && !event->isAutoRepeat())
+    {
+        clearSelection();
+        event->accept();
+        return;
+    }
+
     if (event->key() == Qt::Key_Space && !event->isAutoRepeat())
     {
         m_handMode = true;
@@ -479,12 +593,31 @@ void MainWindow::onMouseSelection(const QRect& rect)
                          static_cast<int>(std::round(rect.height() / m_scaleFactor)));
 
     auto ref = std::make_shared<ImageBuffer>(m_currentImage.width(), m_currentImage.height());
+    // Replace previous selection by default (don't accumulate multiple rects)
+    m_selection.clear();
     Selection::Rect selRect{imageSpaceRect.x(), imageSpaceRect.y(), imageSpaceRect.width(),
                             imageSpaceRect.height()};
     m_selection.addRect(selRect, ref);
     if (m_imageLabel)
         m_imageLabel->setSelectionRect(rect);
     updateImageDisplay();
+}
+
+void MainWindow::updateColorPickerIcon()
+{
+    if (!m_colorPickerAct)
+        return;
+
+    const int sz = 16;
+    QPixmap pix(sz, sz);
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setBrush(QBrush(m_bucketColor));
+    p.setPen(Qt::black);
+    p.drawRect(0, 0, sz - 1, sz - 1);
+    p.end();
+    m_colorPickerAct->setIcon(QIcon(pix));
 }
 
 void MainWindow::clearSelection()
@@ -501,4 +634,119 @@ void MainWindow::toggleSelectionMode(bool enabled)
         m_imageLabel->setSelectionEnabled(enabled);
     m_selectToggleAct->setChecked(enabled);
     m_scrollArea->viewport()->setCursor(enabled ? Qt::CrossCursor : Qt::ArrowCursor);
+    // si on active la sélection, désactiver le pot de peinture
+    if (enabled && m_bucketAct)
+    {
+        m_bucketAct->setChecked(false);
+        m_bucketMode = false;
+    }
+}
+
+void MainWindow::bucketFillAt(const QPoint& viewportPos)
+{
+    if (m_currentImage.isNull())
+        return;
+
+    // Calculer la position dans l'image en tenant compte du zoom et des scrollbars
+    int hVal = m_scrollArea->horizontalScrollBar()->value();
+    int vVal = m_scrollArea->verticalScrollBar()->value();
+
+    const int imgX = static_cast<int>(std::round((hVal + viewportPos.x()) / m_scaleFactor));
+    const int imgY = static_cast<int>(std::round((vVal + viewportPos.y()) / m_scaleFactor));
+
+    if (imgX < 0 || imgX >= m_currentImage.width() || imgY < 0 || imgY >= m_currentImage.height())
+        return;
+
+    // Build working buffer directly from current image
+    ImageBuffer workingBuffer(m_currentImage.width(), m_currentImage.height());
+    for (int y = 0; y < m_currentImage.height(); ++y)
+    {
+        for (int x = 0; x < m_currentImage.width(); ++x)
+        {
+            const QRgb p = m_currentImage.pixel(x, y);
+            const uint8_t r = qRed(p);
+            const uint8_t g = qGreen(p);
+            const uint8_t b = qBlue(p);
+            const uint8_t a = qAlpha(p);
+            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
+                                  (static_cast<uint32_t>(g) << 16) |
+                                  (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
+            workingBuffer.setPixel(x, y, rgba);
+        }
+    }
+
+    const uint32_t newColor = (static_cast<uint32_t>(m_bucketColor.red()) << 24) |
+                              (static_cast<uint32_t>(m_bucketColor.green()) << 16) |
+                              (static_cast<uint32_t>(m_bucketColor.blue()) << 8) |
+                              static_cast<uint32_t>(m_bucketColor.alpha());
+
+    // Perform flood fill and get changed pixels directly
+    std::vector<std::tuple<int, int, uint32_t>> changedPixels;
+    if (m_selection.hasMask())
+    {
+        if (m_selection.t_at(imgX, imgY) != 0)
+        {
+            changedPixels = core::floodFillWithinMaskTracked(workingBuffer, *m_selection.mask(),
+                                                             imgX, imgY, core::Color{newColor});
+        }
+        else
+        {
+            statusBar()->showMessage(tr("Clic hors de la sélection — aucun remplissage"), 2000);
+            return;
+        }
+    }
+    else
+    {
+        changedPixels = core::floodFillTracked(workingBuffer, imgX, imgY, core::Color{newColor});
+    }
+
+    if (changedPixels.empty())
+    {
+        statusBar()->showMessage(tr("Aucun pixel modifié"), 1000);
+        return;
+    }
+
+    // Build PixelChange vector from tracked changes
+    std::vector<app::PixelChange> changes;
+    changes.reserve(changedPixels.size());
+    for (const auto& [x, y, oldColor] : changedPixels)
+    {
+        app::PixelChange pc;
+        pc.x = x;
+        pc.y = y;
+        pc.before = oldColor;
+        pc.after = newColor;
+        changes.push_back(pc);
+    }
+
+    // apply function updates the QImage from the given pixel changes
+    app::ApplyFn apply =
+        [this](std::uint64_t /*layerId*/, const std::vector<app::PixelChange>& ch, bool useBefore)
+    {
+        for (const auto& c : ch)
+        {
+            const uint32_t v = useBefore ? c.before : c.after;
+            const uint8_t r = static_cast<uint8_t>((v >> 24) & 0xFF);
+            const uint8_t g = static_cast<uint8_t>((v >> 16) & 0xFF);
+            const uint8_t b = static_cast<uint8_t>((v >> 8) & 0xFF);
+            const uint8_t a = static_cast<uint8_t>(v & 0xFF);
+            if (c.x >= 0 && c.x < m_currentImage.width() && c.y >= 0 &&
+                c.y < m_currentImage.height())
+                m_currentImage.setPixel(c.x, c.y, qRgba(r, g, b, a));
+        }
+        updateImageDisplay();
+    };
+
+    // create command, execute redo and push to history
+    auto cmd = std::make_unique<app::DataCommand>(0ull, std::move(changes), apply);
+    cmd->redo();
+    m_history.push(std::move(cmd));
+
+    // update undo/redo enabled state
+    if (m_undoAct)
+        m_undoAct->setEnabled(m_history.canUndo());
+    if (m_redoAct)
+        m_redoAct->setEnabled(m_history.canRedo());
+
+    statusBar()->showMessage(tr("Remplissage effectué"), 2000);
 }
