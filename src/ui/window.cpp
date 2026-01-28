@@ -207,7 +207,7 @@ void MainWindow::addNewLayer()
         m_document = std::make_unique<Document>(width, height, 72.f);
         auto imgPtr = std::make_shared<ImageBuffer>(buf);
         auto baseLayer =
-            std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
+            std::make_shared<Layer>(1ull, std::string("Background"), imgPtr, true, false, 1.0f);
         m_document->addLayer(baseLayer);
     }
     const int w = m_document->width();
@@ -219,7 +219,7 @@ void MainWindow::addNewLayer()
     img->fill(0u);  // transparent
 
     uint64_t id = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
-    const std::string name = "Layer " + std::to_string(m_document->layerCount() + 1);
+    const std::string name = "Layer" + std::to_string(m_document->layerCount());
     auto layer = std::make_shared<Layer>(id, name, img, true, false, 1.0f);
     m_document->addLayer(layer);
     populateLayersList();
@@ -277,7 +277,7 @@ void MainWindow::addImageAsLayer()
         m_document = std::make_unique<Document>(width, height, 72.f);
         auto imgPtr = std::make_shared<ImageBuffer>(buf);
         auto layer =
-            std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
+            std::make_shared<Layer>(1ull, std::string("Background"), imgPtr, true, false, 1.0f);
         m_document->addLayer(layer);
         populateLayersList();
         updateImageFromDocument();
@@ -353,9 +353,12 @@ void MainWindow::createLayersPanel()
 void MainWindow::populateLayersList()
 {
     if (!m_document)
+    {
+        if (m_layersList)
+            m_layersList->clear();
         return;
+    }
     m_layersList->clear();
-    // Display layers with top-most first in the list (visual order)
     for (int i = m_document->layerCount() - 1; i >= 0; --i)
     {
         auto layer = m_document->layerAt(i);
@@ -378,6 +381,15 @@ void MainWindow::populateLayersList()
         eyeBtn->setFlat(true);
         // initial visibility glyph
         eyeBtn->setText(layer->visible() ? QString::fromUtf8("👁") : QString::fromUtf8("⦻"));
+        eyeBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        {
+            QFontMetrics fm(eyeBtn->font());
+            const int textW = fm.horizontalAdvance(eyeBtn->text());
+            const int textH = fm.height();
+            const int padW = 8;
+            const int padH = 4;
+            eyeBtn->setFixedSize(textW + padW, textH + padH);
+        }
         QLabel* thumb = new QLabel(row);
         thumb->setFixedSize(48, 48);
         thumb->setAlignment(Qt::AlignCenter);
@@ -400,10 +412,8 @@ void MainWindow::populateLayersList()
 
         m_layersList->setItemWidget(item, row);
 
-        // initialize thumbnail
         thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
 
-        // Connections
         connect(eyeBtn, &QPushButton::clicked, this,
                 [this, layer, eyeBtn, thumb]()
                 {
@@ -560,19 +570,35 @@ QPixmap MainWindow::createLayerThumbnail(const std::shared_ptr<Layer>& layer,
         }
     }
 
-    QPixmap px =
-        QPixmap::fromImage(img).scaled(size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    QPixmap src = QPixmap::fromImage(img);
+    QSize target = size;
+
+    // Compute scaled size but do not upscale small images
+    QSize scaledSize = src.size();
+    if (src.width() > target.width() || src.height() > target.height())
+        scaledSize = src.size().scaled(target, Qt::KeepAspectRatio);
+
+    QPixmap scaled = src.scaled(scaledSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    // Draw the scaled pixmap centered on a transparent canvas of the target size
+    QPixmap canvas(target);
+    canvas.fill(Qt::transparent);
+    QPainter painter(&canvas);
+    const int x = (target.width() - scaled.width()) / 2;
+    const int y = (target.height() - scaled.height()) / 2;
+    painter.drawPixmap(x, y, scaled);
+    painter.end();
 
     if (!layer->visible())
     {
-        QImage dim = px.toImage();
+        QImage dim = canvas.toImage();
         QPainter p(&dim);
         p.fillRect(dim.rect(), QColor(0, 0, 0, 120));
         p.end();
-        px = QPixmap::fromImage(dim);
+        return QPixmap::fromImage(dim);
     }
 
-    return px;
+    return canvas;
 }
 
 void MainWindow::onMergeDown()
@@ -784,18 +810,25 @@ void MainWindow::saveAsEpg()
         }
     }
 
-    // Build a Document with a single layer and save using ZipEpgStorage
-    Document doc(buf.width(), buf.height(), 72.f);
-
+    // If we have a full Document in the UI, save it (preserving separate layers).
+    // Otherwise fall back to building a single-layer Document from the current image.
     try
     {
-        auto imgPtr = std::make_shared<ImageBuffer>(buf);
-        auto layer =
-            std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
-        doc.addLayer(layer);
-
         ZipEpgStorage storage;
-        storage.save(doc, fileName.toStdString());
+        if (m_document && m_document->layerCount() > 0)
+        {
+            storage.save(*m_document, fileName.toStdString());
+        }
+        else
+        {
+            // Build a Document with a single layer and save using ZipEpgStorage
+            Document doc(buf.width(), buf.height(), 72.f);
+            auto imgPtr = std::make_shared<ImageBuffer>(buf);
+            auto layer =
+                std::make_shared<Layer>(1ull, std::string("Background"), imgPtr, true, false, 1.0f);
+            doc.addLayer(layer);
+            storage.save(doc, fileName.toStdString());
+        }
     }
     catch (const std::exception& e)
     {

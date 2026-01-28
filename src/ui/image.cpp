@@ -85,7 +85,7 @@ void ImageActions::newImage(MainWindow* window)
         window->m_document = std::make_unique<Document>(width, height, 72.f);
         auto imgPtr = std::make_shared<ImageBuffer>(buf);
         auto layer =
-            std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
+            std::make_shared<Layer>(1ull, std::string("Background"), imgPtr, true, false, 1.0f);
         window->m_document->addLayer(layer);
         window->populateLayersList();
         window->updateImageFromDocument();
@@ -146,7 +146,8 @@ void ImageActions::openImage(MainWindow* window)
     }
     window->m_document = std::make_unique<Document>(width, height, 72.f);
     auto imgPtr = std::make_shared<ImageBuffer>(buf);
-    auto layer = std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
+    auto layer =
+        std::make_shared<Layer>(1ull, std::string("Background"), imgPtr, true, false, 1.0f);
     window->m_document->addLayer(layer);
     window->populateLayersList();
     window->updateImageFromDocument();
@@ -234,6 +235,9 @@ void ImageActions::closeImage(MainWindow* window)
     window->m_imageLabel->clear();
     window->m_scrollArea->setVisible(false);
     window->m_scaleFactor = 1.0;
+    window->m_document.reset();
+    window->populateLayersList();
+    window->updateImageDisplay();
 
     window->setWindowTitle(QObject::tr("EpiGimp 2.0"));
     window->statusBar()->showMessage(QObject::tr("Image fermée"), 2000);
