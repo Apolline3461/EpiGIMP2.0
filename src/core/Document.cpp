@@ -9,9 +9,8 @@
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 
-Document::Document(const int width,
-                   const int height,  // NOLINT(bugprone-easily-swappable-parameters)
-                   const float dpi)
+Document::Document(const int width, const int height,
+                   const float dpi)  // NOLINT(bugprone-easily-swappable-parameters)
     : width_{width}, height_{height}, dpi_{dpi}
 {
 }
@@ -125,9 +124,9 @@ void Document::mergeDown(int from)
         // Only blend if there's an overlap
         if (minX < maxX && minY < maxY)
         {
-            auto blendPixel = [](std::uint32_t src,
-                                 std::uint32_t dst,  // NOLINT(bugprone-easily-swappable-parameters)
-                                 float layerOpacity) -> std::uint32_t
+            auto blendPixel = [](std::uint32_t src, std::uint32_t dst,
+                                 float layerOpacity)
+                -> std::uint32_t  // NOLINT(bugprone-easily-swappable-parameters)
             {
                 auto extract = [](std::uint32_t px, int shift) -> std::uint8_t
                 { return static_cast<std::uint8_t>((px >> shift) & 0xFFu); };
