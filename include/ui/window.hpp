@@ -15,9 +15,11 @@
 #include <QPoint>
 #include <QScrollArea>
 #include <QString>
+
 #include <memory>
 
 #include "core/Document.hpp"
+
 #include <core/Selection.hpp>
 
 // Définitions pour les analyseurs (clangd) qui ne connaissent pas la

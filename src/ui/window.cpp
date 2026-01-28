@@ -9,8 +9,8 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QHBoxLayout>
-#include <QImageReader>
 #include <QIcon>
+#include <QImageReader>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QListWidget>
