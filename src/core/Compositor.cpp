@@ -114,13 +114,26 @@ static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, i
         if (opacity <= 0.0f)
             continue;
 
+        const int ox = layer->offsetX();
+        const int oy = layer->offsetY();
+        const int imgW = imgPtr->width();
+        const int imgH = imgPtr->height();
+
         for (int sy = 0; sy < maxH; ++sy)
         {
             const int docY = docY0 + sy;
             for (int sx = 0; sx < maxW; ++sx)
             {
                 const int docX = docX0 + sx;
-                const std::uint32_t src = imgPtr->getPixel(docX, docY);
+                const int lx = docX - ox;  // local x in layer image
+                const int ly = docY - oy;  // local y in layer image
+
+                std::uint32_t src = 0u;  // transparent by default
+                if (lx >= 0 && lx < imgW && ly >= 0 && ly < imgH)
+                {
+                    src = imgPtr->getPixel(lx, ly);
+                }
+
                 const std::uint32_t dst = out.getPixel(sx, sy);
                 const std::uint32_t blended = blendPixel(src, dst, opacity);
                 out.setPixel(sx, sy, blended);

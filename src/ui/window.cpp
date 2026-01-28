@@ -368,8 +368,11 @@ void MainWindow::populateLayersList()
         QListWidgetItem* item = new QListWidgetItem(m_layersList);
         // store the document index for this row
         item->setData(Qt::UserRole, i);
-        item->setFlags(item->flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable |
-                       Qt::ItemIsDragEnabled);
+        const bool isBottom = (i == 0);
+        Qt::ItemFlags flags = item->flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+        if (!isBottom)
+            flags = flags | Qt::ItemIsDragEnabled;
+        item->setFlags(flags);
         m_layersList->addItem(item);
 
         // Create a custom widget for the layer row
@@ -431,6 +434,10 @@ void MainWindow::populateLayersList()
                     updateImageFromDocument();
                     thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
                 });
+
+        // make background name read-only
+        if (isBottom)
+            nameEdit->setReadOnly(true);
 
         connect(nameEdit, &QLineEdit::editingFinished, this,
                 [this, layer, nameEdit]() { layer->setName(nameEdit->text().toStdString()); });
@@ -649,12 +656,78 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
         if (event->type() == QEvent::MouseButtonPress)
         {
             QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            // Start panning when space (hand mode) is active
             if (me->button() == Qt::LeftButton && m_handMode)
             {
                 m_panningActive = true;
                 m_lastPanPos = me->pos();
                 m_scrollArea->viewport()->setCursor(Qt::ClosedHandCursor);
                 return true;
+            }
+
+            // If not panning and left button pressed on the viewport, and a layer is selected,
+            // start dragging that layer in document coordinates.
+            if (me->button() == Qt::LeftButton && !m_handMode && m_document && m_layersList)
+            {
+                QListWidgetItem* cur = m_layersList->currentItem();
+                int pickedIdx = -1;
+
+                // compute doc coord under mouse
+                QPoint vpPos = me->pos();
+                int hVal = m_scrollArea->horizontalScrollBar()->value();
+                int vVal = m_scrollArea->verticalScrollBar()->value();
+                const int docX = static_cast<int>((hVal + vpPos.x()) / m_scaleFactor);
+                const int docY = static_cast<int>((vVal + vpPos.y()) / m_scaleFactor);
+
+                if (cur)
+                {
+                    pickedIdx = cur->data(Qt::UserRole).toInt();
+                }
+                else
+                {
+                    // pick topmost editable visible layer under cursor (skip background idx 0)
+                    for (int i = m_document->layerCount() - 1; i >= 1; --i)
+                    {
+                        auto lyr = m_document->layerAt(i);
+                        if (!lyr || !lyr->visible() || !lyr->image() || !lyr->isEditable())
+                            continue;
+                        const int lx = docX - lyr->offsetX();
+                        const int ly = docY - lyr->offsetY();
+                        if (lx < 0 || ly < 0 || lx >= lyr->image()->width() ||
+                            ly >= lyr->image()->height())
+                            continue;
+                        const uint32_t px = lyr->image()->getPixel(lx, ly);
+                        const uint8_t a = static_cast<uint8_t>(px & 0xFFu);
+                        if (a == 0)
+                            continue;
+                        pickedIdx = i;
+                        // update selection in the layers list to match picked layer
+                        for (int j = 0; j < m_layersList->count(); ++j)
+                        {
+                            auto it = m_layersList->item(j);
+                            if (it && it->data(Qt::UserRole).toInt() == pickedIdx)
+                            {
+                                m_layersList->setCurrentItem(it);
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                if (pickedIdx <= 0)
+                    return true;  // no valid layer picked or attempting to pick background
+
+                auto layer = m_document->layerAt(pickedIdx);
+                if (layer)
+                {
+                    m_layerDragActive = true;
+                    m_dragLayerIndex = pickedIdx;
+                    m_layerDragStartDocPos = QPoint(docX, docY);
+                    m_layerDragInitialOffsetX = layer->offsetX();
+                    m_layerDragInitialOffsetY = layer->offsetY();
+                    return true;
+                }
             }
         }
         else if (event->type() == QEvent::MouseMove)
@@ -670,6 +743,46 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
                     m_scrollArea->verticalScrollBar()->value() - delta.y());
                 return true;
             }
+
+            // Handle layer dragging
+            if (m_layerDragActive && m_document && m_dragLayerIndex >= 0)
+            {
+                QMouseEvent* me = static_cast<QMouseEvent*>(event);
+                QPoint vpPos = me->pos();
+                int hVal = m_scrollArea->horizontalScrollBar()->value();
+                int vVal = m_scrollArea->verticalScrollBar()->value();
+                const int docX = static_cast<int>((hVal + vpPos.x()) / m_scaleFactor);
+                const int docY = static_cast<int>((vVal + vpPos.y()) / m_scaleFactor);
+
+                const int dx = docX - m_layerDragStartDocPos.x();
+                const int dy = docY - m_layerDragStartDocPos.y();
+
+                auto layer = m_document->layerAt(m_dragLayerIndex);
+                if (layer)
+                {
+                    layer->setOffset(m_layerDragInitialOffsetX + dx,
+                                     m_layerDragInitialOffsetY + dy);
+                    // preserve selection
+                    QListWidgetItem* cur = m_layersList->currentItem();
+                    int selIdx = cur ? cur->data(Qt::UserRole).toInt() : -1;
+                    populateLayersList();
+                    // restore selection by matching stored document index
+                    if (selIdx >= 0)
+                    {
+                        for (int i = 0; i < m_layersList->count(); ++i)
+                        {
+                            QListWidgetItem* it = m_layersList->item(i);
+                            if (it && it->data(Qt::UserRole).toInt() == selIdx)
+                            {
+                                m_layersList->setCurrentItem(it);
+                                break;
+                            }
+                        }
+                    }
+                    updateImageFromDocument();
+                }
+                return true;
+            }
         }
         else if (event->type() == QEvent::MouseButtonRelease)
         {
@@ -678,6 +791,13 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
             {
                 m_panningActive = false;
                 m_scrollArea->viewport()->setCursor(Qt::OpenHandCursor);
+                return true;
+            }
+
+            if (me->button() == Qt::LeftButton && m_layerDragActive)
+            {
+                m_layerDragActive = false;
+                m_dragLayerIndex = -1;
                 return true;
             }
         }

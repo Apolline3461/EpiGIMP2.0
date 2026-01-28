@@ -99,4 +99,10 @@ class MainWindow : public QMainWindow
     std::unique_ptr<Document> m_document;
     QDockWidget* m_layersDock{nullptr};
     QListWidget* m_layersList{nullptr};
+    // layer dragging state (drag the selected layer on the canvas)
+    bool m_layerDragActive{false};
+    int m_dragLayerIndex{-1};
+    QPoint m_layerDragStartDocPos;  // in document pixel coords
+    int m_layerDragInitialOffsetX{0};
+    int m_layerDragInitialOffsetY{0};
 };

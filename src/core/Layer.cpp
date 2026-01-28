@@ -78,3 +78,19 @@ void Layer::setImageBuffer(std::shared_ptr<ImageBuffer> image)
 {
     image_ = std::move(image);
 }
+
+int Layer::offsetX() const noexcept
+{
+    return offsetX_;
+}
+
+int Layer::offsetY() const noexcept
+{
+    return offsetY_;
+}
+
+void Layer::setOffset(int x, int y)
+{
+    offsetX_ = x;
+    offsetY_ = y;
+}
