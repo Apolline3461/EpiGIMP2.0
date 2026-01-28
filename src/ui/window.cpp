@@ -9,6 +9,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QHBoxLayout>
+#include <QImageReader>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QListWidget>
@@ -113,6 +114,11 @@ void MainWindow::createActions()
     m_addLayerAct->setStatusTip(tr("Ajouter un nouveau calque vide au document"));
     connect(m_addLayerAct, &QAction::triggered, this, &MainWindow::addNewLayer);
 
+    m_addImageLayerAct = new QAction(tr("Ajouter une image en calque"), this);
+    m_addImageLayerAct->setStatusTip(
+        tr("Charger une image et l'ajouter en tant que nouveau calque"));
+    connect(m_addImageLayerAct, &QAction::triggered, this, &MainWindow::addImageAsLayer);
+
     // Menu Vue
     m_zoomInAct = new QAction(tr("Zoom &Avant"), this);
     m_zoomInAct->setShortcut(QKeySequence::ZoomIn);
@@ -153,6 +159,7 @@ void MainWindow::createMenus()
     m_fileMenu->addAction(m_newAct);
     m_fileMenu->addAction(m_openAct);
     m_fileMenu->addAction(m_addLayerAct);
+    m_fileMenu->addAction(m_addImageLayerAct);
     m_fileMenu->addAction(m_openEpgAct);
     m_fileMenu->addAction(m_saveAct);
     m_fileMenu->addAction(m_saveEpgAct);
@@ -217,6 +224,110 @@ void MainWindow::addNewLayer()
     m_document->addLayer(layer);
     populateLayersList();
     updateImageFromDocument();
+}
+
+void MainWindow::addImageAsLayer()
+{
+    QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+
+    QString fileName = QFileDialog::getOpenFileName(
+        this, tr("Ajouter une image en nouveau calque"), picturesPath,
+        tr("Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp);;Tous les fichiers (*)"));
+
+    if (fileName.isEmpty())
+        return;
+
+    QImageReader reader(fileName);
+    reader.setAutoTransform(true);
+    const QImage image = reader.read();
+
+    if (image.isNull())
+    {
+        QMessageBox::critical(this, tr("Erreur"),
+                              tr("Impossible de charger l'image %1:\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(reader.errorString()));
+        return;
+    }
+
+    // If there's no document yet, create one from the loaded image (same behavior as openImage)
+    if (!m_document)
+    {
+        m_currentImage = image;
+        m_currentFileName = fileName;
+
+        const int width = m_currentImage.width();
+        const int height = m_currentImage.height();
+        ImageBuffer buf(width, height);
+        for (int y = 0; y < height; ++y)
+        {
+            for (int x = 0; x < width; ++x)
+            {
+                const QRgb p = m_currentImage.pixel(x, y);
+                const uint8_t r = qRed(p);
+                const uint8_t g = qGreen(p);
+                const uint8_t b = qBlue(p);
+                const uint8_t a = qAlpha(p);
+                const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
+                                      (static_cast<uint32_t>(g) << 16) |
+                                      (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
+                buf.setPixel(x, y, rgba);
+            }
+        }
+        m_document = std::make_unique<Document>(width, height, 72.f);
+        auto imgPtr = std::make_shared<ImageBuffer>(buf);
+        auto layer =
+            std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
+        m_document->addLayer(layer);
+        populateLayersList();
+        updateImageFromDocument();
+        m_scrollArea->setVisible(true);
+        QString message = tr("Image chargée et ajoutée comme calque: %1 (%2x%3)")
+                              .arg(QFileInfo(fileName).fileName())
+                              .arg(m_currentImage.width())
+                              .arg(m_currentImage.height());
+        statusBar()->showMessage(message);
+        setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
+        return;
+    }
+
+    // Create a new transparent buffer matching document size and blit the loaded image at (0,0)
+    const int docW = m_document->width();
+    const int docH = m_document->height();
+    if (docW <= 0 || docH <= 0)
+        return;
+
+    auto imgBuf = std::make_shared<ImageBuffer>(docW, docH);
+    imgBuf->fill(0u);  // transparent
+
+    // copy pixels from loaded image into the new layer (clamped to document bounds)
+    const int copyW = std::min(docW, image.width());
+    const int copyH = std::min(docH, image.height());
+    for (int y = 0; y < copyH; ++y)
+    {
+        for (int x = 0; x < copyW; ++x)
+        {
+            const QRgb p = image.pixel(x, y);
+            const uint8_t r = qRed(p);
+            const uint8_t g = qGreen(p);
+            const uint8_t b = qBlue(p);
+            const uint8_t a = qAlpha(p);
+            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
+                                  (static_cast<uint32_t>(g) << 16) |
+                                  (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
+            imgBuf->setPixel(x, y, rgba);
+        }
+    }
+
+    uint64_t id = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
+    const std::string name = "Layer " + std::to_string(m_document->layerCount() + 1);
+    auto layer = std::make_shared<Layer>(id, name, imgBuf, true, false, 1.0f);
+    m_document->addLayer(layer);
+    populateLayersList();
+    updateImageFromDocument();
+    m_scrollArea->setVisible(true);
+    statusBar()->showMessage(
+        tr("Image ajoutée en tant que calque: %1").arg(QFileInfo(fileName).fileName()));
 }
 
 void MainWindow::createLayersPanel()

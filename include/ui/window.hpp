@@ -39,6 +39,7 @@ class MainWindow : public QMainWindow
     void openEpg();
     void saveAsEpg();
     void addNewLayer();
+    void addImageAsLayer();
     void onLayerItemChanged(QListWidgetItem* item);
     void onLayerDoubleClicked(QListWidgetItem* item);
     void onLayersRowsMoved(const QModelIndex& parent, int start, int end,
@@ -92,6 +93,7 @@ class MainWindow : public QMainWindow
     QAction* m_openEpgAct;
     QAction* m_saveEpgAct;
     QAction* m_addLayerAct{nullptr};
+    QAction* m_addImageLayerAct{nullptr};
 
     // Document and layers UI
     std::unique_ptr<Document> m_document;
