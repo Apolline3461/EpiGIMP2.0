@@ -475,7 +475,7 @@ void MainWindow::populateLayersList()
             nameEdit->setReadOnly(true);
 
         connect(nameEdit, &QLineEdit::editingFinished, this,
-                [this, layer, nameEdit]() { layer->setName(nameEdit->text().toStdString()); });
+                [layer, nameEdit]() { layer->setName(nameEdit->text().toStdString()); });
     }
 }
 

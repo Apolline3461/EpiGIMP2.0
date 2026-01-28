@@ -89,7 +89,7 @@ int Layer::offsetY() const noexcept
     return offsetY_;
 }
 
-void Layer::setOffset(int x, int y)
+void Layer::setOffset(int x, int y)  // NOLINT(bugprone-easily-swappable-parameters)
 {
     offsetX_ = x;
     offsetY_ = y;
