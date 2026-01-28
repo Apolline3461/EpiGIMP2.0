@@ -369,8 +369,9 @@ void MainWindow::populateLayersList()
         // store the document index for this row
         item->setData(Qt::UserRole, i);
         const bool isBottom = (i == 0);
+        const bool isLocked = layer->locked();
         Qt::ItemFlags flags = item->flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable;
-        if (!isBottom)
+        if (!isBottom && !isLocked)
             flags = flags | Qt::ItemIsDragEnabled;
         item->setFlags(flags);
         m_layersList->addItem(item);
@@ -393,6 +394,20 @@ void MainWindow::populateLayersList()
             const int padH = 4;
             eyeBtn->setFixedSize(textW + padW, textH + padH);
         }
+        QPushButton* lockBtn = new QPushButton(row);
+        lockBtn->setFlat(true);
+        lockBtn->setText(layer->locked() ? QString::fromUtf8("🔒") : QString::fromUtf8("🔓"));
+        lockBtn->setToolTip(tr("Verrouiller/déverrouiller"));
+        lockBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        {
+            QFontMetrics fm(lockBtn->font());
+            const int textW = fm.horizontalAdvance(lockBtn->text());
+            const int textH = fm.height();
+            const int padW = 8;
+            const int padH = 4;
+            lockBtn->setFixedSize(textW + padW, textH + padH);
+        }
+
         QLabel* thumb = new QLabel(row);
         thumb->setFixedSize(48, 48);
         thumb->setAlignment(Qt::AlignCenter);
@@ -406,9 +421,11 @@ void MainWindow::populateLayersList()
         QSlider* opacitySlider = new QSlider(Qt::Horizontal, row);
         opacitySlider->setRange(0, 100);
         opacitySlider->setValue(static_cast<int>(layer->opacity() * 100.0f));
-        opacitySlider->setFixedWidth(100);
+        opacitySlider->setFixedWidth(50);
+        opacitySlider->setEnabled(!layer->locked());
 
         h->addWidget(eyeBtn);
+        h->addWidget(lockBtn);
         h->addWidget(nameEdit);
         h->addWidget(opacitySlider);
         h->addWidget(thumb);
@@ -427,6 +444,24 @@ void MainWindow::populateLayersList()
                     thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
                 });
 
+        connect(lockBtn, &QPushButton::clicked, this,
+                [this, layer, lockBtn, nameEdit, opacitySlider, item, isBottom, thumb]()
+                {
+                    layer->setLocked(!layer->locked());
+                    lockBtn->setText(layer->locked() ? QString::fromUtf8("🔒")
+                                                     : QString::fromUtf8("🔓"));
+                    // disable editing when locked
+                    nameEdit->setReadOnly(isBottom || layer->locked());
+                    opacitySlider->setEnabled(!layer->locked());
+                    // update item flags to reflect dragability
+                    Qt::ItemFlags flags = item->flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+                    if (!isBottom && !layer->locked())
+                        flags = flags | Qt::ItemIsDragEnabled;
+                    item->setFlags(flags);
+                    updateImageFromDocument();
+                    thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
+                });
+
         connect(opacitySlider, &QSlider::valueChanged, this,
                 [this, layer, thumb](int v)
                 {
@@ -435,8 +470,8 @@ void MainWindow::populateLayersList()
                     thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
                 });
 
-        // make background name read-only
-        if (isBottom)
+        // make background name read-only or if layer locked
+        if (isBottom || layer->locked())
             nameEdit->setReadOnly(true);
 
         connect(nameEdit, &QLineEdit::editingFinished, this,
@@ -467,6 +502,9 @@ void MainWindow::onLayerDoubleClicked(QListWidgetItem* item)
     if (!layer)
         return;
     layer->setLocked(!layer->locked());
+    // Refresh UI to reflect lock state
+    populateLayersList();
+    updateImageFromDocument();
 }
 
 void MainWindow::onShowLayerContextMenu(const QPoint& pos)
@@ -682,6 +720,13 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
                 if (cur)
                 {
                     pickedIdx = cur->data(Qt::UserRole).toInt();
+                    // Prevent starting a drag if the selected layer is not editable (e.g., locked)
+                    if (pickedIdx > 0)
+                    {
+                        auto selLayer = m_document->layerAt(pickedIdx);
+                        if (!selLayer || !selLayer->isEditable())
+                            return true;
+                    }
                 }
                 else
                 {
