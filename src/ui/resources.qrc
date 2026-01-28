@@ -3,5 +3,9 @@
   <qresource prefix="/">
     <file>icons/selection.svg</file>
     <file>icons/clear_selection.svg</file>
+    <file>icons/eye.svg</file>
+    <file>icons/eye_closed.svg</file>
+    <file>icons/lock.svg</file>
+    <file>icons/unlock.svg</file>
   </qresource>
 </RCC>

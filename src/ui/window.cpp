@@ -11,6 +11,7 @@
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QImageReader>
+#include <QInputDialog>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QListWidget>
@@ -26,6 +27,8 @@
 #include <QSlider>
 #include <QStandardPaths>
 #include <QStatusBar>
+#include <QTextEdit>
+#include <QTextOption>
 #include <QToolBar>
 
 #include "core/Compositor.hpp"
@@ -350,35 +353,23 @@ void MainWindow::populateLayersList()
 
         // Create a custom widget for the layer row
         QWidget* row = new QWidget();
+        row->setFixedHeight(56);
         QHBoxLayout* h = new QHBoxLayout(row);
         h->setContentsMargins(4, 2, 4, 2);
 
         QPushButton* eyeBtn = new QPushButton(row);
         eyeBtn->setFlat(true);
-        // initial visibility glyph
-        eyeBtn->setText(layer->visible() ? QString::fromUtf8("👁") : QString::fromUtf8("⦻"));
+        eyeBtn->setIcon(QIcon(layer->visible() ? ":/icons/eye.svg" : ":/icons/eye_closed.svg"));
+        eyeBtn->setIconSize(QSize(16, 16));
         eyeBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-        {
-            QFontMetrics fm(eyeBtn->font());
-            const int textW = fm.horizontalAdvance(eyeBtn->text());
-            const int textH = fm.height();
-            const int padW = 8;
-            const int padH = 4;
-            eyeBtn->setFixedSize(textW + padW, textH + padH);
-        }
+        eyeBtn->setFixedSize(28, 28);
         QPushButton* lockBtn = new QPushButton(row);
         lockBtn->setFlat(true);
-        lockBtn->setText(layer->locked() ? QString::fromUtf8("🔒") : QString::fromUtf8("🔓"));
+        lockBtn->setIcon(QIcon(layer->locked() ? ":/icons/lock.svg" : ":/icons/unlock.svg"));
+        lockBtn->setIconSize(QSize(16, 16));
         lockBtn->setToolTip(tr("Verrouiller/déverrouiller"));
         lockBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-        {
-            QFontMetrics fm(lockBtn->font());
-            const int textW = fm.horizontalAdvance(lockBtn->text());
-            const int textH = fm.height();
-            const int padW = 8;
-            const int padH = 4;
-            lockBtn->setFixedSize(textW + padW, textH + padH);
-        }
+        lockBtn->setFixedSize(28, 28);
 
         QLabel* thumb = new QLabel(row);
         thumb->setFixedSize(48, 48);
@@ -386,9 +377,26 @@ void MainWindow::populateLayersList()
 
         eyeBtn->setToolTip(tr("Basculer visibilité"));
 
-        QLineEdit* nameEdit = new QLineEdit(QString::fromStdString(layer->name()), row);
-        nameEdit->setFrame(false);
-        nameEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+        QTextEdit* nameEdit = new QTextEdit(row);
+        nameEdit->setAcceptRichText(false);
+        nameEdit->setPlainText(QString::fromStdString(layer->name()));
+        nameEdit->setStyleSheet("border: none; background: transparent;");
+        nameEdit->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+        nameEdit->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        nameEdit->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        nameEdit->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+        QFontMetrics fmName(nameEdit->font());
+        const int lineH = fmName.lineSpacing();
+        const int minNameH = lineH + 8;
+        const int maxNameH = lineH * 3 + 8;  // up to 3 lines
+        nameEdit->setFixedHeight(minNameH);
+        nameEdit->setMaximumHeight(maxNameH);
+        nameEdit->setFixedWidth(60);
+        // Disable the QTextEdit builtin context menu so right-click opens the
+        // layers list context menu (rename/resize/delete) instead of cut/copy/paste.
+        nameEdit->setContextMenuPolicy(Qt::NoContextMenu);
+        // start read-only for background or locked layers
+        nameEdit->setReadOnly(isBottom || layer->locked());
 
         QSlider* opacitySlider = new QSlider(Qt::Horizontal, row);
         opacitySlider->setRange(0, 100);
@@ -403,6 +411,7 @@ void MainWindow::populateLayersList()
         h->addWidget(thumb);
 
         m_layersList->setItemWidget(item, row);
+        item->setSizeHint(row->sizeHint());
 
         thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
 
@@ -410,8 +419,8 @@ void MainWindow::populateLayersList()
                 [this, layer, eyeBtn, thumb]()
                 {
                     layer->setVisible(!layer->visible());
-                    eyeBtn->setText(layer->visible() ? QString::fromUtf8("👁")
-                                                     : QString::fromUtf8("⦻"));
+                    eyeBtn->setIcon(
+                        QIcon(layer->visible() ? ":/icons/eye.svg" : ":/icons/eye_closed.svg"));
                     updateImageFromDocument();
                     thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
                 });
@@ -420,8 +429,8 @@ void MainWindow::populateLayersList()
                 [this, layer, lockBtn, nameEdit, opacitySlider, item, isBottom, thumb]()
                 {
                     layer->setLocked(!layer->locked());
-                    lockBtn->setText(layer->locked() ? QString::fromUtf8("🔒")
-                                                     : QString::fromUtf8("🔓"));
+                    lockBtn->setIcon(
+                        QIcon(layer->locked() ? ":/icons/lock.svg" : ":/icons/unlock.svg"));
                     // disable editing when locked
                     nameEdit->setReadOnly(isBottom || layer->locked());
                     opacitySlider->setEnabled(!layer->locked());
@@ -446,8 +455,15 @@ void MainWindow::populateLayersList()
         if (isBottom || layer->locked())
             nameEdit->setReadOnly(true);
 
-        connect(nameEdit, &QLineEdit::editingFinished, this,
-                [layer, nameEdit]() { layer->setName(nameEdit->text().toStdString()); });
+        connect(nameEdit, &QTextEdit::textChanged, this,
+                [layer, nameEdit, minNameH, maxNameH]()
+                {
+                    // update layer name and clamp displayed height to 3 lines
+                    layer->setName(nameEdit->toPlainText().toStdString());
+                    nameEdit->document()->setTextWidth(nameEdit->viewport()->width());
+                    int h = static_cast<int>(nameEdit->document()->size().height()) + 8;
+                    nameEdit->setFixedHeight(qMax(minNameH, qMin(maxNameH, h)));
+                });
     }
 }
 
@@ -466,28 +482,114 @@ void MainWindow::onLayerItemChanged(QListWidgetItem* item)
 
 void MainWindow::onLayerDoubleClicked(QListWidgetItem* item)
 {
-    // Toggle locked on double click
+    // Double-click on a layer item starts inline editing of the name (if editable)
     if (!m_document || !item)
         return;
     const int idx = item->data(Qt::UserRole).toInt();
     auto layer = m_document->layerAt(idx);
     if (!layer)
         return;
-    layer->setLocked(!layer->locked());
-    // Refresh UI to reflect lock state
-    populateLayersList();
-    updateImageFromDocument();
+
+    QWidget* row = m_layersList->itemWidget(item);
+    if (!row)
+        return;
+    if (auto nameEdit = row->findChild<QTextEdit*>())
+    {
+        if (idx == 0 || layer->locked())
+            return;  // background or locked layer not editable
+        nameEdit->setReadOnly(false);
+        nameEdit->setFocus(Qt::MouseFocusReason);
+        QTextCursor c = nameEdit->textCursor();
+        c.movePosition(QTextCursor::End);
+        nameEdit->setTextCursor(c);
+    }
 }
 
 void MainWindow::onShowLayerContextMenu(const QPoint& pos)
 {
     QListWidgetItem* item = m_layersList->itemAt(pos);
+    if (!item)
+        item = m_layersList->currentItem();
     QMenu menu(this);
-    const QAction* const mergeDownAct = menu.addAction(tr("Merge Down"));
-    const QAction* const act = menu.exec(m_layersList->mapToGlobal(pos));
-    if (act == mergeDownAct && item && m_document)
+    QAction* renameAct = menu.addAction(tr("Renommer"));
+    QAction* resizeAct = menu.addAction(tr("Redimensionner..."));
+    QAction* deleteAct = menu.addAction(tr("Supprimer"));
+    menu.addSeparator();
+    QAction* mergeDownAct = menu.addAction(tr("Merge Down"));
+
+    const QAction* act = menu.exec(m_layersList->mapToGlobal(pos));
+    if (!item || !m_document)
+        return;
+
+    const int idx = item->data(Qt::UserRole).toInt();
+    auto layerPtr = m_document->layerAt(idx);
+    const bool isBottomLayer = (idx == 0);
+    const bool isLockedLayer = layerPtr ? layerPtr->locked() : false;
+    renameAct->setEnabled(!isBottomLayer && !isLockedLayer);
+    deleteAct->setEnabled(!isBottomLayer);
+
+    if (act == renameAct)
     {
-        const int idx = item->data(Qt::UserRole).toInt();
+        bool ok = false;
+        const QString current = QString::fromStdString(m_document->layerAt(idx)->name());
+        const QString text = QInputDialog::getText(this, tr("Renommer le calque"), tr("Nom:"),
+                                                   QLineEdit::Normal, current, &ok);
+        if (ok)
+        {
+            m_document->layerAt(idx)->setName(text.toStdString());
+            populateLayersList();
+        }
+    }
+    else if (act == resizeAct)
+    {
+        bool okW = false;
+        bool okH = false;
+        const int curW = m_document->width();
+        const int curH = m_document->height();
+        int w = QInputDialog::getInt(this, tr("Redimensionner le calque"), tr("Largeur:"), curW, 1,
+                                     10000, 1, &okW);
+        if (!okW)
+            return;
+        int h = QInputDialog::getInt(this, tr("Redimensionner le calque"), tr("Hauteur:"), curH, 1,
+                                     10000, 1, &okH);
+        if (!okH)
+            return;
+
+        auto lyr = m_document->layerAt(idx);
+        if (lyr && lyr->image())
+        {
+            ImageBuffer newBuf(w, h);
+            newBuf.fill(0u);
+            const ImageBuffer& old = *lyr->image();
+            const int copyW = std::min(w, old.width());
+            const int copyH = std::min(h, old.height());
+            for (int yy = 0; yy < copyH; ++yy)
+            {
+                for (int xx = 0; xx < copyW; ++xx)
+                {
+                    newBuf.setPixel(xx, yy, old.getPixel(xx, yy));
+                }
+            }
+            lyr->setImageBuffer(std::make_shared<ImageBuffer>(newBuf));
+            populateLayersList();
+            updateImageFromDocument();
+        }
+    }
+    else if (act == deleteAct)
+    {
+        const QString layerName = QString::fromStdString(m_document->layerAt(idx)->name());
+        const int ret = QMessageBox::question(this, tr("Supprimer le calque"),
+                                              tr("Supprimer le calque %1 ?").arg(layerName),
+                                              QMessageBox::Yes | QMessageBox::No);
+        if (ret == QMessageBox::Yes)
+        {
+            m_document->removeLayer(idx);
+            populateLayersList();
+            updateImageFromDocument();
+        }
+    }
+    else if (act == mergeDownAct)
+    {
         m_document->mergeDown(idx);
         populateLayersList();
         updateImageFromDocument();
@@ -565,7 +667,6 @@ QPixmap MainWindow::createLayerThumbnail(const std::shared_ptr<Layer>& layer,
     {
         QPainter p(&out);
         p.fillRect(out.rect(), QColor(200, 200, 200));
-        p.end();
         return out;
     }
 
@@ -573,7 +674,8 @@ QPixmap MainWindow::createLayerThumbnail(const std::shared_ptr<Layer>& layer,
     if (lb.width() <= 0 || lb.height() <= 0)
         return out;
 
-    QImage img(lb.width(), lb.height(), QImage::Format_ARGB32);
+    // Build a QImage from the ImageBuffer in a robust way using setPixelColor
+    QImage img(lb.width(), lb.height(), QImage::Format_ARGB32_Premultiplied);
     for (int y = 0; y < lb.height(); ++y)
     {
         for (int x = 0; x < lb.width(); ++x)
@@ -583,27 +685,24 @@ QPixmap MainWindow::createLayerThumbnail(const std::shared_ptr<Layer>& layer,
             const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
             const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
             const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
-            img.setPixel(x, y, qRgba(r, g, b, a));
+            img.setPixelColor(x, y, QColor(r, g, b, a));
         }
     }
 
-    QPixmap src = QPixmap::fromImage(img);
     QSize target = size;
+    QSize scaledSize = img.size();
+    if (img.width() > target.width() || img.height() > target.height())
+        scaledSize = img.size().scaled(target, Qt::KeepAspectRatio);
 
-    // Compute scaled size but do not upscale small images
-    QSize scaledSize = src.size();
-    if (src.width() > target.width() || src.height() > target.height())
-        scaledSize = src.size().scaled(target, Qt::KeepAspectRatio);
+    QImage scaled = img.scaled(scaledSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 
-    QPixmap scaled = src.scaled(scaledSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-
-    // Draw the scaled pixmap centered on a transparent canvas of the target size
+    // Draw the scaled image centered on a transparent canvas of the target size
     QPixmap canvas(target);
     canvas.fill(Qt::transparent);
     QPainter painter(&canvas);
-    const int x = (target.width() - scaled.width()) / 2;
-    const int y = (target.height() - scaled.height()) / 2;
-    painter.drawPixmap(x, y, scaled);
+    const int cx = (target.width() - scaled.width()) / 2;
+    const int cy = (target.height() - scaled.height()) / 2;
+    painter.drawImage(cx, cy, scaled);
     painter.end();
 
     if (!layer->visible())
@@ -611,7 +710,6 @@ QPixmap MainWindow::createLayerThumbnail(const std::shared_ptr<Layer>& layer,
         QImage dim = canvas.toImage();
         QPainter p(&dim);
         p.fillRect(dim.rect(), QColor(0, 0, 0, 120));
-        p.end();
         return QPixmap::fromImage(dim);
     }
 
@@ -661,6 +759,28 @@ void MainWindow::updateImageDisplay()
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 {
+    if (auto te = qobject_cast<QTextEdit*>(watched))
+    {
+        if (event->type() == QEvent::Resize)
+        {
+            // adjust document width so wrapping updates, then resize height to fit content
+            te->document()->setTextWidth(te->viewport()->width());
+            int h = static_cast<int>(te->document()->size().height()) + 8;
+            QFontMetrics fm(te->font());
+            int minH = fm.height() + 8;
+            te->setFixedHeight(qMax(minH, h));
+        }
+        else if (event->type() == QEvent::FocusOut)
+        {
+            te->setReadOnly(true);
+            te->document()->setTextWidth(te->viewport()->width());
+            int h = static_cast<int>(te->document()->size().height()) + 8;
+            QFontMetrics fm(te->font());
+            int minH = fm.height() + 8;
+            te->setFixedHeight(qMax(minH, h));
+        }
+        return false;
+    }
     if (watched == m_scrollArea->viewport())
     {
         if (event->type() == QEvent::MouseButtonPress)
@@ -930,25 +1050,9 @@ void MainWindow::saveAsEpg()
         fileName += ".epg";
 
     // convert QImage -> ImageBuffer
-    ImageBuffer buf(m_currentImage.width(), m_currentImage.height());
-    for (int y = 0; y < m_currentImage.height(); ++y)
-    {
-        for (int x = 0; x < m_currentImage.width(); ++x)
-        {
-            const QRgb p = m_currentImage.pixel(x, y);
-            const uint8_t r = qRed(p);
-            const uint8_t g = qGreen(p);
-            const uint8_t bch = qBlue(p);
-            const uint8_t a = qAlpha(p);
-            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
-                                  (static_cast<uint32_t>(g) << 16) |
-                                  (static_cast<uint32_t>(bch) << 8) | static_cast<uint32_t>(a);
-            buf.setPixel(x, y, rgba);
-        }
-    }
+    ImageBuffer buf = ImageConversion::qImageToImageBuffer(m_currentImage, m_currentImage.width(),
+                                                           m_currentImage.height());
 
-    // If we have a full Document in the UI, save it (preserving separate layers).
-    // Otherwise fall back to building a single-layer Document from the current image.
     try
     {
         ZipEpgStorage storage;
