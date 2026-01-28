@@ -10,6 +10,10 @@
 #include <QImageWriter>
 #include <QLabel>
 #include <QMessageBox>
+#include <QMouseEvent>
+#include <QPainter>
+#include <QPaintEvent>
+#include <QRubberBand>
 #include <QSpinBox>
 #include <QStandardPaths>
 #include <QStatusBar>
@@ -19,6 +23,7 @@
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 #include "ui/ImageConversion.hpp"
+#include "ui/window.hpp"
 
 void ImageActions::newImage(MainWindow* window)
 {
@@ -213,4 +218,85 @@ void ImageActions::closeImage(MainWindow* window)
 
     window->setWindowTitle(QObject::tr("EpiGimp 2.0"));
     window->statusBar()->showMessage(QObject::tr("Image fermée"), 2000);
+}
+
+ImageLabel::ImageLabel(QWidget* parent)
+    : QLabel(parent), m_rubberBand_(new QRubberBand(QRubberBand::Rectangle, this))
+{
+    setMouseTracking(true);
+    m_hasSelection_ = false;
+}
+
+void ImageLabel::mousePressEvent(QMouseEvent* event)
+{
+    if (!m_selectionEnabled_)
+    {
+        QLabel::mousePressEvent(event);
+        return;
+    }
+
+    if (event->button() == Qt::LeftButton)
+    {
+        m_origin_ = event->pos();
+        m_rubberBand_->setGeometry(QRect(m_origin_, QSize()));
+        m_rubberBand_->show();
+    }
+    QLabel::mousePressEvent(event);
+}
+
+void ImageLabel::mouseMoveEvent(QMouseEvent* event)
+{
+    if (!m_selectionEnabled_)
+    {
+        QLabel::mouseMoveEvent(event);
+        return;
+    }
+
+    if (m_rubberBand_->isVisible())
+    {
+        QRect rect(m_origin_, event->pos());
+        m_rubberBand_->setGeometry(rect.normalized());
+    }
+    QLabel::mouseMoveEvent(event);
+}
+
+void ImageLabel::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (!m_selectionEnabled_)
+    {
+        QLabel::mouseReleaseEvent(event);
+        return;
+    }
+
+    if (event->button() == Qt::LeftButton && m_rubberBand_->isVisible())
+    {
+        QRect rect(m_origin_, event->pos());
+        rect = rect.normalized();
+        // ensure non-empty
+        if (rect.width() > 0 && rect.height() > 0)
+        {
+            m_selectionRect_ = rect;
+            m_hasSelection_ = true;
+            m_rubberBand_->hide();
+            update();
+            emit this->selectionFinished(rect);
+        }
+    }
+    QLabel::mouseReleaseEvent(event);
+}
+
+void ImageLabel::paintEvent(QPaintEvent* event)
+{
+    QLabel::paintEvent(event);
+
+    if (m_hasSelection_)
+    {
+        QPainter painter(this);
+        QPen pen(Qt::red);
+        pen.setStyle(Qt::DotLine);
+        pen.setWidth(2);
+        painter.setPen(pen);
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRect(m_selectionRect_);
+    }
 }

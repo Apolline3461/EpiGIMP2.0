@@ -5,6 +5,7 @@ set(UI_SOURCES
         window.cpp
         image.cpp
         ImageConversion.cpp
+        resources.qrc
 )
 
 set(UI_HEADERS

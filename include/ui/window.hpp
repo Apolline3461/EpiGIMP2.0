@@ -15,12 +15,21 @@
 #include <QPoint>
 #include <QScrollArea>
 #include <QString>
-
 #include <memory>
 
 #include "core/Document.hpp"
+#include <core/Selection.hpp>
+
+// Définitions pour les analyseurs (clangd) qui ne connaissent pas la
+// macro `slots`. Ne pas redéfinir pour `moc`.
+#if !defined(Q_MOC_RUN)
+#if !defined(slots)
+#define slots
+#endif
+#endif
 
 class ImageActions;
+class ImageLabel;
 
 class MainWindow : public QMainWindow
 {
@@ -36,6 +45,11 @@ class MainWindow : public QMainWindow
     void zoomIn();
     void zoomOut();
     void resetZoom();
+
+    void onMouseSelection(const QRect& rect);
+
+    void clearSelection();
+    void toggleSelectionMode(bool enabled);
 
     void openEpg();
     void saveAsEpg();
@@ -67,7 +81,7 @@ class MainWindow : public QMainWindow
     void keyReleaseEvent(QKeyEvent* event) override;
 
     // Membres internes
-    QLabel* m_imageLabel;
+    ImageLabel* m_imageLabel;
     QScrollArea* m_scrollArea;
     QImage m_currentImage;
     QString m_currentFileName;
@@ -75,6 +89,7 @@ class MainWindow : public QMainWindow
 
     QMenu* m_fileMenu;
     QMenu* m_viewMenu;
+    QMenu* m_cmdMenu;
 
     QAction* m_newAct;
     QAction* m_openAct;
@@ -106,4 +121,9 @@ class MainWindow : public QMainWindow
     QPoint m_layerDragStartDocPos;  // in document pixel coords
     int m_layerDragInitialOffsetX{0};
     int m_layerDragInitialOffsetY{0};
+    QAction* m_clearSelectionAct;
+    QAction* m_selectToggleAct;
+
+    // Sélection active pour l'image
+    Selection m_selection;
 };

@@ -1,21 +1,8 @@
 #include <stb_image.h>
 #include <stb_image_write.h>
 #include <zip.h>
-#include <zipconf.h>
 
-#include <algorithm>
-#include <cmath>
-#include <cstdlib>
-#include <cstring>
-#include <exception>
-#include <iomanip>
-#include <ios>
-#include <memory>
-#include <sstream>
-#include <stdexcept>
 #include <string>
-#include <utility>
-#include <vector>
 
 #include "core/Document.hpp"
 #include "core/Layer.hpp"
