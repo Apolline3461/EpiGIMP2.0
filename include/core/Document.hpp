@@ -12,7 +12,9 @@ class Layer;
 class Document
 {
    public:
-    explicit Document(int width, int height, float dpi = 72.f);
+    explicit Document(int width, int height,
+                      float dpi = 72.f)  // NOLINT(bugprone-easily-swappable-parameters)
+        ;
 
     [[nodiscard]] int width() const noexcept;
     [[nodiscard]] int height() const noexcept;

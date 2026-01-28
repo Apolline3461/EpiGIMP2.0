@@ -100,8 +100,9 @@ void Document::mergeDown(int from)
         const int maxW = std::min(srcImg->width(), dstImg->width());
         const int maxH = std::min(srcImg->height(), dstImg->height());
 
-        auto blendPixel = [](std::uint32_t src, std::uint32_t dst, float layerOpacity)
-            -> std::uint32_t /* NOLINT(bugprone-easily-swappable-parameters) */
+        auto blendPixel =
+            [](std::uint32_t src, std::uint32_t dst,
+               float layerOpacity) -> std::uint32_t  // NOLINT(bugprone-easily-swappable-parameters)
         {
             auto extract = [](std::uint32_t px, int shift) -> std::uint8_t
             { return static_cast<std::uint8_t>((px >> shift) & 0xFFu); };
