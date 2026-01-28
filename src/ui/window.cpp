@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QIcon>
 #include <QKeyEvent>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -12,8 +13,7 @@
 #include <QScrollBar>
 #include <QStandardPaths>
 #include <QStatusBar>
-
-#include <string>
+#include <QToolBar>
 
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
@@ -23,7 +23,7 @@
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
-      m_imageLabel(new QLabel),
+      m_imageLabel(new ImageLabel),
       m_scrollArea(new QScrollArea),
       m_scaleFactor(1.0),
       m_fileMenu(nullptr),
@@ -46,6 +46,14 @@ MainWindow::MainWindow(QWidget* parent)
     // Création de l'interface
     createActions();
     createMenus();
+    // commande: barre d'outils pour sélection
+    QToolBar* cmd = addToolBar(tr("Commande"));
+    if (m_selectToggleAct)
+        cmd->addAction(m_selectToggleAct);
+    if (m_clearSelectionAct)
+        cmd->addAction(m_clearSelectionAct);
+    // connect selection signal
+    connect(m_imageLabel, &ImageLabel::selectionFinished, this, &MainWindow::onMouseSelection);
     // panning: capter les événements de la zone de viewport
     m_scrollArea->viewport()->installEventFilter(this);
 
@@ -125,6 +133,18 @@ void MainWindow::createActions()
     m_zoom2Act->setShortcut(QKeySequence("Ctrl+3"));
     m_zoom2Act->setStatusTip(tr("Zoom 2x"));
     connect(m_zoom2Act, &QAction::triggered, [this]() { setScaleAndCenter(2.0); });
+
+    // Sélection rectangulaire
+    m_clearSelectionAct = new QAction(tr("Effacer la sélection"), this);
+    m_clearSelectionAct->setStatusTip(tr("Supprimer la sélection active"));
+    m_clearSelectionAct->setIcon(QIcon(":/icons/clear_selection.svg"));
+    connect(m_clearSelectionAct, &QAction::triggered, this, &MainWindow::clearSelection);
+
+    m_selectToggleAct = new QAction(tr("Mode sélection"), this);
+    m_selectToggleAct->setCheckable(true);
+    m_selectToggleAct->setStatusTip(tr("Activer le mode sélection par souris"));
+    m_selectToggleAct->setIcon(QIcon(":/icons/selection.svg"));
+    connect(m_selectToggleAct, &QAction::toggled, this, &MainWindow::toggleSelectionMode);
 }
 
 void MainWindow::createMenus()
@@ -439,4 +459,46 @@ void MainWindow::openEpg()
 
     statusBar()->showMessage(message);
     setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
+}
+
+void MainWindow::onMouseSelection(const QRect& rect)
+{
+    // rect is in widget space, need to transform to image space
+    if (m_currentImage.isNull())
+        return;
+
+    // Validate scale factor (should be between 0.1 and 5.0 as per scaleImage())
+    if (m_scaleFactor < 0.1)
+        return;
+
+    // Transform from widget space to image space by dividing by scale factor
+    // Use rounding for better precision instead of truncation
+    QRect imageSpaceRect(static_cast<int>(std::round(rect.x() / m_scaleFactor)),
+                         static_cast<int>(std::round(rect.y() / m_scaleFactor)),
+                         static_cast<int>(std::round(rect.width() / m_scaleFactor)),
+                         static_cast<int>(std::round(rect.height() / m_scaleFactor)));
+
+    auto ref = std::make_shared<ImageBuffer>(m_currentImage.width(), m_currentImage.height());
+    Selection::Rect selRect{imageSpaceRect.x(), imageSpaceRect.y(), imageSpaceRect.width(),
+                            imageSpaceRect.height()};
+    m_selection.addRect(selRect, ref);
+    if (m_imageLabel)
+        m_imageLabel->setSelectionRect(rect);
+    updateImageDisplay();
+}
+
+void MainWindow::clearSelection()
+{
+    m_selection.clear();
+    if (m_imageLabel)
+        m_imageLabel->clearSelectionRect();
+    updateImageDisplay();
+}
+
+void MainWindow::toggleSelectionMode(bool enabled)
+{
+    if (m_imageLabel)
+        m_imageLabel->setSelectionEnabled(enabled);
+    m_selectToggleAct->setChecked(enabled);
+    m_scrollArea->viewport()->setCursor(enabled ? Qt::CrossCursor : Qt::ArrowCursor);
 }
