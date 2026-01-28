@@ -1,5 +1,5 @@
 set(EPIGIMP_APP_TEST_SOURCES
-        test_App_Service.cpp
+        test_AppService.cpp
         test_History.cpp
 )
 
