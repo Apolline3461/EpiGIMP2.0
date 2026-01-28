@@ -17,7 +17,6 @@
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QToolBar>
-
 #include <vector>
 
 #include "app/Command.hpp"
