@@ -8,6 +8,10 @@
 Document::Document(const int width, const int height, const float dpi)
     : width_{width}, height_{height}, dpi_{dpi}
 {
+    if (width_ <= 0 || height_ <= 0)
+        throw std::invalid_argument("Document: invalid size");
+    if (dpi_ <= 0.f)
+        throw std::invalid_argument("Document: invalid dpi");
 }
 
 int Document::width() const noexcept

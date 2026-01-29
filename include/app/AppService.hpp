@@ -5,29 +5,14 @@
 #pragma once
 
 #include "app/History.hpp"
+#include "app/Signal.h"
 #include "core/Document.hpp"
 #include "io/IStorage.hpp"
 
+class IStorage;
+class Document;
 namespace app
 {
-class Signal
-{
-   public:
-    using Slot = std::function<void()>;
-    void connect(Slot s)
-    {
-        slots_.push_back(std::move(s));
-    }
-    void emit()
-    {
-        for (auto& s : slots_)
-            s();
-    }
-
-   private:
-    std::vector<Slot> slots_;
-};
-
 struct Size
 {
     int w;
@@ -49,7 +34,9 @@ class AppService
     std::size_t activeLayer() const;
     void setActiveLayer(std::size_t idx);
 
-    void addLayer();  // MVP pour le test ActiveLayerSet_ValidIndex
+    void addLayer();
+    void removeLayer(std::size_t idx);
+    void setLayerLocked(std::size_t idx, bool locked);
 
     void undo();
     void redo();

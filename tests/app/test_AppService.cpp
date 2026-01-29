@@ -2,14 +2,17 @@
 // Created by apolline on 21/01/2026.
 //
 
-#include <gtest/gtest.h>
 #include <memory>
 #include <string>
 
 #include "app/AppService.hpp"
-#include "io/IStorage.hpp"
-#include "io/EpgTypes.hpp"
 #include "core/Document.hpp"
+#include "io/EpgTypes.hpp"
+#include "io/IStorage.hpp"
+
+#include <core/ImageBuffer.hpp>
+#include <core/Layer.hpp>
+#include <gtest/gtest.h>
 
 class SpyStorage final : public IStorage {
 public:
@@ -22,8 +25,6 @@ public:
     std::string lastExportPath;
     const Document* lastSavedDoc = nullptr;
     const Document* lastExportedDoc = nullptr;
-
-    io::epg::OpenResult openResultToReturn{};
 
     io::epg::OpenResult open(const std::string& path) override {
         openCalled = true;
@@ -76,6 +77,48 @@ TEST(AppService, newDocumentInitialState_Default) {
 
     EXPECT_FALSE(app->canUndo());
     EXPECT_FALSE(app->canRedo());
+}
+
+TEST(AppService, NewDocumentInitialLayer_CountIsOne) {
+
+    const auto app = makeApp();
+
+    app->newDocument(app::Size{100, 200}, 72.F);
+
+    const Document& doc = app->document();
+    EXPECT_EQ(doc.layerCount(), 1);
+
+    auto bgLayer = doc.layerAt(0);
+    ASSERT_NE(bgLayer, nullptr);
+
+    EXPECT_TRUE(bgLayer->visible());
+    EXPECT_TRUE(bgLayer->locked());
+    EXPECT_FLOAT_EQ(bgLayer->opacity(), 1.f);
+
+    ASSERT_NE(bgLayer->image(), nullptr);
+    EXPECT_EQ(bgLayer->image()->width(), 100);
+    EXPECT_EQ(bgLayer->image()->height(), 200);
+
+    EXPECT_EQ(bgLayer->image()->getPixel(0,0), 0xFFFFFFFFu);
+    EXPECT_EQ(bgLayer->image()->getPixel(99,199), 0xFFFFFFFFu);
+}
+
+TEST(AppService, RemoveLayer_WhenLocked_Throws) {
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    EXPECT_THROW(app->removeLayer(0), std::runtime_error);
+    EXPECT_EQ(app->document().layerCount(), 1);
+}
+
+TEST(AppService, RemoveLayer_AfterUnlock_AllowsEmptyDocument) {
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    app->setLayerLocked(0, false);
+    app->removeLayer(0);
+
+    EXPECT_EQ(app->document().layerCount(), 0);
 }
 
 TEST(AppService, documentChanged_EmittedOnNewDocument) {

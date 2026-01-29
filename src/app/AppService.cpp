@@ -5,6 +5,9 @@
 
 #include <stdexcept>
 
+#include <core/ImageBuffer.hpp>
+#include <core/Layer.hpp>
+
 namespace app
 {
 
@@ -13,9 +16,25 @@ AppService::AppService(std::unique_ptr<IStorage> storage)
 {
 }
 
-void AppService::newDocument(Size /*size*/, float /*dpi*/)
+void AppService::newDocument(Size size, float dpi)
 {
-    throw std::logic_error("TODO AppService::newDocument");
+    doc_ = Document(size.w, size.h, dpi);
+    history_.clear();
+    activeLayer_ = 0;
+
+    auto img = std::make_shared<ImageBuffer>(size.w, size.h);
+    img->fill(0xFFFFFFFFu);  // blanc
+
+    auto layer = std::make_shared<Layer>(
+        /*id*/ 0,
+        /*name*/ "Background",
+        /*image*/ img,
+        /*visible*/ true,
+        /*locked*/ true,
+        /*opacity*/ 1.f);
+    doc_.addLayer(std::move(layer));
+
+    documentChanged.emit();
 }
 
 void AppService::open(const std::string& /*path*/)
@@ -50,6 +69,35 @@ void AppService::setActiveLayer(std::size_t /*idx*/)
 void AppService::addLayer()
 {
     throw std::logic_error("TODO AppService::addLayer");
+}
+void AppService::removeLayer(std::size_t idx)
+{
+    auto layer = doc_.layerAt(static_cast<int>(idx));
+    if (!layer)
+        throw std::out_of_range("layer idx");
+
+    if (layer->locked())
+        throw std::runtime_error("Cannot remove locked layer");
+
+    doc_.removeLayer(static_cast<int>(idx));
+
+    if (doc_.layerCount() == 0)
+    {
+        activeLayer_ = 0;
+    }
+    else if (activeLayer_ >= static_cast<std::size_t>(doc_.layerCount()))
+    {
+        activeLayer_ = static_cast<std::size_t>(doc_.layerCount() - 1);
+    }
+    documentChanged.emit();
+}
+void AppService::setLayerLocked(std::size_t idx, bool locked)
+{
+    auto layer = doc_.layerAt(static_cast<int>(idx));
+    if (!layer)
+        throw std::out_of_range("layer idx");
+    layer->setLocked(locked);
+    documentChanged.emit();
 }
 
 void AppService::undo()
