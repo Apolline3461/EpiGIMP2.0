@@ -13,6 +13,7 @@
 #include "core/Layer.hpp"
 #include "io/EpgTypes.hpp"
 #include "io/IStorage.hpp"
+#include "common/Geometry.hpp"
 
 class SpyStorage final : public IStorage {
 public:
@@ -166,7 +167,7 @@ TEST(AppService_State, Selection_SetRect_CreatesMaskInDocument)
     const auto app = makeApp();
     app->newDocument(app::Size{10, 10}, 72.f);
 
-    Selection::Rect r{2, 3, 4, 2};
+    common::Rect r{2, 3, 4, 2};
     app->setSelectionRect(r);
 
     const auto& sel = app->document().selection();
@@ -586,3 +587,44 @@ TEST(AppService_Signals, Selection_Clear_EmitsDocumentChangedOnce)
     app->clearSelectionRect(); // +1
     EXPECT_EQ(hits, 1);
 }
+
+TEST(AppService_Picking, pickColorAt_ReadsPixelFromActiveLayer)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFU;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    auto img = app->document().layerAt(1)->image();
+    ASSERT_NE(img, nullptr);
+    img->setPixel(4, 5, 0xFF112233U);
+
+    EXPECT_EQ(app->pickColorAt(common::Point{4, 5}), 0xFF112233U);
+}
+
+TEST(AppService_Picking, pickColorAt_OutOfBounds_ReturnsTransparent)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    EXPECT_EQ(app->pickColorAt(common::Point{-1, 0}), 0x00000000u);
+    EXPECT_EQ(app->pickColorAt(common::Point{0, -1}), 0x00000000u);
+    EXPECT_EQ(app->pickColorAt(common::Point{10, 0}), 0x00000000u);
+    EXPECT_EQ(app->pickColorAt(common::Point{0, 10}), 0x00000000u);
+}
+
+TEST(AppService_Picking, pickColorAt_NoDocument_Throws)
+{
+    const auto app = makeApp();
+    EXPECT_THROW(app->pickColorAt(common::Point{0, 0}), std::runtime_error);
+}
+

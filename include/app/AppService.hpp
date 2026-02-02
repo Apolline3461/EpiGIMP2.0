@@ -6,9 +6,8 @@
 
 #include "app/History.hpp"
 #include "app/Signal.h"
+#include "common/Geometry.hpp"
 #include "io/IStorage.hpp"
-
-#include <core/Selection.hpp>
 
 class Document;
 namespace app
@@ -55,10 +54,10 @@ class AppService
     // void beginStroke(const ToolParams&, Point pStart);
     // void moveStroke(Point p);
     // void endStroke();
-    // uint32_t pickColorAt(Point p) const;
+    uint32_t pickColorAt(common::Point p) const;
 
     const Selection& selection() const;
-    void setSelectionRect(Selection::Rect r);
+    void setSelectionRect(common::Rect r);
     void clearSelectionRect();
 
     void undo();
@@ -75,8 +74,8 @@ class AppService
     std::size_t activeLayer_ = 0;
     std::uint64_t nextLayerId_ = 1;
     std::unique_ptr<Command> currentStroke_;
-    // std::vector<Point> pointToDraw_;
-    // std::optional<Point> lastPointToDraw_;
+    // std::vector<common::PointPoint> pointToDraw_;
+    // std::optional<common::Point> lastPointToDraw_;
     void apply(std::unique_ptr<Command> cmd);
 };
 };  // namespace app

@@ -573,6 +573,11 @@ void AppService::mergeLayerDown(std::size_t from)
                                              &activeLayer_));
 }
 
+uint32_t AppService::pickColorAt(common::Point /*p*/) const
+{
+    return uint32_t(0);
+}
+
 const Selection& AppService::selection() const
 {
     if (!doc_)
