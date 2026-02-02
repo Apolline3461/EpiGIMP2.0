@@ -52,8 +52,8 @@ class AppService
 
     void undo();
     void redo();
-    bool canUndo() const noexcept;
-    bool canRedo() const noexcept;
+    [[nodiscard]] bool canUndo() const noexcept;
+    [[nodiscard]] bool canRedo() const noexcept;
 
     Signal documentChanged;
 
