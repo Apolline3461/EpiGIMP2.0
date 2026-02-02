@@ -232,3 +232,163 @@ TEST(AppService, exportImage_CallsStorage) {
     EXPECT_EQ(spy->lastExportedDoc, current);
 
 }
+
+TEST(AppServiceUndoRedo, AddLayerCommand_UndoRedo_RestoresSameLayerId) {
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    ASSERT_EQ(app->document().layerCount(), 1);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.name = "L1";
+    spec.color = 0xFF00FFFFu;
+
+    app->addLayer(spec);
+    ASSERT_EQ(app->document().layerCount(), 2);
+
+    const auto idAdded = app->document().layerAt(1)->id();
+    ASSERT_NE(idAdded, 0u);
+
+    app->undo();
+    EXPECT_EQ(app->document().layerCount(), 1);
+
+    app->redo();
+    ASSERT_EQ(app->document().layerCount(), 2);
+
+    EXPECT_EQ(app->document().layerAt(1)->id(), idAdded);
+
+    EXPECT_TRUE(app->canUndo());
+    EXPECT_FALSE(app->canRedo());
+}
+
+// TEST(AppServiceUndoRedo, SetLayerLocked_UndoRedo_RestoresPreviousValue)
+// {
+//     const auto app = makeApp();
+//     app->newDocument(app::Size{10,10}, 72.f);
+//
+//     ASSERT_TRUE(app->document().layerAt(0)->locked());
+//
+//     app->setLayerLocked(0, false);
+//     EXPECT_FALSE(app->document().layerAt(0)->locked());
+//     EXPECT_TRUE(app->canUndo());
+//     EXPECT_FALSE(app->canRedo());
+//
+//     app->undo();
+//     EXPECT_TRUE(app->document().layerAt(0)->locked());
+//     EXPECT_FALSE(app->canUndo());
+//     EXPECT_TRUE(app->canRedo());
+//
+//     app->redo();
+//     EXPECT_FALSE(app->document().layerAt(0)->locked());
+//     EXPECT_TRUE(app->canUndo());
+//     EXPECT_FALSE(app->canRedo());
+// }
+
+//
+// TEST(AppServiceUndoRedo, SetLayerVisible_UndoRedo_RestoresPreviousValue)
+// {
+//     const auto app = makeApp();
+//     app->newDocument(app::Size{10,10}, 72.f);
+//
+//     ASSERT_TRUE(app->document().layerAt(0)->visible());
+//
+//     app->setLayerVisible(0, false);
+//     EXPECT_FALSE(app->document().layerAt(0)->visible());
+//
+//     app->undo();
+//     EXPECT_TRUE(app->document().layerAt(0)->visible());
+//
+//     app->redo();
+//     EXPECT_FALSE(app->document().layerAt(0)->visible());
+// }
+//
+// TEST(AppServiceUndoRedo, SetLayerOpacity_UndoRedo_RestoresPreviousValue)
+// {
+//     const auto app = makeApp();
+//     app->newDocument(app::Size{10,10}, 72.f);
+//
+//     ASSERT_FLOAT_EQ(app->document().layerAt(0)->opacity(), 1.f);
+//
+//     app->setLayerOpacity(0, 0.25f);
+//     EXPECT_FLOAT_EQ(app->document().layerAt(0)->opacity(), 0.25f);
+//
+//     app->undo();
+//     EXPECT_FLOAT_EQ(app->document().layerAt(0)->opacity(), 1.f);
+//
+//     app->redo();
+//     EXPECT_FLOAT_EQ(app->document().layerAt(0)->opacity(), 0.25f);
+// }
+//
+// TEST(AppServiceUndoRedo, RemoveLayer_UndoRedo_RestoresLayer)
+// {
+//     const auto app = makeApp();
+//     app->newDocument(app::Size{10,10}, 72.f);
+//
+//     app::LayerSpec spec{};
+//     spec.locked = false; // important
+//     app->addLayer(spec);
+//
+//     ASSERT_EQ(app->document().layerCount(), 2);
+//     const auto removedId = app->document().layerAt(1)->id();
+//
+//     app->removeLayer(1);
+//     EXPECT_EQ(app->document().layerCount(), 1);
+//
+//     app->undo();
+//     ASSERT_EQ(app->document().layerCount(), 2);
+//     EXPECT_EQ(app->document().layerAt(1)->id(), removedId);
+//
+//     app->redo();
+//     EXPECT_EQ(app->document().layerCount(), 1);
+// }
+//
+// TEST(AppServiceUndoRedo, ReorderLayer_UndoRedo_RestoresOrder)
+// {
+//     const auto app = makeApp();
+//     app->newDocument(app::Size{10,10}, 72.f);
+//
+//     app::LayerSpec spec{};
+//     spec.locked = false;
+//     spec.name = "L1";
+//     app->addLayer(spec);
+//     spec.name = "L2";
+//     app->addLayer(spec);
+//
+//     // order: bg(0), L1(1), L2(2)
+//     const auto idL1 = app->document().layerAt(1)->id();
+//     const auto idL2 = app->document().layerAt(2)->id();
+//
+//     app->reorderLayer(2, 1); // move L2 above L1
+//     EXPECT_EQ(app->document().layerAt(1)->id(), idL2);
+//     EXPECT_EQ(app->document().layerAt(2)->id(), idL1);
+//
+//     app->undo();
+//     EXPECT_EQ(app->document().layerAt(1)->id(), idL1);
+//     EXPECT_EQ(app->document().layerAt(2)->id(), idL2);
+//
+//     app->redo();
+//     EXPECT_EQ(app->document().layerAt(1)->id(), idL2);
+//     EXPECT_EQ(app->document().layerAt(2)->id(), idL1);
+// }
+//
+// TEST(AppServiceUndoRedo, MergeDown_UndoRedo_RestoresLayerCount)
+// {
+//     const auto app = makeApp();
+//     app->newDocument(app::Size{10,10}, 72.f);
+//
+//     app::LayerSpec spec{};
+//     spec.locked = false;
+//     app->addLayer(spec);
+//     app->addLayer(spec);
+//     ASSERT_EQ(app->document().layerCount(), 3);
+//
+//     app->mergeLayerDown(2);
+//     EXPECT_EQ(app->document().layerCount(), 2);
+//
+//     app->undo();
+//     EXPECT_EQ(app->document().layerCount(), 3);
+//
+//     app->redo();
+//     EXPECT_EQ(app->document().layerCount(), 2);
+// }
