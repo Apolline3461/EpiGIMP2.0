@@ -53,8 +53,7 @@ static std::unique_ptr<app::AppService> makeApp(SpyStorage** outSpy = nullptr) {
     return std::make_unique<app::AppService>(std::move(spy));
 }
 
-TEST(AppService, documentReturnsConstRef)
-{
+TEST(AppService_State, documentReturnsConstRef) {
     const auto app = makeApp();
     app->newDocument(app::Size{10, 10}, 72.f);
 
@@ -63,10 +62,10 @@ TEST(AppService, documentReturnsConstRef)
     EXPECT_EQ(p1, p2);
 }
 
-TEST(AppService, newDocumentInitialState_Default) {
+TEST(AppService_State, newDocumentInitialState_Default) {
     const auto app = makeApp();
 
-    app->newDocument(app::Size{640, 480}, 72.F);
+    app->newDocument(app::Size{.w=640, .h=480}, 72.F);
 
     const Document& doc = app->document();
     EXPECT_EQ(doc.width(), 640);
@@ -79,7 +78,50 @@ TEST(AppService, newDocumentInitialState_Default) {
     EXPECT_FALSE(app->canRedo());
 }
 
-TEST(AppService, LayerIds_AreUnique) {
+TEST(AppService_State, newDocumentInitialLayer_CountIsOne) {
+
+    const auto app = makeApp();
+
+    app->newDocument(app::Size{.w=100, .h=200}, 72.F);
+
+    const Document& doc = app->document();
+    EXPECT_EQ(doc.layerCount(), 1);
+
+    auto bgLayer = doc.layerAt(0);
+    ASSERT_NE(bgLayer, nullptr);
+
+    EXPECT_TRUE(bgLayer->visible());
+    EXPECT_TRUE(bgLayer->locked());
+    EXPECT_FLOAT_EQ(bgLayer->opacity(), 1.f);
+
+    ASSERT_NE(bgLayer->image(), nullptr);
+    EXPECT_EQ(bgLayer->image()->width(), 100);
+    EXPECT_EQ(bgLayer->image()->height(), 200);
+
+    EXPECT_EQ(bgLayer->image()->getPixel(0,0), 0xFFFFFFFFU);
+    EXPECT_EQ(bgLayer->image()->getPixel(99,199), 0xFFFFFFFFU);
+}
+
+TEST(AppService_State, ActiveLayerSet_ValidIndex) {
+    const auto app = makeApp();
+    app::LayerSpec spec{};
+
+    app->newDocument(app::Size{10, 10}, 72.f);
+    app->addLayer(spec);
+    app->addLayer(spec);
+
+    app->setActiveLayer(2);
+    EXPECT_EQ(app->activeLayer(), 2);
+}
+
+TEST(AppService_State, ActiveLayerSet_OutOfRangeThrows) {
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    EXPECT_THROW(app->setActiveLayer(1), std::out_of_range);
+}
+
+TEST(AppService_State, LayerIds_AreUnique) {
     const auto app = makeApp();
     app->newDocument(app::Size{10, 10}, 72.f);
 
@@ -104,7 +146,7 @@ TEST(AppService, LayerIds_AreUnique) {
     }
 }
 
-TEST(AppService, LayerIds_ResetOnNewDocument) {
+TEST(AppService_State, LayerIds_ResetOnNewDocument) {
     const auto app = makeApp();
     app::LayerSpec spec{};
 
@@ -119,31 +161,7 @@ TEST(AppService, LayerIds_ResetOnNewDocument) {
     EXPECT_EQ(id1, id2); // si tu resets nextLayerId_ à 1
 }
 
-TEST(AppService, NewDocumentInitialLayer_CountIsOne) {
-
-    const auto app = makeApp();
-
-    app->newDocument(app::Size{100, 200}, 72.F);
-
-    const Document& doc = app->document();
-    EXPECT_EQ(doc.layerCount(), 1);
-
-    auto bgLayer = doc.layerAt(0);
-    ASSERT_NE(bgLayer, nullptr);
-
-    EXPECT_TRUE(bgLayer->visible());
-    EXPECT_TRUE(bgLayer->locked());
-    EXPECT_FLOAT_EQ(bgLayer->opacity(), 1.f);
-
-    ASSERT_NE(bgLayer->image(), nullptr);
-    EXPECT_EQ(bgLayer->image()->width(), 100);
-    EXPECT_EQ(bgLayer->image()->height(), 200);
-
-    EXPECT_EQ(bgLayer->image()->getPixel(0,0), 0xFFFFFFFFu);
-    EXPECT_EQ(bgLayer->image()->getPixel(99,199), 0xFFFFFFFFu);
-}
-
-TEST(AppService, RemoveLayer_WhenLocked_Throws) {
+TEST(AppService_Layers, RemoveLayer_WhenLocked_Throws) {
     const auto app = makeApp();
     app->newDocument(app::Size{10, 10}, 72.f);
 
@@ -151,7 +169,7 @@ TEST(AppService, RemoveLayer_WhenLocked_Throws) {
     EXPECT_EQ(app->document().layerCount(), 1);
 }
 
-TEST(AppService, RemoveLayer_AfterUnlock_AllowsEmptyDocument) {
+TEST(AppService_Layers, RemoveLayer_AfterUnlock_AllowsEmptyDocument) {
     const auto app = makeApp();
     app->newDocument(app::Size{10, 10}, 72.f);
 
@@ -161,28 +179,7 @@ TEST(AppService, RemoveLayer_AfterUnlock_AllowsEmptyDocument) {
     EXPECT_EQ(app->document().layerCount(), 0);
 }
 
-TEST(AppService, ActiveLayerSet_ValidIndex)
-{
-    const auto app = makeApp();
-    app::LayerSpec spec{};
-
-    app->newDocument(app::Size{10, 10}, 72.f);
-    app->addLayer(spec);
-    app->addLayer(spec);
-
-    app->setActiveLayer(2);
-    EXPECT_EQ(app->activeLayer(), 2);
-}
-
-TEST(AppService, ActiveLayerSet_OutOfRangeThrows)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
-
-    EXPECT_THROW(app->setActiveLayer(1), std::out_of_range);
-}
-
-TEST(AppService, Open_CallsStorage) {
+TEST(AppService_IO, Open_CallsStorage) {
     SpyStorage* spy = nullptr;
     auto app = makeApp(&spy);
 
@@ -192,7 +189,7 @@ TEST(AppService, Open_CallsStorage) {
     EXPECT_TRUE(spy->openCalled);
     EXPECT_EQ(spy->lastOpenPath, "foo.epg");
 }
-TEST(AppService, Save_CallsStorage) {
+TEST(AppService_IO, Save_CallsStorage) {
     SpyStorage* spy = nullptr;
     auto app = makeApp(&spy);
 
@@ -206,7 +203,7 @@ TEST(AppService, Save_CallsStorage) {
     EXPECT_EQ(spy->lastSavedDoc, current);
 }
 
-TEST(AppService, exportImage_CallsStorage) {
+TEST(AppService_IO, exportImage_CallsStorage) {
     SpyStorage* spy = nullptr;
     auto app = makeApp(&spy);
 
@@ -222,7 +219,7 @@ TEST(AppService, exportImage_CallsStorage) {
 
 }
 
-TEST(AppServiceUndoRedo, AddLayerCommand_UndoRedo_RestoresSameLayerId) {
+TEST(AppService_UndoRedo, AddLayerCommand_UndoRedo_RestoresSameLayerId) {
     const auto app = makeApp();
     app->newDocument(app::Size{10, 10}, 72.f);
 
@@ -251,7 +248,7 @@ TEST(AppServiceUndoRedo, AddLayerCommand_UndoRedo_RestoresSameLayerId) {
     EXPECT_FALSE(app->canRedo());
 }
 
-TEST(AppServiceSignals, documentChanged_EmittedOnNewDocument) {
+TEST(AppService_Signals, documentChanged_EmittedOnNewDocument) {
     const auto app = makeApp();
 
     int hits = 0;
@@ -262,7 +259,7 @@ TEST(AppServiceSignals, documentChanged_EmittedOnNewDocument) {
     EXPECT_EQ(hits, 1);
 }
 
-TEST(AppServiceSignals, AddLayer_EmitsDocumentChangedOnce)
+TEST(AppService_Signals, AddLayer_EmitsDocumentChangedOnce)
 {
     const auto app = makeApp();
     app->newDocument(app::Size{10, 10}, 72.f);
