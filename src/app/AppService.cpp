@@ -13,6 +13,19 @@
 namespace app
 {
 
+static std::uint64_t computeNextLayerId(const Document& doc)
+{
+    std::uint64_t maxId = 0;
+    for (int i = 0; i < doc.layerCount(); ++i)
+    {
+        if (auto layer = doc.layerAt(i))
+        {
+            maxId = std::max(maxId, layer->id());
+        }
+    }
+    return maxId + 1;
+}
+
 AppService::AppService(std::unique_ptr<IStorage> storage)
     : storage_(std::move(storage)), history_(20), activeLayer_(0)
 {
@@ -40,9 +53,19 @@ void AppService::newDocument(Size size, float dpi)
     documentChanged.emit();
 }
 
-void AppService::open(const std::string& /*path*/)
+void AppService::open(const std::string& path)
 {
-    throw std::logic_error("TODO AppService::open");
+    if (!storage_)
+        throw std::runtime_error("Failed Open: storage is null");
+    auto result = storage_->open(path);
+    if (!result.document)
+        throw std::runtime_error("Failed Open: failed to load document");
+    doc_ = std::move(result.document);
+    history_.clear();
+    activeLayer_ = 0;
+
+    nextLayerId_ = computeNextLayerId(*doc_);
+    documentChanged.emit();
 }
 
 void AppService::save(const std::string& /*path*/)
