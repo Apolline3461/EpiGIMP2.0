@@ -68,9 +68,13 @@ void AppService::open(const std::string& path)
     documentChanged.emit();
 }
 
-void AppService::save(const std::string& /*path*/)
+void AppService::save(const std::string& path)
 {
-    throw std::logic_error("TODO AppService::save");
+    if (!storage_)
+        throw std::runtime_error("Failed Save: storage is null");
+    if (!doc_)
+        throw std::runtime_error("Failed Save: document is null");
+    storage_->save(*doc_, path);
 }
 
 void AppService::exportPng(const std::string& /*path*/)
