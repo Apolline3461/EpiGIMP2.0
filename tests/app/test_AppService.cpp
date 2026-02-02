@@ -40,7 +40,7 @@ public:
         lastSavedDoc = &doc;
     }
 
-    void exportPng(const Document& doc, const std::string& path) override {
+    void exportImage(const Document& doc, const std::string& path) override {
         exportCalled = true;
         lastExportPath = path;
         lastExportedDoc = &doc;
@@ -217,14 +217,14 @@ TEST(AppService, Save_CallsStorage) {
     EXPECT_EQ(spy->lastSavedDoc, current);
 }
 
-TEST(AppService, ExportPng_CallsStorage) {
+TEST(AppService, exportImage_CallsStorage) {
     SpyStorage* spy = nullptr;
     auto app = makeApp(&spy);
 
     app->newDocument(app::Size{10, 10}, 72.f);
     const Document* current = &app->document();
 
-    app->exportPng("out.png");
+    app->exportImage("out.png");
 
     ASSERT_NE(spy, nullptr);
     EXPECT_TRUE(spy->exportCalled);

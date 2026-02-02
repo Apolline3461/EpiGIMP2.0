@@ -35,7 +35,7 @@ class AppService
     void newDocument(Size size, float dpi);
     void open(const std::string& path);
     void save(const std::string& path);
-    void exportPng(const std::string& path);
+    void exportImage(const std::string& path);
 
     const Document& document() const;
 

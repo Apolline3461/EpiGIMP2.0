@@ -534,7 +534,7 @@ void ZipEpgStorage::save(const Document& doc, const std::string& path)
 
 // ----------------- EXPORT PNG --------------------------------------------
 
-void ZipEpgStorage::exportPng(const Document& doc, const std::string& path)
+void ZipEpgStorage::exportImage(const Document& doc, const std::string& path)
 {
     if (doc.layerCount() == 0)
         throw std::runtime_error("Document vide, impossible d'exporter");

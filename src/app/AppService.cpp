@@ -77,9 +77,13 @@ void AppService::save(const std::string& path)
     storage_->save(*doc_, path);
 }
 
-void AppService::exportPng(const std::string& /*path*/)
+void AppService::exportImage(const std::string& path)
 {
-    throw std::logic_error("TODO AppService::exportPng");
+    if (!storage_)
+        throw std::runtime_error("Failed Export: storage is null");
+    if (!doc_)
+        throw std::runtime_error("Failed Export: document is null");
+    storage_->exportImage(*doc_, path);
 }
 
 const Document& AppService::document() const
