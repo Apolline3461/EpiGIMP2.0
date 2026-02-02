@@ -161,6 +161,35 @@ TEST(AppService_State, LayerIds_ResetOnNewDocument) {
     EXPECT_EQ(id1, id2); // si tu resets nextLayerId_ à 1
 }
 
+TEST(AppService_State, Selection_SetRect_CreatesMaskInDocument)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    Selection::Rect r{2, 3, 4, 2};
+    app->setSelectionRect(r);
+
+    const auto& sel = app->document().selection();
+    EXPECT_TRUE(sel.hasMask());
+    ASSERT_NE(sel.mask(), nullptr);
+    EXPECT_EQ(sel.mask()->width(), 10);
+    EXPECT_EQ(sel.mask()->height(), 10);
+}
+
+TEST(AppService_State, Selection_Clear_RemovesMaskInDocument)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    app->setSelectionRect(Selection::Rect{1, 1, 2, 2});
+    ASSERT_TRUE(app->document().selection().hasMask());
+
+    app->clearSelectionRect();
+    EXPECT_FALSE(app->document().selection().hasMask());
+    EXPECT_EQ(app->document().selection().mask(), nullptr);
+}
+
+
 TEST(AppService_Layers, RemoveLayer_WhenLocked_Throws) {
     const auto app = makeApp();
     app->newDocument(app::Size{10, 10}, 72.f);
@@ -464,7 +493,7 @@ TEST(AppService_Signals, RemoveLayer_UndoRedo_EmitsDocumentChangedOnceEach)
 
     app::LayerSpec spec{};
     spec.locked = false;
-    app->addLayer(spec); // (on ne compte pas forcément ici, donc on reset hits après)
+    app->addLayer(spec);
 
     int hits = 0;
     app->documentChanged.connect([&]() { ++hits; });
@@ -533,3 +562,27 @@ TEST(AppService_Signals, SetLayerLocked_NoChange_DoesNotEmit)
     EXPECT_EQ(hits, 0);
 }
 
+TEST(AppService_Signals, Selection_SetRect_EmitsDocumentChangedOnce)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    app->setSelectionRect(Selection::Rect{1, 1, 2, 2}); // +1
+    EXPECT_EQ(hits, 1);
+}
+
+TEST(AppService_Signals, Selection_Clear_EmitsDocumentChangedOnce)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    app->setSelectionRect(Selection::Rect{1, 1, 2, 2}); // on ignore ce hit
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    app->clearSelectionRect(); // +1
+    EXPECT_EQ(hits, 1);
+}

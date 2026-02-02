@@ -7,6 +7,8 @@
 #include <memory>
 #include <vector>
 
+#include "Selection.hpp"
+
 class Layer;
 
 class Document
@@ -27,9 +29,14 @@ class Document
     [[nodiscard]] int layerCount() const noexcept;
     [[nodiscard]] std::shared_ptr<Layer> layerAt(int index) const;
 
-    // const Selection& selection() const noexcept;
-    //[[nodiscard]] Selection& selection() noexcept { return selection_; }
-    //[[nodiscard]] const Selection& selection() const noexcept { return selection_; }
+    Selection& selection() noexcept
+    {
+        return selection_;
+    }
+    const Selection& selection() const noexcept
+    {
+        return selection_;
+    };
 
    private:
     int width_{};
@@ -38,5 +45,5 @@ class Document
 
     std::vector<std::shared_ptr<Layer>> layers_{};
 
-    // Selection selection_{};
+    Selection selection_{};
 };

@@ -1,6 +1,7 @@
 //
 // Created by apolline on 21/01/2026.
 //
+
 #include "app/AppService.hpp"
 
 #include <algorithm>
@@ -376,6 +377,11 @@ class MergeDownCommand final : public Command
 
 AppService::AppService(std::unique_ptr<IStorage> storage) : storage_(std::move(storage)) {}
 
+const Document& AppService::document() const
+{
+    return *doc_;
+}
+
 void AppService::newDocument(Size size, float dpi)
 {
     doc_ = std::make_unique<Document>(size.w, size.h, dpi);
@@ -431,11 +437,6 @@ void AppService::exportImage(const std::string& path)
     storage_->exportImage(*doc_, path);
 }
 
-const Document& AppService::document() const
-{
-    return *doc_;
-}
-
 std::size_t AppService::activeLayer() const
 {
     return activeLayer_;
@@ -486,20 +487,6 @@ void AppService::setLayerOpacity(std::size_t idx, float alpha)
         std::make_unique<SetLayerOpacityCommand>(doc_.get(), layer->id(), layer->opacity(), alpha));
 }
 
-void AppService::addLayer(const LayerSpec& spec)
-{
-    if (!doc_)
-        throw std::runtime_error("AddLayer Error : document is null");
-
-    auto img = std::make_shared<ImageBuffer>(doc_->width(), doc_->height());
-    img->fill(spec.color);
-
-    auto layer = std::make_shared<Layer>(nextLayerId_++, spec.name, img, spec.visible, spec.locked,
-                                         spec.opacity);
-
-    apply(std::make_unique<AddLayerCommand>(doc_.get(), std::move(layer), &activeLayer_));
-}
-
 void AppService::setLayerLocked(std::size_t idx, bool locked)
 {
     if (!doc_)
@@ -514,6 +501,20 @@ void AppService::setLayerLocked(std::size_t idx, bool locked)
 
     apply(
         std::make_unique<SetLayerLockedCommand>(doc_.get(), layer->id(), layer->locked(), locked));
+}
+
+void AppService::addLayer(const LayerSpec& spec)
+{
+    if (!doc_)
+        throw std::runtime_error("AddLayer Error : document is null");
+
+    auto img = std::make_shared<ImageBuffer>(doc_->width(), doc_->height());
+    img->fill(spec.color);
+
+    auto layer = std::make_shared<Layer>(nextLayerId_++, spec.name, img, spec.visible, spec.locked,
+                                         spec.opacity);
+
+    apply(std::make_unique<AddLayerCommand>(doc_.get(), std::move(layer), &activeLayer_));
 }
 
 void AppService::removeLayer(std::size_t idx)
@@ -531,6 +532,7 @@ void AppService::removeLayer(std::size_t idx)
     apply(std::make_unique<RemoveLayerCommand>(doc_.get(), layer, static_cast<int>(idx),
                                                &activeLayer_));
 }
+
 void AppService::reorderLayer(std::size_t from, std::size_t to)
 {
     if (!doc_)
@@ -571,13 +573,27 @@ void AppService::mergeLayerDown(std::size_t from)
                                              &activeLayer_));
 }
 
-void AppService::apply(app::History::CommandPtr cmd)
+const Selection& AppService::selection() const
 {
-    if (!cmd)
-        return;
+    if (!doc_)
+        throw std::runtime_error("selection: document is null");
+    return doc_->selection();
+}
 
-    cmd->redo();
-    history_.push(std::move(cmd));
+void AppService::setSelectionRect(Selection::Rect r)
+{
+    if (!doc_)
+        throw std::runtime_error("setSelectionRect: document is null");
+    doc_->selection().clear();
+    doc_->selection().addRect(r, std::make_shared<ImageBuffer>(doc_->width(), doc_->height()));
+    documentChanged.emit();
+}
+
+void AppService::clearSelectionRect()
+{
+    if (!doc_)
+        throw std::runtime_error("clearSelectionRect: document is null");
+    doc_->selection().clear();
     documentChanged.emit();
 }
 
@@ -589,6 +605,7 @@ void AppService::undo()
     history_.undo();
     documentChanged.emit();
 }
+
 void AppService::redo()
 {
     if (!history_.canRedo())
@@ -597,14 +614,23 @@ void AppService::redo()
     history_.redo();
     documentChanged.emit();
 }
-
 bool AppService::canUndo() const noexcept
 {
     return history_.canUndo();
 }
+
 bool AppService::canRedo() const noexcept
 {
     return history_.canRedo();
+}
+void AppService::apply(app::History::CommandPtr cmd)
+{
+    if (!cmd)
+        return;
+
+    cmd->redo();
+    history_.push(std::move(cmd));
+    documentChanged.emit();
 }
 
 }  // namespace app

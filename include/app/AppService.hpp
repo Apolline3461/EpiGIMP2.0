@@ -8,6 +8,8 @@
 #include "app/Signal.h"
 #include "io/IStorage.hpp"
 
+#include <core/Selection.hpp>
+
 class Document;
 namespace app
 {
@@ -50,6 +52,15 @@ class AppService
     void reorderLayer(std::size_t from, std::size_t to);
     void mergeLayerDown(std::size_t from);
 
+    // void beginStroke(const ToolParams&, Point pStart);
+    // void moveStroke(Point p);
+    // void endStroke();
+    // uint32_t pickColorAt(Point p) const;
+
+    const Selection& selection() const;
+    void setSelectionRect(Selection::Rect r);
+    void clearSelectionRect();
+
     void undo();
     void redo();
     [[nodiscard]] bool canUndo() const noexcept;
@@ -66,7 +77,6 @@ class AppService
     std::unique_ptr<Command> currentStroke_;
     // std::vector<Point> pointToDraw_;
     // std::optional<Point> lastPointToDraw_;
-
     void apply(std::unique_ptr<Command> cmd);
 };
 };  // namespace app
