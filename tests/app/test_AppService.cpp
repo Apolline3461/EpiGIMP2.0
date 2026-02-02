@@ -4,15 +4,15 @@
 
 #include <memory>
 #include <string>
+#include <unordered_set>
+#include <gtest/gtest.h>
 
 #include "app/AppService.hpp"
 #include "core/Document.hpp"
+#include "core/ImageBuffer.hpp"
+#include "core/Layer.hpp"
 #include "io/EpgTypes.hpp"
 #include "io/IStorage.hpp"
-
-#include <core/ImageBuffer.hpp>
-#include <core/Layer.hpp>
-#include <gtest/gtest.h>
 
 class SpyStorage final : public IStorage {
 public:
@@ -79,6 +79,46 @@ TEST(AppService, newDocumentInitialState_Default) {
     EXPECT_FALSE(app->canRedo());
 }
 
+TEST(AppService, LayerIds_AreUnique) {
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    app::LayerSpec spec{};
+    app->addLayer(spec);
+    app->addLayer(spec);
+    app->addLayer(spec);
+
+    const Document& doc = app->document();
+    const int n = doc.layerCount();
+    ASSERT_GT(n, 0);
+
+    std::unordered_set<std::uint64_t> ids;
+    ids.reserve(static_cast<std::size_t>(n));
+
+    for (int i = 0; i < n; ++i) {
+        auto layer = doc.layerAt(i);
+        ASSERT_NE(layer, nullptr);
+
+        const auto id = layer->id();
+        EXPECT_TRUE(ids.insert(id).second) << "Duplicate layer id detected: " << id;
+    }
+}
+
+TEST(AppService, LayerIds_ResetOnNewDocument) {
+    const auto app = makeApp();
+    app::LayerSpec spec{};
+
+    app->newDocument(app::Size{10, 10}, 72.f);
+    app->addLayer(spec);
+    auto id1 = app->document().layerAt(1)->id(); // 0 = bg, 1 = first added
+
+    app->newDocument(app::Size{10, 10}, 72.f);
+    app->addLayer(spec);
+    auto id2 = app->document().layerAt(1)->id();
+
+    EXPECT_EQ(id1, id2); // si tu resets nextLayerId_ à 1
+}
+
 TEST(AppService, NewDocumentInitialLayer_CountIsOne) {
 
     const auto app = makeApp();
@@ -135,10 +175,11 @@ TEST(AppService, documentChanged_EmittedOnNewDocument) {
 TEST(AppService, ActiveLayerSet_ValidIndex)
 {
     const auto app = makeApp();
+    app::LayerSpec spec{};
 
     app->newDocument(app::Size{10, 10}, 72.f);
-    app->addLayer();
-    app->addLayer();
+    app->addLayer(spec);
+    app->addLayer(spec);
 
     app->setActiveLayer(2);
     EXPECT_EQ(app->activeLayer(), 2);

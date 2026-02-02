@@ -6,10 +6,8 @@
 
 #include "app/History.hpp"
 #include "app/Signal.h"
-#include "core/Document.hpp"
 #include "io/IStorage.hpp"
 
-class IStorage;
 class Document;
 namespace app
 {
@@ -19,10 +17,20 @@ struct Size
     int h;
 };
 
+struct LayerSpec
+{  // maybe we can use it for other things in that's case we will put in a separated file
+    std::uint32_t color = 0xFFFFFFFFU;
+    std::string name = "Layer ";
+    bool visible = true;
+    bool locked = true;
+    float opacity = 1.F;
+};
+
 class AppService
 {
    public:
     explicit AppService(std::unique_ptr<IStorage> storage);
+    ~AppService() = default;
 
     void newDocument(Size size, float dpi);
     void open(const std::string& path);
@@ -34,7 +42,7 @@ class AppService
     std::size_t activeLayer() const;
     void setActiveLayer(std::size_t idx);
 
-    void addLayer();
+    void addLayer(const LayerSpec& spec);
     void removeLayer(std::size_t idx);
     void setLayerLocked(std::size_t idx, bool locked);
 
@@ -48,7 +56,8 @@ class AppService
    private:
     std::unique_ptr<IStorage> storage_;
     app::History history_;
-    Document doc_;
-    std::size_t activeLayer_{0};
+    std::unique_ptr<Document> doc_;
+    std::size_t activeLayer_;
+    std::uint64_t nextLayerId_ = 1;
 };
 };  // namespace app
