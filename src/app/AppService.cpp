@@ -275,7 +275,7 @@ class ReorderLayerCommand final : public Command
     }
 
    private:
-    void moveTo(int target)
+    void moveTo(size_t target)
     {
         if (!doc_)
             return;
@@ -287,16 +287,14 @@ class ReorderLayerCommand final : public Command
         if (cur == -1)
             return;
 
-        int t = target;
-        if (t < 0)
-            t = 0;
+        size_t t = target;
         if (t >= n)
             t = n - 1;
 
-        if (cur == t)
+        if (static_cast<size_t>(cur) == t)
             return;
 
-        doc_->reorderLayer(cur, t);
+        doc_->reorderLayer(static_cast<size_t>(cur), t);
 
         if (activeLayer_)
         {
@@ -308,8 +306,8 @@ class ReorderLayerCommand final : public Command
 
     Document* doc_{nullptr};
     std::uint64_t layerId_{0};
-    int from_{0};
-    int to_{0};
+    size_t from_{0};
+    size_t to_{0};
     std::size_t* activeLayer_{nullptr};
 };
 
@@ -334,7 +332,7 @@ class MergeDownCommand final : public Command
         if (idx <= 0)
             throw std::runtime_error("Cannot merge down background");
 
-        doc_->mergeDown(idx);
+        doc_->mergeDown(static_cast<size_t>(idx));
         clampActive();
     }
 
@@ -344,15 +342,13 @@ class MergeDownCommand final : public Command
             return;
 
         const size_t n = doc_->layerCount();
-        int insertAt = from_;
-        if (insertAt < 0)
-            insertAt = 0;
+        size_t insertAt = from_;
         if (insertAt > n)
             insertAt = n;
 
         doc_->addLayer(removed_, insertAt);
         if (activeLayer_)
-            *activeLayer_ = static_cast<std::size_t>(insertAt);
+            *activeLayer_ = insertAt;
     }
 
    private:
@@ -372,7 +368,7 @@ class MergeDownCommand final : public Command
 
     Document* doc_{nullptr};
     std::shared_ptr<Layer> removed_;
-    int from_{0};
+    size_t from_{0};
     std::size_t* activeLayer_{nullptr};
 };
 

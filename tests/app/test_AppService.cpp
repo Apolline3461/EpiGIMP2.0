@@ -14,6 +14,7 @@
 #include "io/EpgTypes.hpp"
 #include "io/IStorage.hpp"
 #include "common/Geometry.hpp"
+#include "common/Colors.hpp"
 
 class SpyStorage final : public IStorage {
 public:
@@ -616,15 +617,55 @@ TEST(AppService_Picking, pickColorAt_OutOfBounds_ReturnsTransparent)
     app->addLayer(spec);
     app->setActiveLayer(1);
 
-    EXPECT_EQ(app->pickColorAt(common::Point{-1, 0}), 0x00000000u);
-    EXPECT_EQ(app->pickColorAt(common::Point{0, -1}), 0x00000000u);
-    EXPECT_EQ(app->pickColorAt(common::Point{10, 0}), 0x00000000u);
-    EXPECT_EQ(app->pickColorAt(common::Point{0, 10}), 0x00000000u);
+    EXPECT_EQ(app->pickColorAt(common::Point{-1, 0}), common::colors::Transparent);
+    EXPECT_EQ(app->pickColorAt(common::Point{0, -1}), common::colors::Transparent);
+    EXPECT_EQ(app->pickColorAt(common::Point{10, 0}), common::colors::Transparent);
+    EXPECT_EQ(app->pickColorAt(common::Point{0, 10}), common::colors::Transparent);
 }
 
 TEST(AppService_Picking, pickColorAt_NoDocument_Throws)
 {
     const auto app = makeApp();
     EXPECT_THROW(app->pickColorAt(common::Point{0, 0}), std::runtime_error);
+}
+
+TEST(AppService_Picking, pickColorAt_DoesNotEmitDocumentChanged)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    auto img = app->document().layerAt(1)->image();
+    ASSERT_NE(img, nullptr);
+    img->setPixel(1, 1, 0xFF010203u);
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    (void)app->pickColorAt(common::Point{1, 1});
+    EXPECT_EQ(hits, 0);
+}
+
+TEST(AppService_Picking, pickColorAt_DoesNotAffectUndoRedo)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    const bool beforeUndo = app->canUndo();
+    const bool beforeRedo = app->canRedo();
+
+    (void)app->pickColorAt(common::Point{0, 0});
+
+    EXPECT_EQ(app->canUndo(), beforeUndo);
+    EXPECT_EQ(app->canRedo(), beforeRedo);
 }
 
