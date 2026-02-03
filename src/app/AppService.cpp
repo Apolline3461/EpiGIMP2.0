@@ -1,12 +1,13 @@
 //
 // Created by apolline on 21/01/2026.
 //
-
 #include "app/AppService.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <stdexcept>
 
+#include "common/Colors.hpp"
 #include "core/Document.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
@@ -16,7 +17,7 @@ namespace app
 static std::uint64_t computeNextLayerId(const Document& doc)
 {
     std::uint64_t maxId = 0;
-    for (int i = 0; i < doc.layerCount(); ++i)
+    for (size_t i = 0; i < doc.layerCount(); ++i)
     {
         if (auto layer = doc.layerAt(i))
         {
@@ -28,7 +29,7 @@ static std::uint64_t computeNextLayerId(const Document& doc)
 
 static int findLayerIndexById(const Document& doc, std::uint64_t id)
 {
-    for (int i = 0; i < doc.layerCount(); ++i)
+    for (size_t i = 0; i < doc.layerCount(); ++i)
         if (auto l = doc.layerAt(i); l && l->id() == id)
             return i;
     return -1;
@@ -52,7 +53,7 @@ class AddLayerCommand final : public Command
 
         doc_->addLayer(layer_);
         if (activeLayer_)
-            *activeLayer_ = static_cast<std::size_t>(doc_->layerCount() - 1);
+            *activeLayer_ = doc_->layerCount() - 1;
     }
 
     void undo() override
@@ -278,7 +279,7 @@ class ReorderLayerCommand final : public Command
     {
         if (!doc_)
             return;
-        const int n = doc_->layerCount();
+        const size_t n = doc_->layerCount();
         if (n <= 0)
             return;
 
@@ -342,7 +343,7 @@ class MergeDownCommand final : public Command
         if (!doc_ || !removed_)
             return;
 
-        const int n = doc_->layerCount();
+        const size_t n = doc_->layerCount();
         int insertAt = from_;
         if (insertAt < 0)
             insertAt = 0;
@@ -359,7 +360,7 @@ class MergeDownCommand final : public Command
     {
         if (!activeLayer_)
             return;
-        const int n = doc_->layerCount();
+        const size_t n = doc_->layerCount();
         if (n <= 0)
         {
             *activeLayer_ = 0;
@@ -447,7 +448,7 @@ void AppService::setActiveLayer(const std::size_t idx)
     if (!doc_)
         throw std::runtime_error("setActiveLayer: document is null");
 
-    const int count = doc_->layerCount();
+    const size_t count = doc_->layerCount();
     if (idx >= static_cast<std::size_t>(count))
     {
         throw std::out_of_range("From setActiveLayer: index out of range");
@@ -538,7 +539,7 @@ void AppService::reorderLayer(std::size_t from, std::size_t to)
     if (!doc_)
         throw std::runtime_error("reorderLayer: document is null");
 
-    const int n = doc_->layerCount();
+    const size_t n = doc_->layerCount();
     if (from >= static_cast<std::size_t>(n) || to >= static_cast<std::size_t>(n))
         throw std::out_of_range("reorderLayer: index out of range");
 
@@ -558,7 +559,7 @@ void AppService::mergeLayerDown(std::size_t from)
     if (!doc_)
         throw std::runtime_error("mergeLayerDown: document is null");
 
-    const int n = doc_->layerCount();
+    const size_t n = doc_->layerCount();
     if (from >= static_cast<std::size_t>(n))
         throw std::out_of_range("mergeLayerDown: index out of range");
 
@@ -573,9 +574,27 @@ void AppService::mergeLayerDown(std::size_t from)
                                              &activeLayer_));
 }
 
-uint32_t AppService::pickColorAt(common::Point /*p*/) const
+uint32_t AppService::pickColorAt(common::Point p) const
 {
-    return uint32_t(0);
+    if (!doc_)
+        throw std::runtime_error("pickColorAt: document is null");
+    const auto n = doc_->layerCount();
+    if (n <= 0)
+        return common::colors::Transparent;
+    if (activeLayer_ >= n)
+        return common::colors::Transparent;
+
+    auto layer = doc_->layerAt(activeLayer_);
+    if (!layer)
+        return common::colors::Transparent;
+
+    auto img = layer->image();
+    if (!img)
+        return common::colors::Transparent;
+    if (p.x < 0 || p.y < 0 || p.x >= img->width() || p.y >= img->height())
+        return common::colors::Transparent;
+
+    return img->getPixel(p.x, p.y);
 }
 
 const Selection& AppService::selection() const

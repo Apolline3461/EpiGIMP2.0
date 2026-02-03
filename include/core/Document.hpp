@@ -20,14 +20,14 @@ class Document
     [[nodiscard]] int height() const noexcept;
     [[nodiscard]] float dpi() const noexcept;
 
-    int addLayer(std::shared_ptr<Layer> layer);
-    int addLayer(std::shared_ptr<Layer> layer, int idx);
-    void removeLayer(int idx);
-    void reorderLayer(int from, int to);
-    void mergeDown(int from);
+    size_t addLayer(std::shared_ptr<Layer> layer);
+    size_t addLayer(std::shared_ptr<Layer> layer, size_t idx);
+    void removeLayer(size_t idx);
+    void reorderLayer(size_t from, size_t to);
+    void mergeDown(size_t from);
 
-    [[nodiscard]] int layerCount() const noexcept;
-    [[nodiscard]] std::shared_ptr<Layer> layerAt(int index) const;
+    [[nodiscard]] size_t layerCount() const noexcept;
+    [[nodiscard]] std::shared_ptr<Layer> layerAt(size_t index) const;
 
     Selection& selection() noexcept
     {
