@@ -40,9 +40,8 @@ class AddLayerCommand final : public Command
     {
         if (!doc_ || !layer_)
             return;
-
-        // GCC 15 false positive: warns about dangling pointer even though
-        // removeLayer() takes size_t by value. Safe to suppress.
+// GCC 15 false positive: warns about dangling pointer even though
+// removeLayer() takes size_t by value. Safe to suppress.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdangling-pointer"
         auto idx = findLayerIndexById(*doc_, layer_->id());
