@@ -4,7 +4,6 @@
 #include "core/Document.hpp"
 
 #include "core/Layer.hpp"
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 Document::Document(const int width, const int height, const float dpi)
     : width_{width}, height_{height}, dpi_{dpi}
 {
