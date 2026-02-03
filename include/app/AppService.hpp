@@ -3,14 +3,21 @@
 //
 
 #pragma once
+#include <memory>
 
 #include "app/History.hpp"
 #include "app/Signal.h"
 #include "app/ToolParams.hpp"
+#include "commands/StrokeCommand.hpp"
 #include "common/Geometry.hpp"
 #include "io/IStorage.hpp"
 
 class Document;
+
+namespace app::command
+{
+class StrokeCommand;
+}
 namespace app
 {
 struct Size
@@ -74,7 +81,7 @@ class AppService
     std::unique_ptr<Document> doc_;
     std::size_t activeLayer_ = 0;
     std::uint64_t nextLayerId_ = 1;
-    std::unique_ptr<Command> currentStroke_;
+    std::unique_ptr<commands::StrokeCommand> currentStroke_;
     // std::vector<common::PointPoint> pointToDraw_;
     // std::optional<common::Point> lastPointToDraw_;
     void apply(std::unique_ptr<Command> cmd);

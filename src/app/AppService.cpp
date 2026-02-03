@@ -9,6 +9,8 @@
 #include <unordered_map>
 
 #include "app/Command.hpp"
+#include "app/commands/CommandUtils.hpp"
+#include "app/commands/LayerCommands.hpp"
 #include "app/ToolParams.hpp"
 #include "common/Colors.hpp"
 #include "core/Document.hpp"
@@ -17,34 +19,6 @@
 
 namespace app
 {
-static void rasterizeLine(common::Point a, common::Point b,
-                          const std::function<void(int, int)>& emitPixel)
-{
-    int x0 = a.x, y0 = a.y;
-    int x1 = b.x, y1 = b.y;
-
-    int dx = std::abs(x1 - x0), sx = (x0 < x1) ? 1 : -1;
-    int dy = -std::abs(y1 - y0), sy = (y0 < y1) ? 1 : -1;
-    int err = dx + dy;
-
-    while (true)
-    {
-        emitPixel(x0, y0);
-        if (x0 == x1 && y0 == y1)
-            break;
-        int e2 = 2 * err;
-        if (e2 >= dy)
-        {
-            err += dy;
-            x0 += sx;
-        }
-        if (e2 <= dx)
-        {
-            err += dx;
-            y0 += sy;
-        }
-    }
-}
 
 static std::uint64_t computeNextLayerId(const Document& doc)
 {
@@ -58,456 +32,6 @@ static std::uint64_t computeNextLayerId(const Document& doc)
     }
     return maxId + 1;
 }
-
-static int findLayerIndexById(const Document& doc, std::uint64_t id)
-{
-    for (size_t i = 0; i < doc.layerCount(); ++i)
-        if (auto l = doc.layerAt(i); l && l->id() == id)
-            return i;
-    return -1;
-}
-
-class StrokeCommand final : public Command
-{
-   public:
-    StrokeCommand(Document* doc, std::uint64_t layerId, app::ToolParams params, ApplyFn apply)
-        : doc_(doc), layerId_(layerId), params_(params), apply_(std::move(apply))
-    {
-    }
-
-    void addPoint(common::Point p)
-    {
-        points_.push_back(p);
-    }
-
-    void redo() override
-    {
-        if (!built_)
-            buildChanges();
-        apply_(layerId_, changes_, /*useBefore=*/false);
-    }
-
-    void undo() override
-    {
-        if (!built_)
-            return;  // rien à annuler si jamais pas construit
-        apply_(layerId_, changes_, /*useBefore=*/true);
-    }
-
-   private:
-    void buildChanges()
-    {
-        built_ = true;
-        if (!doc_)
-            return;
-
-        const int idx = findLayerIndexById(*doc_, layerId_);
-        if (idx < 0)
-            return;
-
-        auto layer = doc_->layerAt(static_cast<std::size_t>(idx));
-        if (!layer || !layer->image())
-            return;
-
-        auto img = layer->image();
-        const int w = img->width();
-        const int h = img->height();
-
-        // évite doublons : key = (y<<32) | x
-        std::unordered_map<std::uint64_t, PixelChange> map;
-        map.reserve(256);
-
-        auto record = [&](int x, int y)
-        {
-            if (x < 0 || y < 0 || x >= w || y >= h)
-                return;
-
-            const std::uint64_t key =
-                (static_cast<std::uint64_t>(static_cast<std::uint32_t>(y)) << 32) |
-                static_cast<std::uint32_t>(x);
-
-            auto it = map.find(key);
-            if (it == map.end())
-            {
-                PixelChange ch{};
-                ch.x = x;
-                ch.y = y;
-                ch.before = img->getPixel(x, y);
-                ch.after = params_.color;
-                map.emplace(key, ch);
-            }
-            else
-            {
-                // le pixel a déjà été touché pendant ce stroke : on met à jour after
-                it->second.after = params_.color;
-            }
-        };
-
-        if (points_.empty())
-            return;
-
-        if (points_.size() == 1)
-        {
-            record(points_[0].x, points_[0].y);
-        }
-        else
-        {
-            for (std::size_t i = 1; i < points_.size(); ++i)
-            {
-                rasterizeLine(points_[i - 1], points_[i], record);
-            }
-        }
-
-        changes_.reserve(map.size());
-        for (auto& kv : map)
-            changes_.push_back(kv.second);
-    }
-
-    Document* doc_{nullptr};
-    std::uint64_t layerId_{0};
-    app::ToolParams params_{};
-    ApplyFn apply_;
-    std::vector<common::Point> points_;
-    std::vector<PixelChange> changes_;
-    bool built_{false};
-};
-
-class AddLayerCommand final : public Command
-{
-   public:
-    AddLayerCommand(Document* doc, std::shared_ptr<Layer> layer, std::size_t* activeLayer)
-        : doc_(doc), layer_(std::move(layer)), activeLayer_(activeLayer)
-    {
-    }
-
-    void redo() override
-    {
-        if (!doc_ || !layer_)
-            return;
-
-        if (findLayerIndexById(*doc_, layer_->id()) != -1)
-            return;
-
-        doc_->addLayer(layer_);
-        if (activeLayer_)
-            *activeLayer_ = doc_->layerCount() - 1;
-    }
-
-    void undo() override
-    {
-        if (!doc_ || !layer_)
-            return;
-
-        const int idx = findLayerIndexById(*doc_, layer_->id());
-        if (idx != -1)
-            doc_->removeLayer(idx);
-
-        if (activeLayer_)
-        {
-            const int n = doc_->layerCount();
-            if (n <= 0)
-                *activeLayer_ = 0;
-            else if (*activeLayer_ >= static_cast<std::size_t>(n))
-                *activeLayer_ = static_cast<std::size_t>(n - 1);
-        }
-    }
-
-   private:
-    Document* doc_{nullptr};
-    std::shared_ptr<Layer> layer_;
-    std::size_t* activeLayer_{nullptr};
-};
-
-class SetLayerLockedCommand final : public Command
-{
-   public:
-    SetLayerLockedCommand(Document* doc, std::uint64_t layerId, bool before, bool after)
-        : doc_(doc), layerId_(layerId), before_(before), after_(after)
-    {
-    }
-
-    void redo() override
-    {
-        set(after_);
-    }
-    void undo() override
-    {
-        set(before_);
-    }
-
-   private:
-    void set(bool v)
-    {
-        if (!doc_)
-            return;
-        const int idx = findLayerIndexById(*doc_, layerId_);
-        if (idx == -1)
-            return;
-        auto layer = doc_->layerAt(idx);
-        if (!layer)
-            return;
-        layer->setLocked(v);
-    }
-
-    Document* doc_{nullptr};
-    std::uint64_t layerId_{0};
-    bool before_{};
-    bool after_{};
-};
-
-class SetLayerVisibleCommand final : public Command
-{
-   public:
-    SetLayerVisibleCommand(Document* doc, std::uint64_t layerId, bool before, bool after)
-        : doc_(doc), layerId_(layerId), before_(before), after_(after)
-    {
-    }
-
-    void redo() override
-    {
-        set(after_);
-    }
-    void undo() override
-    {
-        set(before_);
-    }
-
-   private:
-    void set(bool v)
-    {
-        if (!doc_)
-            return;
-        const int idx = findLayerIndexById(*doc_, layerId_);
-        if (idx == -1)
-            return;
-        auto layer = doc_->layerAt(idx);
-        if (!layer)
-            return;
-        layer->setVisible(v);
-    }
-
-    Document* doc_{nullptr};
-    std::uint64_t layerId_{0};
-    bool before_{};
-    bool after_{};
-};
-
-class SetLayerOpacityCommand final : public Command
-{
-   public:
-    SetLayerOpacityCommand(Document* doc, std::uint64_t layerId, float before, float after)
-        : doc_(doc), layerId_(layerId), before_(before), after_(after)
-    {
-    }
-
-    void redo() override
-    {
-        set(after_);
-    }
-    void undo() override
-    {
-        set(before_);
-    }
-
-   private:
-    void set(float v)
-    {
-        if (!doc_)
-            return;
-        const int idx = findLayerIndexById(*doc_, layerId_);
-        if (idx == -1)
-            return;
-        auto layer = doc_->layerAt(idx);
-        if (!layer)
-            return;
-        layer->setOpacity(v);
-    }
-
-    Document* doc_{nullptr};
-    std::uint64_t layerId_{0};
-    float before_{1.f};
-    float after_{1.f};
-};
-
-class RemoveLayerCommand final : public Command
-{
-   public:
-    RemoveLayerCommand(Document* doc, std::shared_ptr<Layer> removed, int index,
-                       std::size_t* activeLayer)
-        : doc_(doc), removed_(std::move(removed)), index_(index), activeLayer_(activeLayer)
-    {
-    }
-
-    void redo() override
-    {
-        if (!doc_ || !removed_)
-            return;
-
-        const int idx = findLayerIndexById(*doc_, removed_->id());
-        if (idx == -1)
-            return;
-
-        auto layer = doc_->layerAt(idx);
-        if (layer && layer->locked())
-            throw std::runtime_error("Cannot remove locked layer");
-
-        doc_->removeLayer(idx);
-        clampActive();
-    }
-
-    void undo() override
-    {
-        if (!doc_ || !removed_)
-            return;
-
-        const int n = doc_->layerCount();
-        int insertAt = index_;
-        if (insertAt < 0)
-            insertAt = 0;
-        if (insertAt > n)
-            insertAt = n;
-
-        doc_->addLayer(removed_, insertAt);
-        if (activeLayer_)
-            *activeLayer_ = static_cast<std::size_t>(insertAt);
-    }
-
-   private:
-    void clampActive()
-    {
-        if (!activeLayer_)
-            return;
-        const int n = doc_->layerCount();
-        if (n <= 0)
-        {
-            *activeLayer_ = 0;
-            return;
-        }
-        if (*activeLayer_ >= static_cast<std::size_t>(n))
-            *activeLayer_ = static_cast<std::size_t>(n - 1);
-    }
-
-    Document* doc_{nullptr};
-    std::shared_ptr<Layer> removed_;
-    int index_{-1};
-    std::size_t* activeLayer_{nullptr};
-};
-
-class ReorderLayerCommand final : public Command
-{
-   public:
-    ReorderLayerCommand(Document* doc, std::uint64_t layerId, int from, int to,
-                        std::size_t* activeLayer)
-        : doc_(doc), layerId_(layerId), from_(from), to_(to), activeLayer_(activeLayer)
-    {
-    }
-
-    void redo() override
-    {
-        moveTo(to_);
-    }
-    void undo() override
-    {
-        moveTo(from_);
-    }
-
-   private:
-    void moveTo(size_t target)
-    {
-        if (!doc_)
-            return;
-        const size_t n = doc_->layerCount();
-        if (n <= 0)
-            return;
-
-        const int cur = findLayerIndexById(*doc_, layerId_);
-        if (cur == -1)
-            return;
-
-        size_t t = target;
-        if (t >= n)
-            t = n - 1;
-
-        if (static_cast<size_t>(cur) == t)
-            return;
-
-        doc_->reorderLayer(static_cast<size_t>(cur), t);
-
-        if (activeLayer_)
-        {
-            const int after = findLayerIndexById(*doc_, layerId_);
-            if (after != -1)
-                *activeLayer_ = static_cast<std::size_t>(after);
-        }
-    }
-
-    Document* doc_{nullptr};
-    std::uint64_t layerId_{0};
-    size_t from_{0};
-    size_t to_{0};
-    std::size_t* activeLayer_{nullptr};
-};
-
-class MergeDownCommand final : public Command
-{
-   public:
-    MergeDownCommand(Document* doc, std::shared_ptr<Layer> removed, int from,
-                     std::size_t* activeLayer)
-        : doc_(doc), removed_(std::move(removed)), from_(from), activeLayer_(activeLayer)
-    {
-    }
-
-    void redo() override
-    {
-        if (!doc_ || !removed_)
-            return;
-
-        const int idx = findLayerIndexById(*doc_, removed_->id());
-        if (idx == -1)
-            return;
-
-        if (idx <= 0)
-            throw std::runtime_error("Cannot merge down background");
-
-        doc_->mergeDown(static_cast<size_t>(idx));
-        clampActive();
-    }
-
-    void undo() override
-    {
-        if (!doc_ || !removed_)
-            return;
-
-        const size_t n = doc_->layerCount();
-        size_t insertAt = from_;
-        if (insertAt > n)
-            insertAt = n;
-
-        doc_->addLayer(removed_, insertAt);
-        if (activeLayer_)
-            *activeLayer_ = insertAt;
-    }
-
-   private:
-    void clampActive()
-    {
-        if (!activeLayer_)
-            return;
-        const size_t n = doc_->layerCount();
-        if (n <= 0)
-        {
-            *activeLayer_ = 0;
-            return;
-        }
-        if (*activeLayer_ >= static_cast<std::size_t>(n))
-            *activeLayer_ = static_cast<std::size_t>(n - 1);
-    }
-
-    Document* doc_{nullptr};
-    std::shared_ptr<Layer> removed_;
-    size_t from_{0};
-    std::size_t* activeLayer_{nullptr};
-};
 
 AppService::AppService(std::unique_ptr<IStorage> storage) : storage_(std::move(storage)) {}
 
@@ -601,8 +125,7 @@ void AppService::setLayerVisible(std::size_t idx, bool visible)
     if (layer->visible() == visible)
         return;
 
-    apply(std::make_unique<SetLayerVisibleCommand>(doc_.get(), layer->id(), layer->visible(),
-                                                   visible));
+    apply(commands::makeSetLayerVisibleCommand(doc_.get(), layer->id(), layer->visible(), visible));
 }
 
 void AppService::setLayerOpacity(std::size_t idx, float alpha)
@@ -617,8 +140,7 @@ void AppService::setLayerOpacity(std::size_t idx, float alpha)
     if (layer->opacity() == alpha)
         return;
 
-    apply(
-        std::make_unique<SetLayerOpacityCommand>(doc_.get(), layer->id(), layer->opacity(), alpha));
+    apply(commands::makeSetLayerOpacityCommand(doc_.get(), layer->id(), layer->opacity(), alpha));
 }
 
 void AppService::setLayerLocked(std::size_t idx, bool locked)
@@ -633,8 +155,7 @@ void AppService::setLayerLocked(std::size_t idx, bool locked)
     if (layer->locked() == locked)
         return;
 
-    apply(
-        std::make_unique<SetLayerLockedCommand>(doc_.get(), layer->id(), layer->locked(), locked));
+    apply(commands::makeSetLayerLockedCommand(doc_.get(), layer->id(), layer->locked(), locked));
 }
 
 void AppService::addLayer(const LayerSpec& spec)
@@ -648,7 +169,7 @@ void AppService::addLayer(const LayerSpec& spec)
     auto layer = std::make_shared<Layer>(nextLayerId_++, spec.name, img, spec.visible, spec.locked,
                                          spec.opacity);
 
-    apply(std::make_unique<AddLayerCommand>(doc_.get(), std::move(layer), &activeLayer_));
+    apply(commands::makeAddLayerCommand(doc_.get(), std::move(layer), &activeLayer_));
 }
 
 void AppService::removeLayer(std::size_t idx)
@@ -663,8 +184,8 @@ void AppService::removeLayer(std::size_t idx)
     if (layer->locked())
         throw std::runtime_error("Cannot remove locked layer");
 
-    apply(std::make_unique<RemoveLayerCommand>(doc_.get(), layer, static_cast<int>(idx),
-                                               &activeLayer_));
+    apply(
+        commands::makeRemoveLayerCommand(doc_.get(), layer, static_cast<int>(idx), &activeLayer_));
 }
 
 void AppService::reorderLayer(std::size_t from, std::size_t to)
@@ -683,8 +204,8 @@ void AppService::reorderLayer(std::size_t from, std::size_t to)
     if (!layer)
         throw std::out_of_range("reorderLayer: invalid from");
 
-    apply(std::make_unique<ReorderLayerCommand>(doc_.get(), layer->id(), static_cast<int>(from),
-                                                static_cast<int>(to), &activeLayer_));
+    apply(commands::makeReorderLayerCommand(doc_.get(), layer->id(), static_cast<int>(from),
+                                            static_cast<int>(to), &activeLayer_));
 }
 
 void AppService::mergeLayerDown(std::size_t from)
@@ -703,8 +224,7 @@ void AppService::mergeLayerDown(std::size_t from)
     if (!layer)
         throw std::out_of_range("mergeLayerDown: invalid index");
 
-    apply(std::make_unique<MergeDownCommand>(doc_.get(), layer, static_cast<int>(from),
-                                             &activeLayer_));
+    apply(commands::makeMergeDownCommand(doc_.get(), layer, static_cast<int>(from), &activeLayer_));
 }
 
 void AppService::beginStroke(const ToolParams& params, common::Point pStart)
@@ -733,11 +253,11 @@ void AppService::beginStroke(const ToolParams& params, common::Point pStart)
     {
         if (!doc)
             return;
-        const int idx = findLayerIndexById(*doc, id);
-        if (idx < 0)
+        auto idx = commands::findLayerIndexById(*doc, id);
+        if (!idx)
             return;
 
-        auto layer2 = doc->layerAt(static_cast<std::size_t>(idx));
+        auto layer2 = doc->layerAt(*idx);
         if (!layer2 || !layer2->image())
             return;
         auto img = layer2->image();
@@ -747,20 +267,16 @@ void AppService::beginStroke(const ToolParams& params, common::Point pStart)
             img->setPixel(ch.x, ch.y, useBefore ? ch.before : ch.after);
         }
     };
-
-    auto cmd = std::make_unique<StrokeCommand>(doc_.get(), layerId, params, std::move(applyFn));
-    cmd->addPoint(pStart);
-    currentStroke_ = std::move(cmd);
+    currentStroke_ =
+        std::make_unique<commands::StrokeCommand>(doc_.get(), layerId, params, std::move(applyFn));
+    currentStroke_->addPoint(pStart);
 }
 
 void AppService::moveStroke(common::Point p)
 {
     if (!currentStroke_)
         return;
-    auto* stroke = dynamic_cast<StrokeCommand*>(currentStroke_.get());
-    if (!stroke)
-        return;
-    stroke->addPoint(p);
+    currentStroke_->addPoint(p);
 }
 void AppService::endStroke()
 {

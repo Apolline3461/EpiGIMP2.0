@@ -1,10 +1,11 @@
 file(GLOB APP_HEADERS
-        ${EPIGIMP_ROOT_INCLUDE_DIR}/app/*.h
         ${EPIGIMP_ROOT_INCLUDE_DIR}/app/*.hpp
+        ${EPIGIMP_ROOT_INCLUDE_DIR}/app/commands/*.hpp
 )
 
 file(GLOB APP_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/commands/*.cpp
 )
 
 add_library(epigimp_app STATIC
