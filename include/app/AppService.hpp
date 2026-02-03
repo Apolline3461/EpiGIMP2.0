@@ -6,6 +6,7 @@
 
 #include "app/History.hpp"
 #include "app/Signal.h"
+#include "app/ToolParams.hpp"
 #include "common/Geometry.hpp"
 #include "io/IStorage.hpp"
 
@@ -51,9 +52,9 @@ class AppService
     void reorderLayer(std::size_t from, std::size_t to);
     void mergeLayerDown(std::size_t from);
 
-    // void beginStroke(const ToolParams&, Point pStart);
-    // void moveStroke(Point p);
-    // void endStroke();
+    void beginStroke(const ToolParams&, common::Point pStart);
+    void moveStroke(common::Point p);
+    void endStroke();
     uint32_t pickColorAt(common::Point p) const;
 
     const Selection& selection() const;

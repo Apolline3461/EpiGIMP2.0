@@ -6,7 +6,10 @@
 #include <algorithm>
 #include <cstddef>
 #include <stdexcept>
+#include <unordered_map>
 
+#include "app/Command.hpp"
+#include "app/ToolParams.hpp"
 #include "common/Colors.hpp"
 #include "core/Document.hpp"
 #include "core/ImageBuffer.hpp"
@@ -14,6 +17,35 @@
 
 namespace app
 {
+static void rasterizeLine(common::Point a, common::Point b,
+                          const std::function<void(int, int)>& emitPixel)
+{
+    int x0 = a.x, y0 = a.y;
+    int x1 = b.x, y1 = b.y;
+
+    int dx = std::abs(x1 - x0), sx = (x0 < x1) ? 1 : -1;
+    int dy = -std::abs(y1 - y0), sy = (y0 < y1) ? 1 : -1;
+    int err = dx + dy;
+
+    while (true)
+    {
+        emitPixel(x0, y0);
+        if (x0 == x1 && y0 == y1)
+            break;
+        int e2 = 2 * err;
+        if (e2 >= dy)
+        {
+            err += dy;
+            x0 += sx;
+        }
+        if (e2 <= dx)
+        {
+            err += dx;
+            y0 += sy;
+        }
+    }
+}
+
 static std::uint64_t computeNextLayerId(const Document& doc)
 {
     std::uint64_t maxId = 0;
@@ -34,6 +66,111 @@ static int findLayerIndexById(const Document& doc, std::uint64_t id)
             return i;
     return -1;
 }
+
+class StrokeCommand final : public Command
+{
+   public:
+    StrokeCommand(Document* doc, std::uint64_t layerId, app::ToolParams params, ApplyFn apply)
+        : doc_(doc), layerId_(layerId), params_(params), apply_(std::move(apply))
+    {
+    }
+
+    void addPoint(common::Point p)
+    {
+        points_.push_back(p);
+    }
+
+    void redo() override
+    {
+        if (!built_)
+            buildChanges();
+        apply_(layerId_, changes_, /*useBefore=*/false);
+    }
+
+    void undo() override
+    {
+        if (!built_)
+            return;  // rien à annuler si jamais pas construit
+        apply_(layerId_, changes_, /*useBefore=*/true);
+    }
+
+   private:
+    void buildChanges()
+    {
+        built_ = true;
+        if (!doc_)
+            return;
+
+        const int idx = findLayerIndexById(*doc_, layerId_);
+        if (idx < 0)
+            return;
+
+        auto layer = doc_->layerAt(static_cast<std::size_t>(idx));
+        if (!layer || !layer->image())
+            return;
+
+        auto img = layer->image();
+        const int w = img->width();
+        const int h = img->height();
+
+        // évite doublons : key = (y<<32) | x
+        std::unordered_map<std::uint64_t, PixelChange> map;
+        map.reserve(256);
+
+        auto record = [&](int x, int y)
+        {
+            if (x < 0 || y < 0 || x >= w || y >= h)
+                return;
+
+            const std::uint64_t key =
+                (static_cast<std::uint64_t>(static_cast<std::uint32_t>(y)) << 32) |
+                static_cast<std::uint32_t>(x);
+
+            auto it = map.find(key);
+            if (it == map.end())
+            {
+                PixelChange ch{};
+                ch.x = x;
+                ch.y = y;
+                ch.before = img->getPixel(x, y);
+                ch.after = params_.color;
+                map.emplace(key, ch);
+            }
+            else
+            {
+                // le pixel a déjà été touché pendant ce stroke : on met à jour after
+                it->second.after = params_.color;
+            }
+        };
+
+        if (points_.empty())
+            return;
+
+        if (points_.size() == 1)
+        {
+            record(points_[0].x, points_[0].y);
+        }
+        else
+        {
+            for (std::size_t i = 1; i < points_.size(); ++i)
+            {
+                rasterizeLine(points_[i - 1], points_[i], record);
+            }
+        }
+
+        changes_.reserve(map.size());
+        for (auto& kv : map)
+            changes_.push_back(kv.second);
+    }
+
+    Document* doc_{nullptr};
+    std::uint64_t layerId_{0};
+    app::ToolParams params_{};
+    ApplyFn apply_;
+    std::vector<common::Point> points_;
+    std::vector<PixelChange> changes_;
+    bool built_{false};
+};
 
 class AddLayerCommand final : public Command
 {
@@ -568,6 +705,68 @@ void AppService::mergeLayerDown(std::size_t from)
 
     apply(std::make_unique<MergeDownCommand>(doc_.get(), layer, static_cast<int>(from),
                                              &activeLayer_));
+}
+
+void AppService::beginStroke(const ToolParams& params, common::Point pStart)
+{
+    if (!doc_)
+        throw std::runtime_error("beginStroke: document is null");
+    if (currentStroke_)
+        throw std::logic_error("beginStroke: stroke already in progress");
+
+    const auto n = doc_->layerCount();
+    if (n == 0 || activeLayer_ >= n)
+        throw std::runtime_error("beginStroke: invalid active layer");
+
+    auto layer = doc_->layerAt(activeLayer_);
+    if (!layer)
+        throw std::runtime_error("beginStroke: active layer null");
+    if (layer->locked())
+        throw std::runtime_error("beginStroke: layer is locked");
+    if (!layer->image())
+        throw std::runtime_error("beginStroke: layer has no image");
+
+    const std::uint64_t layerId = layer->id();
+
+    ApplyFn applyFn = [doc = doc_.get()](std::uint64_t id, const std::vector<PixelChange>& changes,
+                                         bool useBefore)
+    {
+        if (!doc)
+            return;
+        const int idx = findLayerIndexById(*doc, id);
+        if (idx < 0)
+            return;
+
+        auto layer2 = doc->layerAt(static_cast<std::size_t>(idx));
+        if (!layer2 || !layer2->image())
+            return;
+        auto img = layer2->image();
+
+        for (const auto& ch : changes)
+        {
+            img->setPixel(ch.x, ch.y, useBefore ? ch.before : ch.after);
+        }
+    };
+
+    auto cmd = std::make_unique<StrokeCommand>(doc_.get(), layerId, params, std::move(applyFn));
+    cmd->addPoint(pStart);
+    currentStroke_ = std::move(cmd);
+}
+
+void AppService::moveStroke(common::Point p)
+{
+    if (!currentStroke_)
+        return;
+    auto* stroke = dynamic_cast<StrokeCommand*>(currentStroke_.get());
+    if (!stroke)
+        return;
+    stroke->addPoint(p);
+}
+void AppService::endStroke()
+{
+    if (!currentStroke_)
+        return;
+    apply(std::move(currentStroke_));
 }
 
 uint32_t AppService::pickColorAt(common::Point p) const

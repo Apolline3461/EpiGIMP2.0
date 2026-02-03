@@ -589,6 +589,38 @@ TEST(AppService_Signals, Selection_Clear_EmitsDocumentChangedOnce)
     EXPECT_EQ(hits, 1);
 }
 
+TEST(AppService_Signals, Stroke_End_Undo_Redo_EmitsOnceEach)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{6, 3}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    app::ToolParams tp{};
+    tp.color = 0xFF00FF00u;
+
+    const int before = hits;
+
+    app->beginStroke(tp, common::Point{1, 1});
+    app->moveStroke(common::Point{4, 1});
+
+    EXPECT_EQ(hits, before);
+
+    app->endStroke();  // commit -> +1
+    EXPECT_EQ(hits, before + 1);
+
+    app->undo();       // +1
+    app->redo();       // +1
+    EXPECT_EQ(hits, before + 3);
+}
+
+
 TEST(AppService_Picking, pickColorAt_ReadsPixelFromActiveLayer)
 {
     const auto app = makeApp();
@@ -669,3 +701,69 @@ TEST(AppService_Picking, pickColorAt_DoesNotAffectUndoRedo)
     EXPECT_EQ(app->canRedo(), beforeRedo);
 }
 
+TEST(AppService_Stroke, Stroke_DrawsPixels_AndIsUndoable)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{6, 3}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = common::colors::Transparent;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    app::ToolParams tp{};
+    tp.tool = app::ToolKind::Pencil;
+    tp.color = 0xFF112233u;
+
+    app->beginStroke(tp, common::Point{1, 1});
+    app->moveStroke(common::Point{4, 1});
+    app->endStroke();
+
+    auto img = app->document().layerAt(1)->image();
+    ASSERT_NE(img, nullptr);
+
+    // pixels (1..4,1) modifiés
+    for (int x = 1; x <= 4; ++x)
+        EXPECT_EQ(img->getPixel(x, 1), 0xFF112233u);
+
+    // undo
+    ASSERT_TRUE(app->canUndo());
+    app->undo();
+    for (int x = 1; x <= 4; ++x)
+        EXPECT_EQ(img->getPixel(x, 1), common::colors::Transparent);
+
+    ASSERT_TRUE(app->canRedo());
+    app->redo();
+    for (int x = 1; x <= 4; ++x)
+        EXPECT_EQ(img->getPixel(x, 1), 0xFF112233u);
+}
+
+TEST(AppService_Stroke, EndStroke_WithoutBegin_NoOp)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{3, 3}, 72.f);
+
+    EXPECT_FALSE(app->canUndo());
+    EXPECT_NO_THROW(app->endStroke());
+    EXPECT_FALSE(app->canUndo());
+}
+
+TEST(AppService_Stroke, MoveStroke_WithoutBegin_NoOp)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{3, 3}, 72.f);
+
+    EXPECT_NO_THROW(app->moveStroke(common::Point{1, 1}));
+    EXPECT_FALSE(app->canUndo());
+}
+
+TEST(AppService_Stroke, BeginStroke_OnLockedLayer_Throws)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{3, 3}, 72.f);
+
+    // active layer = 0 (Background locked)
+    app::ToolParams tp{};
+    EXPECT_THROW(app->beginStroke(tp, common::Point{0, 0}), std::runtime_error);
+}
