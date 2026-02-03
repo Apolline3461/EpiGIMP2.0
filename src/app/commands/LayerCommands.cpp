@@ -40,14 +40,23 @@ class AddLayerCommand final : public Command
     {
         if (!doc_ || !layer_)
             return;
+
 // GCC 15 false positive: warns about dangling pointer even though
 // removeLayer() takes size_t by value. Safe to suppress.
+#ifdef __GNUC__
+#ifndef __clang__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdangling-pointer"
+#endif
+#endif
         auto idx = findLayerIndexById(*doc_, layer_->id());
         if (idx.has_value())
             doc_->removeLayer(idx.value());
+#ifdef __GNUC__
+#ifndef __clang__
 #pragma GCC diagnostic pop
+#endif
+#endif
         clampActiveLayer(activeLayer_, doc_->layerCount());
     }
 
@@ -140,6 +149,7 @@ class SetLayerVisibleCommand final : public Command
 class SetLayerOpacityCommand final : public Command
 {
    public:
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     SetLayerOpacityCommand(Document* doc, std::uint64_t layerId, float before, float after)
         : doc_(doc), layerId_(layerId), before_(before), after_(after)
     {
@@ -180,6 +190,7 @@ class SetLayerOpacityCommand final : public Command
 class RemoveLayerCommand final : public Command
 {
    public:
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     RemoveLayerCommand(Document* doc, std::shared_ptr<Layer> removed, std::size_t index,
                        std::size_t* activeLayer)
         : doc_(doc), removed_(std::move(removed)), index_(index), activeLayer_(activeLayer)
@@ -226,6 +237,7 @@ class RemoveLayerCommand final : public Command
 class ReorderLayerCommand final : public Command
 {
    public:
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     ReorderLayerCommand(Document* doc, std::uint64_t layerId, std::size_t from, std::size_t to,
                         std::size_t* activeLayer)
         : doc_(doc), layerId_(layerId), from_(from), to_(to), activeLayer_(activeLayer)
@@ -281,6 +293,7 @@ class ReorderLayerCommand final : public Command
 class MergeDownCommand final : public Command
 {
    public:
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     MergeDownCommand(Document* doc, std::shared_ptr<Layer> removed, std::size_t from,
                      std::size_t* activeLayer)
         : doc_(doc), removed_(std::move(removed)), from_(from), activeLayer_(activeLayer)

@@ -398,7 +398,7 @@ std::vector<unsigned char> ZipEpgStorage::composePreviewRGBA(const Document& doc
                 int const srcX = std::min(
                     img.width() - 1, std::max(0, static_cast<int>(static_cast<float>(px) / scale)));
 
-                const size_t dstIdx = (py * w + px) * 4;
+                const size_t dstIdx = static_cast<size_t>(py * w + px) * 4;
                 const size_t srcIdx = srcY * img.strideBytes() + srcX * 4;
 
                 const unsigned char sr = img.data()[srcIdx + 0];
@@ -565,7 +565,7 @@ std::vector<unsigned char> ZipEpgStorage::composeFlattenedRGBA(const Document& d
             for (int x = 0; x < static_cast<int>(docW) && x < img.width(); ++x)
             {
                 size_t const dstIdx = (y * docW + x) * 4;
-                size_t const srcIdx = (y * img.width() + x) * 4;
+                size_t const srcIdx = static_cast<size_t>(y * img.width() + x) * 4;
 
                 float const alpha =
                     (static_cast<float>(img.data()[srcIdx + 3]) / 255.0f) * layerPtr->opacity();

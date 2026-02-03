@@ -4,7 +4,7 @@
 #include "core/Document.hpp"
 
 #include "core/Layer.hpp"
-
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 Document::Document(const int width, const int height, const float dpi)
     : width_{width}, height_{height}, dpi_{dpi}
 {
@@ -57,7 +57,7 @@ size_t Document::addLayer(std::shared_ptr<Layer> layer, const size_t idx)
     if (idx > layers_.size())
         return -1;
 
-    layers_.insert(layers_.begin() + idx, std::move(layer));
+    layers_.insert(layers_.begin() + static_cast<std::ptrdiff_t>(idx), std::move(layer));
     return idx;
 }
 
@@ -66,7 +66,7 @@ void Document::removeLayer(size_t idx)
     const auto size = layers_.size();
     if (idx >= size)
         return;
-    layers_.erase(layers_.begin() + idx);
+    layers_.erase(layers_.begin() + static_cast<std::ptrdiff_t>(idx));
 }
 
 void Document::reorderLayer(size_t from, size_t to)
@@ -77,10 +77,10 @@ void Document::reorderLayer(size_t from, size_t to)
         return;
 
     auto tmpLayer = layers_[from];
-    layers_.erase(layers_.begin() + from);
+    layers_.erase(layers_.begin() + static_cast<std::ptrdiff_t>(from));
     if (to > layers_.size())
         to = layers_.size();
-    layers_.insert(layers_.begin() + to, std::move(tmpLayer));
+    layers_.insert(layers_.begin() + static_cast<std::ptrdiff_t>(to), std::move(tmpLayer));
 }
 
 void Document::mergeDown(const size_t from)
@@ -89,5 +89,5 @@ void Document::mergeDown(const size_t from)
 
     if (from <= 0 || from >= size)
         return;
-    layers_.erase(layers_.begin() + from);
+    layers_.erase(layers_.begin() + static_cast<std::ptrdiff_t>(from));
 }

@@ -10,7 +10,7 @@
 namespace app
 {
 
-enum class ToolKind
+enum class ToolKind : std::uint8_t
 {
     Pencil,
 };

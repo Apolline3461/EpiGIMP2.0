@@ -128,6 +128,7 @@ void AppService::setLayerVisible(std::size_t idx, bool visible)
     apply(commands::makeSetLayerVisibleCommand(doc_.get(), layer->id(), layer->visible(), visible));
 }
 
+// NOLINT(bugprone-easily-swappable-parameters)
 void AppService::setLayerOpacity(std::size_t idx, float alpha)
 {
     if (!doc_)

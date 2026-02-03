@@ -14,12 +14,14 @@
 
 class Document;
 
-namespace app::command
-{
-class StrokeCommand;
-}
 namespace app
 {
+namespace commands
+{
+class StrokeCommand;
+
+}
+
 struct Size
 {
     int w;
