@@ -290,7 +290,7 @@ uint32_t AppService::pickColorAt(common::Point p) const
     if (!doc_)
         throw std::runtime_error("pickColorAt: document is null");
     const auto n = doc_->layerCount();
-    if (n <= 0)
+    if (n == 0)
         return common::colors::Transparent;
     if (activeLayer_ >= n)
         return common::colors::Transparent;

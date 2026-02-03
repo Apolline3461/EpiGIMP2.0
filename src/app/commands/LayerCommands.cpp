@@ -84,7 +84,7 @@ class SetLayerLockedCommand final : public Command
     }
 
    private:
-    void set(bool v)
+    void set(bool v) const
     {
         if (!doc_)
             return;
@@ -124,7 +124,7 @@ class SetLayerVisibleCommand final : public Command
     }
 
    private:
-    void set(bool v)
+    void set(bool v) const
     {
         if (!doc_)
             return;
@@ -165,7 +165,7 @@ class SetLayerOpacityCommand final : public Command
     }
 
    private:
-    void set(float v)
+    void set(float v) const
     {
         if (!doc_)
             return;

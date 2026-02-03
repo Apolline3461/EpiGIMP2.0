@@ -35,19 +35,20 @@ class ZipHandle
             zip_close(z_);
     }
 
-    ZipHandle(ZipHandle&& o) noexcept : z_(o.z_)
+    ZipHandle(ZipHandle&& o) noexcept : z_(o.z_), keepAlive_(std::move(o.keepAlive_))
     {
         o.z_ = nullptr;
     }
     ZipHandle& operator=(ZipHandle&& o) noexcept
     {
-        if (this != &o)
-        {
-            if (z_)
-                zip_close(z_);
-            z_ = o.z_;
-            o.z_ = nullptr;
-        }
+        if (this == &o)
+            return *this;
+        if (z_)
+            zip_close(z_);
+        z_ = o.z_;
+        keepAlive_ = std::move(o.keepAlive_);
+
+        o.z_ = nullptr;
         return *this;
     }
 

@@ -86,7 +86,7 @@ void Document::mergeDown(const size_t from)
 {
     const auto size = layers_.size();
 
-    if (from <= 0 || from >= size)
+    if (from == 0 || from >= size)
         return;
     layers_.erase(layers_.begin() + static_cast<std::ptrdiff_t>(from));
 }

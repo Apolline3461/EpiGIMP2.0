@@ -131,8 +131,8 @@ void StrokeCommand::buildChanges()
     }
 
     changes_.reserve(map.size());
-    for (auto& kv : map)
-        changes_.push_back(kv.second);
+    std::ranges::transform(map, std::back_inserter(changes_),
+                           [](auto const& kv) { return kv.second; });
 }
 
 }  // namespace app::commands

@@ -16,7 +16,7 @@ class Signal
     }
     void emit()
     {
-        for (auto& s : slots_)
+        for (const auto& s : slots_)
             s();
     }
 
