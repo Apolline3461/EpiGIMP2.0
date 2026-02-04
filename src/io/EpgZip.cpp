@@ -42,7 +42,7 @@ std::vector<unsigned char> ZipEpgStorage::readFileFromZip(zip_t* zip,
     }
 
     std::vector<unsigned char> data;
-    data.resize(static_cast<size_t>(st.size));
+    data.resize(st.size);
     zip_int64_t const read = zip_fread(zf, data.data(), st.size);
     if (read < 0 || static_cast<zip_uint64_t>(read) != st.size)
     {
@@ -185,7 +185,7 @@ ZipEpgStorage::Manifest ZipEpgStorage::createManifestFromDocument(const Document
     m.metadata.modifiedUtc = now;
 
     // Layers
-    for (int i = 0; i < doc.layerCount(); ++i)
+    for (size_t i = 0; i < doc.layerCount(); ++i)
     {
         std::string const layerId = formatLayerId(i);
         ManifestLayer L;
@@ -279,11 +279,11 @@ void ZipEpgStorage::writeLayersToZip(ZipHandle& zipHandle, Manifest& m, const Do
     {
         auto& L = m.layers[i];
 
-        if (static_cast<int>(i) >= doc.layerCount())
+        if (i >= doc.layerCount())
             throw std::runtime_error(
                 "Incohérence: nombre de calques différent entre Document et Manifest");
 
-        const auto layerPtr = doc.layerAt(static_cast<int>(i));
+        const auto layerPtr = doc.layerAt(i);
         if (!layerPtr->image())
             throw std::runtime_error("Layer " + layerPtr->name() + " n'a pas de pixels");
 
@@ -365,12 +365,8 @@ std::vector<unsigned char> ZipEpgStorage::composePreviewRGBA(const Document& doc
     const int docW = doc.width();
     const int docH = doc.height();
 
-    if (docW <= 0 || docH <= 0)
-    {
-        outW = 0;
-        outH = 0;
+    if (docW == 0 || docH == 0)
         return {};
-    }
 
     int const pW = std::min(previewMax, docW);
     int const pH = std::min(previewMax, docH);
@@ -384,7 +380,7 @@ std::vector<unsigned char> ZipEpgStorage::composePreviewRGBA(const Document& doc
 
     std::vector<unsigned char> preview(static_cast<size_t>(w) * static_cast<size_t>(h) * 4u, 0);
 
-    for (int i = 0; i < doc.layerCount(); ++i)
+    for (size_t i = 0; i < doc.layerCount(); ++i)
     {
         auto layerPtr = doc.layerAt(i);
         if (!layerPtr || !layerPtr->visible() || !layerPtr->image())
@@ -402,8 +398,8 @@ std::vector<unsigned char> ZipEpgStorage::composePreviewRGBA(const Document& doc
                 int const srcX = std::min(
                     img.width() - 1, std::max(0, static_cast<int>(static_cast<float>(px) / scale)));
 
-                const int dstIdx = (py * w + px) * 4;
-                const int srcIdx = srcY * img.strideBytes() + srcX * 4;
+                const size_t dstIdx = static_cast<size_t>(py * w + px) * 4;
+                const size_t srcIdx = srcY * img.strideBytes() + srcX * 4;
 
                 const unsigned char sr = img.data()[srcIdx + 0];
                 const unsigned char sg = img.data()[srcIdx + 1];
@@ -534,7 +530,7 @@ void ZipEpgStorage::save(const Document& doc, const std::string& path)
 
 // ----------------- EXPORT PNG --------------------------------------------
 
-void ZipEpgStorage::exportPng(const Document& doc, const std::string& path)
+void ZipEpgStorage::exportImage(const Document& doc, const std::string& path)
 {
     if (doc.layerCount() == 0)
         throw std::runtime_error("Document vide, impossible d'exporter");
@@ -550,26 +546,26 @@ void ZipEpgStorage::exportPng(const Document& doc, const std::string& path)
 
 std::vector<unsigned char> ZipEpgStorage::composeFlattenedRGBA(const Document& doc) const
 {
-    const int docW = doc.width();
-    const int docH = doc.height();
+    const size_t docW = doc.width();
+    const size_t docH = doc.height();
 
     if (docW <= 0 || docH <= 0)
         return {};
 
-    std::vector<unsigned char> out(static_cast<size_t>(docW) * static_cast<size_t>(docH) * 4u, 0);
-    for (int i = 0; i < doc.layerCount(); ++i)
+    std::vector<unsigned char> out(docW * docH * 4u, 0);
+    for (size_t i = 0; i < doc.layerCount(); ++i)
     {
         auto layerPtr = doc.layerAt(i);
         if (!layerPtr || !layerPtr->visible() || !layerPtr->image())
             continue;
         const ImageBuffer& img = *layerPtr->image();
 
-        for (int y = 0; y < docH && y < img.height(); ++y)
+        for (int y = 0; y < static_cast<int>(docH) && y < img.height(); ++y)
         {
-            for (int x = 0; x < docW && x < img.width(); ++x)
+            for (int x = 0; x < static_cast<int>(docW) && x < img.width(); ++x)
             {
-                int const dstIdx = (y * docW + x) * 4;
-                int const srcIdx = (y * img.width() + x) * 4;
+                size_t const dstIdx = (y * docW + x) * 4;
+                size_t const srcIdx = static_cast<size_t>(y * img.width() + x) * 4;
 
                 float const alpha =
                     (static_cast<float>(img.data()[srcIdx + 3]) / 255.0f) * layerPtr->opacity();

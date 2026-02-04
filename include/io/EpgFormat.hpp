@@ -43,7 +43,7 @@ class ZipEpgStorage : public IStorage
     // Interface IStorage-like methods
     OpenResult open(const std::string& path) override;
     void save(const Document& doc, const std::string& path) override;
-    void exportPng(const Document& doc, const std::string& path) override;
+    void exportImage(const Document& doc, const std::string& path) override;
 
     // Helpers (made public for unit testing)
     Manifest loadManifestFromZip(zip_t* zipHandle) const;
