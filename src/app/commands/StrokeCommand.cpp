@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <iterator>
 #include <unordered_map>
 
 #include "app/commands/CommandUtils.hpp"
@@ -130,9 +131,10 @@ void StrokeCommand::buildChanges()
             rasterizeLine(points_[i - 1], points_[i], record);
     }
 
+    changes_.clear();
     changes_.reserve(map.size());
-    std::ranges::transform(map, std::back_inserter(changes_),
-                           [](auto const& kv) { return kv.second; });
-}
 
+    std::transform(map.begin(), map.end(), std::back_inserter(changes_),
+                   [](const auto& kv) { return kv.second; });
+}
 }  // namespace app::commands
