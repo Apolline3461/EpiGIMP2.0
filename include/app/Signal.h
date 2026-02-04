@@ -14,7 +14,7 @@ class Signal
     {
         slots_.push_back(std::move(s));
     }
-    void emit() const
+    void notify() const
     {
         for (const auto& s : slots_)
             s();

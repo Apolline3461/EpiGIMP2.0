@@ -61,24 +61,29 @@ void ImageActions::newImage(MainWindow* window)
 
     if (dialog.exec() == QDialog::Accepted)
     {
+        if (!window->myApp_)
+            return;
+        std::uint32_t bg = 0xFFFFFFFFu;
+
         int width = widthSpinBox->value();
         int height = heightSpinBox->value();
 
-        window->m_currentImage = QImage(width, height, QImage::Format_ARGB32);
-        window->m_currentImage.fill(Qt::white);
-        window->m_currentFileName.clear();
+        window->myApp_->newDocument(app::Size{width, height}, 72.f, bg);
 
+        window->m_currentFileName.clear();
         window->updateImageDisplay();
         window->m_scrollArea->setVisible(true);
 
-        QString message = QObject::tr("Nouvelle image créée: %1x%2").arg(width).arg(height);
-        window->statusBar()->showMessage(message);
+        window->statusBar()->showMessage(
+            QObject::tr("Nouvelle image créée: %1x%2").arg(width).arg(height));
         window->setWindowTitle(QObject::tr("Sans titre - EpiGimp 2.0"));
     }
 }
 
 void ImageActions::openImage(MainWindow* window)
 {
+    if (!window->myApp_)
+        return;
     QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
 
     QString fileName = QFileDialog::getOpenFileName(
@@ -102,7 +107,26 @@ void ImageActions::openImage(MainWindow* window)
         return;
     }
 
-    window->m_currentImage = image;
+    QImage img = image.convertToFormat(QImage::Format_ARGB32);
+
+    std::vector<std::uint32_t> pixels;
+    pixels.resize(static_cast<std::size_t>(img.width() * img.height()));
+    for (int y = 0; y < img.height(); ++y)
+    {
+        for (int x = 0; x < img.width(); ++x)
+        {
+            const QRgb px = img.pixel(x, y);
+            const std::uint32_t r = static_cast<std::uint32_t>(qRed(px));
+            const std::uint32_t g = static_cast<std::uint32_t>(qGreen(px));
+            const std::uint32_t b = static_cast<std::uint32_t>(qBlue(px));
+            const std::uint32_t a = static_cast<std::uint32_t>(qAlpha(px));
+            // ton format core: 0xRRGGBBAA
+            pixels[static_cast<std::size_t>(y * img.width() + x)] =
+                (r << 24) | (g << 16) | (b << 8) | a;
+        }
+    }
+    window->myApp_->loadRasterAsNewDocument(app::Size{img.width(), img.height()}, 72.f, pixels);
+
     window->m_currentFileName = fileName;
 
     window->updateImageDisplay();
@@ -185,6 +209,8 @@ void ImageActions::saveImage(MainWindow* window)
 
 void ImageActions::closeImage(MainWindow* window)
 {
+    if (window->myApp_)
+        window->myApp_->closeDocument();
     window->m_currentImage = QImage();
     window->m_currentFileName.clear();
     window->m_imageLabel->clear();

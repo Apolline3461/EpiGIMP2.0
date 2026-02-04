@@ -33,7 +33,7 @@ struct LayerSpec
     std::uint32_t color = 0xFFFFFFFFU;
     std::string name = "Layer ";
     bool visible = true;
-    bool locked = true;
+    bool locked = false;
     float opacity = 1.F;
 };
 
@@ -44,8 +44,12 @@ class AppService
     ~AppService() = default;
 
     const Document& document() const;
+    bool hasDocument() const noexcept;
+    void closeDocument();
 
-    void newDocument(Size size, float dpi);
+    void newDocument(Size size, float dpi, std::uint32_t bgColor = common::colors::White);
+    void loadRasterAsNewDocument(Size size, float dpi,
+                                 const std::vector<std::uint32_t>& pixelsRRGGBBAA);
     void open(const std::string& path);
     void save(const std::string& path);
     void exportImage(const std::string& path);
@@ -65,6 +69,7 @@ class AppService
     void moveStroke(common::Point p);
     void endStroke();
     uint32_t pickColorAt(common::Point p) const;
+    bool bucketFillAt(common::Point p, std::uint32_t rgba);
 
     const Selection& selection() const;
     void setSelectionRect(common::Rect r);

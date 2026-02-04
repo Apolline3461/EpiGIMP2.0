@@ -14,9 +14,9 @@
 #include <QScrollArea>
 #include <QString>
 
-#include "app/History.hpp"
+#include <memory>
 
-#include <core/Selection.hpp>
+#include "app/AppService.hpp"
 
 // Définitions pour les analyseurs (clangd) qui ne connaissent pas la
 // macro `slots`. Ne pas redéfinir pour `moc`.
@@ -36,7 +36,7 @@ class MainWindow : public QMainWindow
 
    public:
     explicit MainWindow(QWidget* parent = nullptr);
-    ~MainWindow() = default;
+    ~MainWindow() override = default;
 
    private slots:
     void zoomIn();
@@ -51,6 +51,9 @@ class MainWindow : public QMainWindow
     void openEpg();
     void saveAsEpg();
 
+    void undo();
+    void redo();
+
    private:
     void createActions();
     void createMenus();
@@ -62,6 +65,17 @@ class MainWindow : public QMainWindow
     bool eventFilter(QObject* watched, QEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void keyReleaseEvent(QKeyEvent* event) override;
+
+    static common::Point toCommonPoint(const QPoint& p)
+    {
+        return common::Point{p.x(), p.y()};
+    }
+    static common::Rect toCommonRect(const QRect& r)
+    {
+        return common::Rect{r.x(), r.y(), r.width(), r.height()};
+    }
+
+    std::unique_ptr<app::AppService> myApp_;
 
     // Membres internes
     ImageLabel* m_imageLabel;
@@ -98,13 +112,9 @@ class MainWindow : public QMainWindow
     QAction* m_colorPickerAct;
     QColor m_bucketColor{Qt::black};
 
-    // Sélection active pour l'image
-    Selection m_selection;
-    // remplissage pot de peinture
     void bucketFillAt(const QPoint& viewportPos);
     void updateColorPickerIcon();
-    // Historique des commandes (undo/redo)
-    app::History m_history{128};
+
     QAction* m_undoAct{nullptr};
     QAction* m_redoAct{nullptr};
 };

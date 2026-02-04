@@ -18,15 +18,86 @@
 #include <QStatusBar>
 #include <QToolBar>
 
+#include <algorithm>
+#include <cmath>
 #include <vector>
 
-#include "app/Command.hpp"
-#include "core/BucketFill.hpp"
-#include "core/ImageBuffer.hpp"
+#include "core/Document.hpp"
 #include "core/Layer.hpp"
-#include "io/EpgFormat.hpp"
-#include "io/EpgJson.hpp"
 #include "ui/image.hpp"
+
+#include <io/EpgFormat.hpp>
+
+namespace
+{
+static inline int clamp255(int v)
+{
+    return std::max(0, std::min(255, v));
+}
+
+static QImage renderFlattened(const Document& doc)
+{
+    const int w = doc.width();
+    const int h = doc.height();
+    if (w <= 0 || h <= 0)
+        return QImage();
+
+    QImage out(w, h, QImage::Format_ARGB32);
+    out.fill(qRgba(0, 0, 0, 0));
+
+    for (std::size_t li = 0; li < doc.layerCount(); ++li)
+    {
+        auto layer = doc.layerAt(li);
+        if (!layer || !layer->visible() || !layer->image())
+            continue;
+
+        const ImageBuffer& img = *layer->image();
+        const float opacity = layer->opacity();
+
+        for (int y = 0; y < h && y < img.height(); ++y)
+        {
+            QRgb* line = reinterpret_cast<QRgb*>(out.scanLine(y));
+            for (int x = 0; x < w && x < img.width(); ++x)
+            {
+                const uint32_t src = img.getPixel(x, y);  // 0xRRGGBBAA
+                const int sr = (src >> 24) & 0xFF;
+                const int sg = (src >> 16) & 0xFF;
+                const int sb = (src >> 8) & 0xFF;
+                const int sa8 = (src) & 0xFF;
+
+                const float sa = (sa8 / 255.0f) * opacity;
+                if (sa <= 0.0f)
+                    continue;
+
+                const QRgb dst = line[x];
+                const float da = qAlpha(dst) / 255.0f;
+
+                const float outA = sa + da * (1.0f - sa);
+                if (outA <= 0.0f)
+                {
+                    line[x] = qRgba(0, 0, 0, 0);
+                    continue;
+                }
+
+                const float dr = qRed(dst);
+                const float dg = qGreen(dst);
+                const float db = qBlue(dst);
+
+                const float outR = (sr * sa + dr * da * (1.0f - sa)) / outA;
+                const float outG = (sg * sa + dg * da * (1.0f - sa)) / outA;
+                const float outB = (sb * sa + db * da * (1.0f - sa)) / outA;
+
+                line[x] = qRgba(clamp255(static_cast<int>(std::round(outR))),
+                                clamp255(static_cast<int>(std::round(outG))),
+                                clamp255(static_cast<int>(std::round(outB))),
+                                clamp255(static_cast<int>(std::round(outA * 255.0f))));
+            }
+        }
+    }
+
+    return out;
+}
+}  // namespace
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -49,7 +120,19 @@ MainWindow::MainWindow(QWidget* parent)
     m_scrollArea->setWidgetResizable(false);
 
     setCentralWidget(m_scrollArea);
+    myApp_ = std::make_unique<app::AppService>(std::make_unique<ZipEpgStorage>());
 
+    myApp_->documentChanged.connect(
+        [this]()
+        {
+            updateImageDisplay();
+
+            // refresh undo/redo enabled state
+            if (m_undoAct)
+                m_undoAct->setEnabled(myApp_->canUndo());
+            if (m_redoAct)
+                m_redoAct->setEnabled(myApp_->canRedo());
+        });
     // Création de l'interface
     createActions();
     createMenus();
@@ -90,12 +173,18 @@ void MainWindow::createActions()
     m_newAct = new QAction(tr("&Nouveau..."), this);
     m_newAct->setShortcut(QKeySequence::New);
     m_newAct->setStatusTip(tr("Créer une nouvelle image"));
-    connect(m_newAct, &QAction::triggered, [this]() { ImageActions::newImage(this); });
+    connect(m_newAct, &QAction::triggered, this,
+            [this]()
+            {
+                if (!myApp_)
+                    return;
+                ImageActions::newImage(this);
+            });
 
     m_openAct = new QAction(tr("&Ouvrir..."), this);
     m_openAct->setShortcut(QKeySequence::Open);
     m_openAct->setStatusTip(tr("Ouvrir une image existante"));
-    connect(m_openAct, &QAction::triggered, [this]() { ImageActions::openImage(this); });
+    connect(m_openAct, &QAction::triggered, this, [this]() { ImageActions::openImage(this); });
 
     m_saveAct = new QAction(tr("&Enregistrer sous..."), this);
     m_saveAct->setShortcut(QKeySequence::SaveAs);
@@ -118,40 +207,14 @@ void MainWindow::createActions()
     m_undoAct->setStatusTip(tr("Annuler la dernière action"));
     m_undoAct->setIcon(QIcon(":/icons/undo.svg"));
     m_undoAct->setEnabled(false);
-    connect(m_undoAct, &QAction::triggered,
-            [this]()
-            {
-                if (m_history.canUndo())
-                {
-                    m_history.undo();
-                    updateImageDisplay();
-                    statusBar()->showMessage(tr("Annuler"), 1000);
-                    if (m_undoAct)
-                        m_undoAct->setEnabled(m_history.canUndo());
-                    if (m_redoAct)
-                        m_redoAct->setEnabled(m_history.canRedo());
-                }
-            });
+    connect(m_undoAct, &QAction::triggered, this, &MainWindow::undo);
 
     m_redoAct = new QAction(tr("&Rétablir"), this);
     m_redoAct->setShortcut(QKeySequence::Redo);
     m_redoAct->setStatusTip(tr("Rétablir la dernière action annulée"));
     m_redoAct->setIcon(QIcon(":/icons/redo.svg"));
     m_redoAct->setEnabled(false);
-    connect(m_redoAct, &QAction::triggered,
-            [this]()
-            {
-                if (m_history.canRedo())
-                {
-                    m_history.redo();
-                    updateImageDisplay();
-                    statusBar()->showMessage(tr("Rétablir"), 1000);
-                    if (m_undoAct)
-                        m_undoAct->setEnabled(m_history.canUndo());
-                    if (m_redoAct)
-                        m_redoAct->setEnabled(m_history.canRedo());
-                }
-            });
+    connect(m_redoAct, &QAction::triggered, this, &MainWindow::redo);
 
     // Fichiers EPG
     m_openEpgAct = new QAction(tr("Ouvrir un fichier &EPG..."), this);
@@ -290,16 +353,31 @@ void MainWindow::resetZoom()
 
 void MainWindow::updateImageDisplay()
 {
-    if (!m_currentImage.isNull())
+    if (!myApp_ || !myApp_->hasDocument())
     {
-        QPixmap pixmap = QPixmap::fromImage(m_currentImage);
-        QSize scaledSize = pixmap.size() * m_scaleFactor;
-        m_imageLabel->setPixmap(
-            pixmap.scaled(scaledSize, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-        m_imageLabel->adjustSize();
-
-        statusBar()->showMessage(tr("Zoom: %1%").arg(static_cast<int>(m_scaleFactor * 100)), 2000);
+        m_scrollArea->setVisible(false);
+        m_imageLabel->clear();
+        return;
     }
+    try
+    {
+        m_currentImage = renderFlattened(myApp_->document());
+    }
+    catch (...)
+    {
+        return;
+    }
+    if (m_currentImage.isNull())
+        return;
+    QPixmap pixmap = QPixmap::fromImage(m_currentImage);
+    QSize scaledSize = pixmap.size() * m_scaleFactor;
+
+    m_imageLabel->setPixmap(
+        pixmap.scaled(scaledSize, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    m_imageLabel->adjustSize();
+
+    statusBar()->showMessage(tr("Zoom: %1%").arg(static_cast<int>(m_scaleFactor * 100)), 2000);
+    m_scrollArea->setVisible(true);
 }
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
@@ -449,7 +527,7 @@ void MainWindow::setScaleAndCenter(double newScale)
 
 void MainWindow::saveAsEpg()
 {
-    if (m_currentImage.isNull())
+    if (!myApp_)
     {
         QMessageBox::information(this, tr("Information"), tr("Aucune image à sauvegarder."));
         return;
@@ -465,41 +543,14 @@ void MainWindow::saveAsEpg()
     if (!fileName.endsWith(".epg", Qt::CaseInsensitive))
         fileName += ".epg";
 
-    // convert QImage -> ImageBuffer
-    ImageBuffer buf(m_currentImage.width(), m_currentImage.height());
-    for (int y = 0; y < m_currentImage.height(); ++y)
-    {
-        for (int x = 0; x < m_currentImage.width(); ++x)
-        {
-            const QRgb p = m_currentImage.pixel(x, y);
-            const uint8_t r = qRed(p);
-            const uint8_t g = qGreen(p);
-            const uint8_t bch = qBlue(p);
-            const uint8_t a = qAlpha(p);
-            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
-                                  (static_cast<uint32_t>(g) << 16) |
-                                  (static_cast<uint32_t>(bch) << 8) | static_cast<uint32_t>(a);
-            buf.setPixel(x, y, rgba);
-        }
-    }
-
-    // Build a Document with a single layer and save using ZipEpgStorage
-    Document doc(buf.width(), buf.height(), 72.f);
-
     try
     {
-        auto imgPtr = std::make_shared<ImageBuffer>(buf);
-        auto layer =
-            std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
-        doc.addLayer(layer);
-
-        ZipEpgStorage storage;
-        storage.save(doc, fileName.toStdString());
+        myApp_->save(fileName.toStdString());
     }
     catch (const std::exception& e)
     {
         QMessageBox::critical(this, tr("Erreur"),
-                              tr("Impossible de sauvegarder le fichier EPG %1.\n%2")
+                              tr("Impossible de sauvegarder %1.\n%2")
                                   .arg(QDir::toNativeSeparators(fileName))
                                   .arg(QString::fromLocal8Bit(e.what())));
         return;
@@ -507,6 +558,21 @@ void MainWindow::saveAsEpg()
 
     m_currentFileName = fileName;
     statusBar()->showMessage(tr("Fichier EPG sauvegardé: %1").arg(fileName), 3000);
+}
+void MainWindow::undo()
+{
+    if (!myApp_)
+        return;
+    myApp_->undo();
+    statusBar()->showMessage(tr("Annuler"), 1000);
+}
+
+void MainWindow::redo()
+{
+    if (!myApp_)
+        return;
+    myApp_->redo();
+    statusBar()->showMessage(tr("Rétablir"), 1000);
 }
 
 void MainWindow::openEpg()
@@ -516,52 +582,21 @@ void MainWindow::openEpg()
         QFileDialog::getOpenFileName(this, tr("Ouvrir un fichier EpiGimp"), currentPath,
                                      tr("EpiGimp (*.epg);;Tous les fichiers (*)"));
 
-    if (fileName.isEmpty())
+    if (fileName.isEmpty() || !myApp_)
         return;
-
-    ZipEpgStorage storage;
-    const auto res = storage.open(fileName.toStdString());
-    if (!res.success || !res.document)
+    try
     {
-        const QString err = QString::fromLocal8Bit(
-            res.errorMessage.empty() ? "Erreur inconnue" : res.errorMessage.c_str());
+        myApp_->open(fileName.toStdString());
+    }
+    catch (const std::exception& e)
+    {
         QMessageBox::critical(this, tr("Erreur"),
-                              tr("Impossible de charger le fichier EPG %1\n%2")
+                              tr("Impossible de charger %1\n%2")
                                   .arg(QDir::toNativeSeparators(fileName))
-                                  .arg(err));
+                                  .arg(QString::fromLocal8Bit(e.what())));
         return;
     }
 
-    const Document& doc = *res.document;
-    if (doc.layerCount() == 0)
-    {
-        QMessageBox::critical(this, tr("Erreur"), tr("Le document ne contient pas d'image."));
-        return;
-    }
-
-    const auto firstLayer = doc.layerAt(0);
-    if (!firstLayer || !firstLayer->image())
-    {
-        QMessageBox::critical(this, tr("Erreur"), tr("Le document ne contient pas d'image."));
-        return;
-    }
-    const ImageBuffer& ib = *firstLayer->image();
-
-    QImage img(ib.width(), ib.height(), QImage::Format_ARGB32);
-    for (int y = 0; y < ib.height(); ++y)
-    {
-        for (int x = 0; x < ib.width(); ++x)
-        {
-            const uint32_t rgba = ib.getPixel(x, y);
-            const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
-            const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
-            const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
-            const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
-            img.setPixel(x, y, qRgba(r, g, b, a));
-        }
-    }
-
-    m_currentImage = img;
     m_currentFileName = fileName;
     updateImageDisplay();
     m_scrollArea->setVisible(true);
@@ -573,34 +608,35 @@ void MainWindow::openEpg()
 
     statusBar()->showMessage(message);
     setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
+    auto l = myApp_->document().layerAt(myApp_->activeLayer());
+    qDebug() << "activeLayer" << myApp_->activeLayer() << "locked" << (l ? l->locked() : -1)
+             << "visible" << (l ? l->visible() : -1);
 }
 
 void MainWindow::onMouseSelection(const QRect& rect)
 {
-    // rect is in widget space, need to transform to image space
-    if (m_currentImage.isNull())
+    if (!myApp_)
         return;
 
-    // Validate scale factor (should be between 0.1 and 5.0 as per scaleImage())
     if (m_scaleFactor < 0.1)
         return;
 
-    // Transform from widget space to image space by dividing by scale factor
-    // Use rounding for better precision instead of truncation
     QRect imageSpaceRect(static_cast<int>(std::round(rect.x() / m_scaleFactor)),
                          static_cast<int>(std::round(rect.y() / m_scaleFactor)),
                          static_cast<int>(std::round(rect.width() / m_scaleFactor)),
                          static_cast<int>(std::round(rect.height() / m_scaleFactor)));
 
-    auto ref = std::make_shared<ImageBuffer>(m_currentImage.width(), m_currentImage.height());
-    // Replace previous selection by default (don't accumulate multiple rects)
-    m_selection.clear();
-    Selection::Rect selRect{imageSpaceRect.x(), imageSpaceRect.y(), imageSpaceRect.width(),
-                            imageSpaceRect.height()};
-    m_selection.addRect(selRect, ref);
+    try
+    {
+        myApp_->setSelectionRect(toCommonRect(imageSpaceRect));
+    }
+    catch (const std::exception&)
+    {
+        return;
+    }
+
     if (m_imageLabel)
         m_imageLabel->setSelectionRect(rect);
-    updateImageDisplay();
 }
 
 void MainWindow::updateColorPickerIcon()
@@ -622,10 +658,11 @@ void MainWindow::updateColorPickerIcon()
 
 void MainWindow::clearSelection()
 {
-    m_selection.clear();
+    if (!myApp_)
+        return;
+    myApp_->clearSelectionRect();
     if (m_imageLabel)
         m_imageLabel->clearSelectionRect();
-    updateImageDisplay();
 }
 
 void MainWindow::toggleSelectionMode(bool enabled)
@@ -644,7 +681,7 @@ void MainWindow::toggleSelectionMode(bool enabled)
 
 void MainWindow::bucketFillAt(const QPoint& viewportPos)
 {
-    if (m_currentImage.isNull())
+    if (!myApp_ || m_currentImage.isNull())
         return;
 
     // Calculer la position dans l'image en tenant compte du zoom et des scrollbars
@@ -656,97 +693,26 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
 
     if (imgX < 0 || imgX >= m_currentImage.width() || imgY < 0 || imgY >= m_currentImage.height())
         return;
-
-    // Build working buffer directly from current image
-    ImageBuffer workingBuffer(m_currentImage.width(), m_currentImage.height());
-    for (int y = 0; y < m_currentImage.height(); ++y)
+    const std::uint32_t newColor = (static_cast<std::uint32_t>(m_bucketColor.red()) << 24) |
+                                   (static_cast<std::uint32_t>(m_bucketColor.green()) << 16) |
+                                   (static_cast<std::uint32_t>(m_bucketColor.blue()) << 8) |
+                                   static_cast<std::uint32_t>(m_bucketColor.alpha());
+    bool changed = false;
+    try
     {
-        for (int x = 0; x < m_currentImage.width(); ++x)
-        {
-            const QRgb p = m_currentImage.pixel(x, y);
-            const uint8_t r = qRed(p);
-            const uint8_t g = qGreen(p);
-            const uint8_t b = qBlue(p);
-            const uint8_t a = qAlpha(p);
-            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
-                                  (static_cast<uint32_t>(g) << 16) |
-                                  (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
-            workingBuffer.setPixel(x, y, rgba);
-        }
+        changed = myApp_->bucketFillAt(common::Point{imgX, imgY}, newColor);
+    }
+    catch (const std::exception& e)
+    {
+        QMessageBox::critical(this, tr("Erreur"), QString::fromLocal8Bit(e.what()));
+        return;
     }
 
-    const uint32_t newColor = (static_cast<uint32_t>(m_bucketColor.red()) << 24) |
-                              (static_cast<uint32_t>(m_bucketColor.green()) << 16) |
-                              (static_cast<uint32_t>(m_bucketColor.blue()) << 8) |
-                              static_cast<uint32_t>(m_bucketColor.alpha());
-
-    // Perform flood fill and get changed pixels directly
-    std::vector<std::tuple<int, int, uint32_t>> changedPixels;
-    if (m_selection.hasMask())
-    {
-        if (m_selection.t_at(imgX, imgY) != 0)
-        {
-            changedPixels = core::floodFillWithinMaskTracked(workingBuffer, *m_selection.mask(),
-                                                             imgX, imgY, core::Color{newColor});
-        }
-        else
-        {
-            statusBar()->showMessage(tr("Clic hors de la sélection — aucun remplissage"), 2000);
-            return;
-        }
-    }
-    else
-    {
-        changedPixels = core::floodFillTracked(workingBuffer, imgX, imgY, core::Color{newColor});
-    }
-
-    if (changedPixels.empty())
+    if (!changed)
     {
         statusBar()->showMessage(tr("Aucun pixel modifié"), 1000);
         return;
     }
-
-    // Build PixelChange vector from tracked changes
-    std::vector<app::PixelChange> changes;
-    changes.reserve(changedPixels.size());
-    for (const auto& [x, y, oldColor] : changedPixels)
-    {
-        app::PixelChange pc;
-        pc.x = x;
-        pc.y = y;
-        pc.before = oldColor;
-        pc.after = newColor;
-        changes.push_back(pc);
-    }
-
-    // apply function updates the QImage from the given pixel changes
-    app::ApplyFn apply =
-        [this](std::uint64_t /*layerId*/, const std::vector<app::PixelChange>& ch, bool useBefore)
-    {
-        for (const auto& c : ch)
-        {
-            const uint32_t v = useBefore ? c.before : c.after;
-            const uint8_t r = static_cast<uint8_t>((v >> 24) & 0xFF);
-            const uint8_t g = static_cast<uint8_t>((v >> 16) & 0xFF);
-            const uint8_t b = static_cast<uint8_t>((v >> 8) & 0xFF);
-            const uint8_t a = static_cast<uint8_t>(v & 0xFF);
-            if (c.x >= 0 && c.x < m_currentImage.width() && c.y >= 0 &&
-                c.y < m_currentImage.height())
-                m_currentImage.setPixel(c.x, c.y, qRgba(r, g, b, a));
-        }
-        updateImageDisplay();
-    };
-
-    // create command, execute redo and push to history
-    auto cmd = std::make_unique<app::DataCommand>(0ull, std::move(changes), apply);
-    cmd->redo();
-    m_history.push(std::move(cmd));
-
-    // update undo/redo enabled state
-    if (m_undoAct)
-        m_undoAct->setEnabled(m_history.canUndo());
-    if (m_redoAct)
-        m_redoAct->setEnabled(m_history.canRedo());
 
     statusBar()->showMessage(tr("Remplissage effectué"), 2000);
 }

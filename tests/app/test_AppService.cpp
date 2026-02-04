@@ -57,7 +57,7 @@ static std::unique_ptr<app::AppService> makeApp(SpyStorage** outSpy = nullptr) {
 
 TEST(AppService_State, documentReturnsConstRef) {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     const Document* p1 = &app->document();
     const Document* p2 = &app->document();
@@ -67,7 +67,7 @@ TEST(AppService_State, documentReturnsConstRef) {
 TEST(AppService_State, newDocumentInitialState_Default) {
     const auto app = makeApp();
 
-    app->newDocument(app::Size{.w=640, .h=480}, 72.F);
+    app->newDocument(app::Size{.w = 640, .h = 480}, 72.F, common::colors::White);
 
     const Document& doc = app->document();
     EXPECT_EQ(doc.width(), 640);
@@ -84,7 +84,7 @@ TEST(AppService_State, newDocumentInitialLayer_CountIsOne) {
 
     const auto app = makeApp();
 
-    app->newDocument(app::Size{.w=100, .h=200}, 72.F);
+    app->newDocument(app::Size{.w = 100, .h = 200}, 72.F, common::colors::White);
 
     const Document& doc = app->document();
     EXPECT_EQ(doc.layerCount(), 1);
@@ -108,7 +108,7 @@ TEST(AppService_State, ActiveLayerSet_ValidIndex) {
     const auto app = makeApp();
     app::LayerSpec spec{};
 
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
     app->addLayer(spec);
     app->addLayer(spec);
 
@@ -118,14 +118,14 @@ TEST(AppService_State, ActiveLayerSet_ValidIndex) {
 
 TEST(AppService_State, ActiveLayerSet_OutOfRangeThrows) {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     EXPECT_THROW(app->setActiveLayer(1), std::out_of_range);
 }
 
 TEST(AppService_State, LayerIds_AreUnique) {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     app::LayerSpec spec{};
     app->addLayer(spec);
@@ -152,11 +152,11 @@ TEST(AppService_State, LayerIds_ResetOnNewDocument) {
     const auto app = makeApp();
     app::LayerSpec spec{};
 
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
     app->addLayer(spec);
     auto id1 = app->document().layerAt(1)->id(); // 0 = bg, 1 = first added
 
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
     app->addLayer(spec);
     auto id2 = app->document().layerAt(1)->id();
 
@@ -166,7 +166,7 @@ TEST(AppService_State, LayerIds_ResetOnNewDocument) {
 TEST(AppService_State, Selection_SetRect_CreatesMaskInDocument)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     common::Rect r{2, 3, 4, 2};
     app->setSelectionRect(r);
@@ -181,7 +181,7 @@ TEST(AppService_State, Selection_SetRect_CreatesMaskInDocument)
 TEST(AppService_State, Selection_Clear_RemovesMaskInDocument)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     app->setSelectionRect(Selection::Rect{1, 1, 2, 2});
     ASSERT_TRUE(app->document().selection().hasMask());
@@ -194,7 +194,7 @@ TEST(AppService_State, Selection_Clear_RemovesMaskInDocument)
 
 TEST(AppService_Layers, RemoveLayer_WhenLocked_Throws) {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     EXPECT_THROW(app->removeLayer(0), std::runtime_error);
     EXPECT_EQ(app->document().layerCount(), 1);
@@ -202,7 +202,7 @@ TEST(AppService_Layers, RemoveLayer_WhenLocked_Throws) {
 
 TEST(AppService_Layers, RemoveLayer_AfterUnlock_AllowsEmptyDocument) {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     app->setLayerLocked(0, false);
     app->removeLayer(0);
@@ -224,7 +224,7 @@ TEST(AppService_IO, Save_CallsStorage) {
     SpyStorage* spy = nullptr;
     auto app = makeApp(&spy);
 
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
     const Document* current = &app->document();
     app->save("bar.epg");
 
@@ -238,7 +238,7 @@ TEST(AppService_IO, exportImage_CallsStorage) {
     SpyStorage* spy = nullptr;
     auto app = makeApp(&spy);
 
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
     const Document* current = &app->document();
 
     app->exportImage("out.png");
@@ -252,7 +252,7 @@ TEST(AppService_IO, exportImage_CallsStorage) {
 
 TEST(AppService_UndoRedo, AddLayerCommand_UndoRedo_RestoresSameLayerId) {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     ASSERT_EQ(app->document().layerCount(), 1);
 
@@ -282,7 +282,7 @@ TEST(AppService_UndoRedo, AddLayerCommand_UndoRedo_RestoresSameLayerId) {
 TEST(AppService_UndoRedo, SetLayerLocked_UndoRedo_RestoresPreviousValue)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     ASSERT_TRUE(app->document().layerAt(0)->locked());
 
@@ -305,7 +305,7 @@ TEST(AppService_UndoRedo, SetLayerLocked_UndoRedo_RestoresPreviousValue)
 TEST(AppService_UndoRedo, SetLayerVisible_UndoRedo_RestoresPreviousValue)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     ASSERT_TRUE(app->document().layerAt(0)->visible());
 
@@ -322,7 +322,7 @@ TEST(AppService_UndoRedo, SetLayerVisible_UndoRedo_RestoresPreviousValue)
 TEST(AppService_UndoRedo, SetLayerOpacity_UndoRedo_RestoresPreviousValue)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     ASSERT_FLOAT_EQ(app->document().layerAt(0)->opacity(), 1.f);
 
@@ -339,7 +339,7 @@ TEST(AppService_UndoRedo, SetLayerOpacity_UndoRedo_RestoresPreviousValue)
 TEST(AppService_UndoRedo, RemoveLayer_UndoRedo_RestoresSameLayerId)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     app::LayerSpec spec{};
     spec.locked = false;
@@ -363,7 +363,7 @@ TEST(AppService_UndoRedo, RemoveLayer_UndoRedo_RestoresSameLayerId)
 TEST(AppService_UndoRedo, ReorderLayer_UndoRedo_RestoresOrder)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     app::LayerSpec spec{};
     spec.locked = false;
@@ -392,7 +392,7 @@ TEST(AppService_UndoRedo, ReorderLayer_UndoRedo_RestoresOrder)
 TEST(AppService_UndoRedo, MergeLayerDown_UndoRedo_RestoresLayerCount)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     app::LayerSpec spec{};
     spec.locked = false;
@@ -417,7 +417,7 @@ TEST(AppService_Signals, documentChanged_EmittedOnNewDocument) {
     int hits = 0;
     app->documentChanged.connect([&]() { hits++; });
 
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     EXPECT_EQ(hits, 1);
 }
@@ -425,7 +425,7 @@ TEST(AppService_Signals, documentChanged_EmittedOnNewDocument) {
 TEST(AppService_Signals, AddLayer_EmitsDocumentChangedOnce)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     int hits = 0;
     app->documentChanged.connect([&]() { ++hits; });
@@ -443,7 +443,7 @@ TEST(AppService_Signals, AddLayer_EmitsDocumentChangedOnce)
 TEST(AppService_Signals, SetLayerLocked_UndoRedo_EmitsDocumentChangedOnceEach)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     int hits = 0;
     app->documentChanged.connect([&]() { ++hits; });
@@ -459,7 +459,7 @@ TEST(AppService_Signals, SetLayerLocked_UndoRedo_EmitsDocumentChangedOnceEach)
 TEST(AppService_Signals, SetLayerVisible_UndoRedo_EmitsDocumentChangedOnceEach)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     int hits = 0;
     app->documentChanged.connect([&]() { ++hits; });
@@ -475,7 +475,7 @@ TEST(AppService_Signals, SetLayerVisible_UndoRedo_EmitsDocumentChangedOnceEach)
 TEST(AppService_Signals, SetLayerOpacity_UndoRedo_EmitsDocumentChangedOnceEach)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     int hits = 0;
     app->documentChanged.connect([&]() { ++hits; });
@@ -491,7 +491,7 @@ TEST(AppService_Signals, SetLayerOpacity_UndoRedo_EmitsDocumentChangedOnceEach)
 TEST(AppService_Signals, RemoveLayer_UndoRedo_EmitsDocumentChangedOnceEach)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     app::LayerSpec spec{};
     spec.locked = false;
@@ -511,7 +511,7 @@ TEST(AppService_Signals, RemoveLayer_UndoRedo_EmitsDocumentChangedOnceEach)
 TEST(AppService_Signals, ReorderLayer_UndoRedo_EmitsDocumentChangedOnceEach)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     app::LayerSpec spec{};
     spec.locked = false;
@@ -532,7 +532,7 @@ TEST(AppService_Signals, ReorderLayer_UndoRedo_EmitsDocumentChangedOnceEach)
 TEST(AppService_Signals, MergeLayerDown_UndoRedo_EmitsDocumentChangedOnceEach)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     app::LayerSpec spec{};
     spec.locked = false;
@@ -553,7 +553,7 @@ TEST(AppService_Signals, MergeLayerDown_UndoRedo_EmitsDocumentChangedOnceEach)
 TEST(AppService_Signals, SetLayerLocked_NoChange_DoesNotEmit)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     int hits = 0;
     app->documentChanged.connect([&]() { ++hits; });
@@ -567,7 +567,7 @@ TEST(AppService_Signals, SetLayerLocked_NoChange_DoesNotEmit)
 TEST(AppService_Signals, Selection_SetRect_EmitsDocumentChangedOnce)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     int hits = 0;
     app->documentChanged.connect([&]() { ++hits; });
@@ -579,7 +579,7 @@ TEST(AppService_Signals, Selection_SetRect_EmitsDocumentChangedOnce)
 TEST(AppService_Signals, Selection_Clear_EmitsDocumentChangedOnce)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     app->setSelectionRect(Selection::Rect{1, 1, 2, 2}); // on ignore ce hit
     int hits = 0;
@@ -592,7 +592,7 @@ TEST(AppService_Signals, Selection_Clear_EmitsDocumentChangedOnce)
 TEST(AppService_Signals, Stroke_End_Undo_Redo_EmitsOnceEach)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{6, 3}, 72.f);
+    app->newDocument(app::Size{6, 3}, 72.f, common::colors::White);
 
     app::LayerSpec spec{};
     spec.locked = false;
@@ -624,7 +624,7 @@ TEST(AppService_Signals, Stroke_End_Undo_Redo_EmitsOnceEach)
 TEST(AppService_Picking, pickColorAt_ReadsPixelFromActiveLayer)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     app::LayerSpec spec{};
     spec.locked = false;
@@ -642,7 +642,7 @@ TEST(AppService_Picking, pickColorAt_ReadsPixelFromActiveLayer)
 TEST(AppService_Picking, pickColorAt_OutOfBounds_ReturnsTransparent)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     app::LayerSpec spec{};
     spec.locked = false;
@@ -664,7 +664,7 @@ TEST(AppService_Picking, pickColorAt_NoDocument_Throws)
 TEST(AppService_Picking, pickColorAt_DoesNotEmitDocumentChanged)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     app::LayerSpec spec{};
     spec.locked = false;
@@ -685,7 +685,7 @@ TEST(AppService_Picking, pickColorAt_DoesNotEmitDocumentChanged)
 TEST(AppService_Picking, pickColorAt_DoesNotAffectUndoRedo)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument(app::Size{10, 10}, 72.f, common::colors::White);
 
     app::LayerSpec spec{};
     spec.locked = false;
@@ -704,7 +704,7 @@ TEST(AppService_Picking, pickColorAt_DoesNotAffectUndoRedo)
 TEST(AppService_Stroke, Stroke_DrawsPixels_AndIsUndoable)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{6, 3}, 72.f);
+    app->newDocument(app::Size{6, 3}, 72.f, common::colors::White);
 
     app::LayerSpec spec{};
     spec.locked = false;
@@ -742,7 +742,7 @@ TEST(AppService_Stroke, Stroke_DrawsPixels_AndIsUndoable)
 TEST(AppService_Stroke, EndStroke_WithoutBegin_NoOp)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{3, 3}, 72.f);
+    app->newDocument(app::Size{3, 3}, 72.f, common::colors::White);
 
     EXPECT_FALSE(app->canUndo());
     EXPECT_NO_THROW(app->endStroke());
@@ -752,7 +752,7 @@ TEST(AppService_Stroke, EndStroke_WithoutBegin_NoOp)
 TEST(AppService_Stroke, MoveStroke_WithoutBegin_NoOp)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{3, 3}, 72.f);
+    app->newDocument(app::Size{3, 3}, 72.f, common::colors::White);
 
     EXPECT_NO_THROW(app->moveStroke(common::Point{1, 1}));
     EXPECT_FALSE(app->canUndo());
@@ -761,7 +761,7 @@ TEST(AppService_Stroke, MoveStroke_WithoutBegin_NoOp)
 TEST(AppService_Stroke, BeginStroke_OnLockedLayer_Throws)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{3, 3}, 72.f);
+    app->newDocument(app::Size{3, 3}, 72.f, common::colors::White);
 
     // active layer = 0 (Background locked)
     app::ToolParams tp{};
