@@ -18,7 +18,27 @@ static std::shared_ptr<Layer> makeLayer(uint64_t id, const std::string& name) {
 // Basic Tests
 // -----------------------------------------------------------------------------
 
-TEST(Document, ConstructorInitialState_DefaultArgs) {
+TEST(Document_State, Selection_InitiallyEmpty)
+{
+    Document doc(10, 10, 72.f);
+
+    EXPECT_FALSE(doc.selection().hasMask());
+    EXPECT_EQ(doc.selection().mask(), nullptr);
+}
+
+TEST(Document_State, Selection_ConstGetterAvailable)
+{
+    Document doc(10, 10, 72.f);
+    const Document& cdoc = doc;
+
+    // doit compiler
+    const auto& sel = cdoc.selection();
+    (void)sel;
+
+    EXPECT_FALSE(sel.hasMask());
+}
+
+TEST(Document_State, ConstructorInitialState_DefaultArgs) {
     const Document doc(800, 600);
 
     EXPECT_EQ(doc.width(), 800);
@@ -29,7 +49,7 @@ TEST(Document, ConstructorInitialState_DefaultArgs) {
    // EXPECT_FALSE(doc.selection().hasMask());
 }
 
-TEST(Document, ConstructorInitialState_CustomDpi) {
+TEST(Document_State, ConstructorInitialState_CustomDpi) {
     const Document doc(1024, 768, 96.f);
 
     EXPECT_EQ(doc.width(), 1024);
