@@ -199,10 +199,22 @@ ZipEpgStorage::Manifest ZipEpgStorage::createManifestFromDocument(const Document
         L.path = "layers/" + layerId + ".png";
         L.sha256 = "";
         L.transform = Transform{};
-        L.bounds.x = 0;
-        L.bounds.y = 0;
-        L.bounds.width = doc.width();
-        L.bounds.height = doc.height();
+        // store layer bounds/offset (bounds.x/y = offset within document)
+        const auto layerPtr = doc.layerAt(i);
+        if (layerPtr && layerPtr->image())
+        {
+            L.bounds.x = layerPtr->offsetX();
+            L.bounds.y = layerPtr->offsetY();
+            L.bounds.width = layerPtr->image()->width();
+            L.bounds.height = layerPtr->image()->height();
+        }
+        else
+        {
+            L.bounds.x = 0;
+            L.bounds.y = 0;
+            L.bounds.width = doc.width();
+            L.bounds.height = doc.height();
+        }
         m.layers.push_back(L);
     }
 
@@ -231,6 +243,8 @@ std::unique_ptr<Document> ZipEpgStorage::createDocumentFromManifest(const Manife
 
             auto layer = std::make_shared<Layer>(std::stoull(lm.id), lm.name, sharedBuf, lm.visible,
                                                  lm.locked, lm.opacity);
+            // restore saved offset (bounds.x, bounds.y)
+            layer->setOffset(lm.bounds.x, lm.bounds.y);
 
             doc->addLayer(layer);
         }
@@ -365,8 +379,12 @@ std::vector<unsigned char> ZipEpgStorage::composePreviewRGBA(const Document& doc
     const int docW = doc.width();
     const int docH = doc.height();
 
-    if (docW == 0 || docH == 0)
+    if (docW <= 0 || docH <= 0)
+    {
+        outW = 0;
+        outH = 0;
         return {};
+    }
 
     int const pW = std::min(previewMax, docW);
     int const pH = std::min(previewMax, docH);
@@ -391,15 +409,22 @@ std::vector<unsigned char> ZipEpgStorage::composePreviewRGBA(const Document& doc
 
         for (int py = 0; py < h; ++py)
         {
-            int const srcY = std::min(
-                img.height() - 1, std::max(0, static_cast<int>(static_cast<float>(py) / scale)));
+            // map preview y to document y
+            const int docY =
+                std::min(docH - 1, std::max(0, static_cast<int>(static_cast<float>(py) / scale)));
             for (int px = 0; px < w; ++px)
             {
-                int const srcX = std::min(
-                    img.width() - 1, std::max(0, static_cast<int>(static_cast<float>(px) / scale)));
+                const int docX = std::min(
+                    docW - 1, std::max(0, static_cast<int>(static_cast<float>(px) / scale)));
 
-                const size_t dstIdx = static_cast<size_t>(py * w + px) * 4;
-                const size_t srcIdx = srcY * img.strideBytes() + srcX * 4;
+                // map document coordinate to layer-local coordinate
+                const int lx = docX - layerPtr->offsetX();
+                const int ly = docY - layerPtr->offsetY();
+                if (lx < 0 || lx >= img.width() || ly < 0 || ly >= img.height())
+                    continue;  // transparent outside layer bounds
+
+                const int dstIdx = (py * w + px) * 4;
+                const int srcIdx = ly * img.strideBytes() + lx * 4;
 
                 const unsigned char sr = img.data()[srcIdx + 0];
                 const unsigned char sg = img.data()[srcIdx + 1];

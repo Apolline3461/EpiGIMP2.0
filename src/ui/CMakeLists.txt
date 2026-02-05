@@ -4,12 +4,14 @@ set(UI_SOURCES
         main.cpp
         window.cpp
         image.cpp
+        ImageConversion.cpp
         resources.qrc
 )
 
 set(UI_HEADERS
         ${EPIGIMP_ROOT_INCLUDE_DIR}/ui/window.hpp
         ${EPIGIMP_ROOT_INCLUDE_DIR}/ui/image.hpp
+        ${EPIGIMP_ROOT_INCLUDE_DIR}/ui/ImageConversion.hpp
 )
 
 add_executable(epigimp
