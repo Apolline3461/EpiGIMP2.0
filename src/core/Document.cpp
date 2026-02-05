@@ -1,10 +1,12 @@
 //
 // Created by apolline on 17/12/2025.
 //
+
 #include "core/Document.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
@@ -14,6 +16,10 @@ Document::Document(const int width, const int height,
                    const float dpi)  // NOLINT(bugprone-easily-swappable-parameters)
     : width_{width}, height_{height}, dpi_{dpi}
 {
+    if (width_ <= 0 || height_ <= 0)
+        throw std::invalid_argument("Document: invalid size");
+    if (dpi_ <= 0.f)
+        throw std::invalid_argument("Document: invalid dpi");
 }
 
 int Document::width() const noexcept
@@ -31,65 +37,65 @@ float Document::dpi() const noexcept
     return dpi_;
 }
 
-int Document::layerCount() const noexcept
+size_t Document::layerCount() const noexcept
 {
     return static_cast<int>(layers_.size());
 }
 
-std::shared_ptr<Layer> Document::layerAt(int index) const
+std::shared_ptr<Layer> Document::layerAt(const size_t index) const
 {
-    if (index < 0 || index >= static_cast<int>(layers_.size()))
+    if (index >= layers_.size())
         return nullptr;
-    return layers_[static_cast<std::size_t>(index)];
+    return layers_[index];
 }
 
-int Document::addLayer(std::shared_ptr<Layer> layer)
+size_t Document::addLayer(std::shared_ptr<Layer> layer)
 {
     if (!layer)
         return -1;
     layers_.push_back(std::move(layer));
-    return static_cast<int>(layers_.size()) - 1;
+    return layers_.size() - 1;
 }
 
-int Document::addLayer(std::shared_ptr<Layer> layer, int idx)
+size_t Document::addLayer(std::shared_ptr<Layer> layer, const size_t idx)
 {
     if (!layer)
         return -1;
 
-    if (const int size = static_cast<int>(layers_.size()); idx < 0 || idx > size)
+    if (idx > layers_.size())
         return -1;
 
-    layers_.insert(layers_.begin() + idx, std::move(layer));
+    layers_.insert(layers_.begin() + static_cast<std::ptrdiff_t>(idx), std::move(layer));
     return idx;
 }
 
-void Document::removeLayer(int idx)
+void Document::removeLayer(size_t idx)
 {
-    const int size = static_cast<int>(layers_.size());
-    if (idx < 0 || idx >= size)
+    const auto size = layers_.size();
+    if (idx >= size)
         return;
-    layers_.erase(layers_.begin() + idx);
+    layers_.erase(layers_.begin() + static_cast<std::ptrdiff_t>(idx));
 }
 
-void Document::reorderLayer(int from, int to)
+void Document::reorderLayer(size_t from, size_t to)
 {
-    const int size = static_cast<int>(layers_.size());
+    const auto size = layers_.size();
 
-    if (from < 0 || from >= size || to < 0 || to >= size || from == to)
+    if (from >= size || to >= size || from == to)
         return;
 
-    auto tmpLayer = layers_[static_cast<std::size_t>(from)];
-    layers_.erase(layers_.begin() + from);
-    if (to > static_cast<int>(layers_.size()))
-        to = static_cast<int>(layers_.size());
-    layers_.insert(layers_.begin() + to, std::move(tmpLayer));
+    auto tmpLayer = layers_[from];
+    layers_.erase(layers_.begin() + static_cast<std::ptrdiff_t>(from));
+    if (to > layers_.size())
+        to = layers_.size();
+    layers_.insert(layers_.begin() + static_cast<std::ptrdiff_t>(to), std::move(tmpLayer));
 }
 
-void Document::mergeDown(int from)
+void Document::mergeDown(const size_t from)
 {
-    const int size = static_cast<int>(layers_.size());
+    const auto size = layers_.size();
 
-    if (from <= 0 || from >= size)
+    if (from == 0 || from >= size)
         return;
     // Merge layer 'from' onto layer 'from-1' (src over dst)
     auto srcLayer = layers_[static_cast<std::size_t>(from)];
@@ -187,7 +193,8 @@ void Document::mergeDown(int from)
     layers_.erase(layers_.begin() + from);
 }
 
-void Document::setLayers(std::vector<std::shared_ptr<Layer>> layers)
-{
-    layers_ = std::move(layers);
-}
+// void Document::setLayers(std::vector<std::shared_ptr<Layer>> layers)
+// {
+//     layers_ = std::move(layers);
+//     layers_.erase(layers_.begin() + static_cast<std::ptrdiff_t>(from));
+// }

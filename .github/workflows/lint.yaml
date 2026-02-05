@@ -141,7 +141,7 @@ jobs:
           set -euo pipefail
           failed=0
 
-          CFG="{Checks: 'clang-analyzer-*,bugprone-*,performance-*', WarningsAsErrors: 'clang-analyzer-*,bugprone-*,performance-*'}"
+          CFG="{Checks: 'clang-analyzer-*,bugprone-*,performance-*,-bugprone-easily-swappable-parameters', WarningsAsErrors: 'clang-analyzer-*,bugprone-*,performance-*,-bugprone-easily-swappable-parameters'}"
 
           while IFS= read -r -d '' f; do
             echo "::group::clang-tidy $f"

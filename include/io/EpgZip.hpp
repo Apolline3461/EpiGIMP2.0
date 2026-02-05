@@ -2,14 +2,12 @@
 
 #include <zip.h>
 
-#include <cstdint>
 #include <memory>
-#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "core/ImageBuffer.hpp"
+#include "core/Document.hpp"
 
 // PNG signature constant
 inline constexpr unsigned char kPngSignature[8] = {137, 80, 78, 71, 13, 10, 26, 10};
@@ -37,19 +35,20 @@ class ZipHandle
             zip_close(z_);
     }
 
-    ZipHandle(ZipHandle&& o) noexcept : z_(o.z_)
+    ZipHandle(ZipHandle&& o) noexcept : z_(o.z_), keepAlive_(std::move(o.keepAlive_))
     {
         o.z_ = nullptr;
     }
     ZipHandle& operator=(ZipHandle&& o) noexcept
     {
-        if (this != &o)
-        {
-            if (z_)
-                zip_close(z_);
-            z_ = o.z_;
-            o.z_ = nullptr;
-        }
+        if (this == &o)
+            return *this;
+        if (z_)
+            zip_close(z_);
+        z_ = o.z_;
+        keepAlive_ = std::move(o.keepAlive_);
+
+        o.z_ = nullptr;
         return *this;
     }
 

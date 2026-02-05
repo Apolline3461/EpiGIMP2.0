@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QAction>
+#include <QColor>
 #include <QDockWidget>
 #include <QEvent>
 #include <QImage>
@@ -13,11 +14,13 @@
 #include <QObject>
 #include <QPixmap>
 #include <QPoint>
+#include <QRect>
 #include <QScrollArea>
 #include <QString>
 
 #include <memory>
 
+#include "app/History.hpp"
 #include "core/Document.hpp"
 
 #include <core/Selection.hpp>
@@ -125,7 +128,18 @@ class MainWindow : public QMainWindow
     int m_layerDragInitialOffsetY{0};
     QAction* m_clearSelectionAct;
     QAction* m_selectToggleAct;
+    QAction* m_bucketAct;
+    bool m_bucketMode{false};
+    QAction* m_colorPickerAct;
+    QColor m_bucketColor{Qt::black};
 
     // Sélection active pour l'image
     Selection m_selection;
+    // remplissage pot de peinture
+    void bucketFillAt(const QPoint& viewportPos);
+    void updateColorPickerIcon();
+    // Historique des commandes (undo/redo)
+    app::History m_history{128};
+    QAction* m_undoAct{nullptr};
+    QAction* m_redoAct{nullptr};
 };

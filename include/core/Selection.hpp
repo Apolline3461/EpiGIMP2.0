@@ -10,12 +10,15 @@
 #include <cstdint>
 #include <memory>
 
+#include "common/Geometry.hpp"
+
 class ImageBuffer;
 
 class Selection
 {
    public:
     Selection() = default;
+    using Rect = common::Rect;
     explicit Selection(std::shared_ptr<ImageBuffer> mask) : mask_(std::move(mask)) {}
 
     [[nodiscard]] bool hasMask() const noexcept
@@ -23,15 +26,6 @@ class Selection
         return static_cast<bool>(mask_);
     }
     uint8_t t_at(int x, int y) const;
-
-    // Use a small Rect type to avoid multiple adjacent primitive parameters
-    struct Rect
-    {
-        int x{};
-        int y{};
-        int w{};
-        int h{};
-    };
 
     void addRect(
         const Rect& rect,
