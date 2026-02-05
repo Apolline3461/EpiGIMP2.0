@@ -941,7 +941,7 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
                         const uint8_t a = static_cast<uint8_t>(px & 0xFFu);
                         if (a == 0)
                             continue;
-                        pickedIdx = i;
+                        pickedIdx = static_cast<int>(i);
                         // update selection in the layers list to match picked layer
                         for (int j = 0; j < m_layersList->count(); ++j)
                         {
