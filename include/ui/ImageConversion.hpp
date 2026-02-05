@@ -19,4 +19,11 @@ namespace ImageConversion
  * and the specified output dimensions.
  */
 ImageBuffer qImageToImageBuffer(const QImage& image, int width, int height);
+/**
+ * @brief Converts an ImageBuffer to a QImage using the given format.
+ * @param buf The source ImageBuffer
+ * @param fmt The desired QImage format (default ARGB32)
+ * @return A QImage containing the converted pixels
+ */
+QImage imageBufferToQImage(const ImageBuffer& buf, QImage::Format fmt = QImage::Format_ARGB32);
 }  // namespace ImageConversion

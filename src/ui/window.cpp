@@ -739,19 +739,7 @@ void MainWindow::updateImageFromDocument()
     Compositor comp;
     comp.compose(*m_document, outBuf);
 
-    QImage img(outBuf.width(), outBuf.height(), QImage::Format_ARGB32);
-    for (int y = 0; y < outBuf.height(); ++y)
-    {
-        for (int x = 0; x < outBuf.width(); ++x)
-        {
-            const uint32_t rgba = outBuf.getPixel(x, y);
-            const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
-            const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
-            const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
-            const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
-            img.setPixel(x, y, qRgba(r, g, b, a));
-        }
-    }
+    QImage img = ImageConversion::imageBufferToQImage(outBuf, QImage::Format_ARGB32);
     m_currentImage = img;
     updateImageDisplay();
 }
@@ -773,20 +761,8 @@ QPixmap MainWindow::createLayerThumbnail(const std::shared_ptr<Layer>& layer,
     if (lb.width() <= 0 || lb.height() <= 0)
         return out;
 
-    // Build a QImage from the ImageBuffer in a robust way using setPixelColor
-    QImage img(lb.width(), lb.height(), QImage::Format_ARGB32_Premultiplied);
-    for (int y = 0; y < lb.height(); ++y)
-    {
-        for (int x = 0; x < lb.width(); ++x)
-        {
-            const uint32_t rgba = lb.getPixel(x, y);
-            const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
-            const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
-            const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
-            const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
-            img.setPixelColor(x, y, QColor(r, g, b, a));
-        }
-    }
+    // Convert the layer buffer to a QImage
+    QImage img = ImageConversion::imageBufferToQImage(lb, QImage::Format_ARGB32_Premultiplied);
 
     QSize target = size;
     QSize scaledSize = img.size();
@@ -1233,19 +1209,7 @@ void MainWindow::openEpg()
     }
     const ImageBuffer& ib = *firstLayer->image();
 
-    QImage img(ib.width(), ib.height(), QImage::Format_ARGB32);
-    for (int y = 0; y < ib.height(); ++y)
-    {
-        for (int x = 0; x < ib.width(); ++x)
-        {
-            const uint32_t rgba = ib.getPixel(x, y);
-            const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
-            const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
-            const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
-            const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
-            img.setPixel(x, y, qRgba(r, g, b, a));
-        }
-    }
+    QImage img = ImageConversion::imageBufferToQImage(ib, QImage::Format_ARGB32);
 
     m_currentImage = img;
     m_currentFileName = fileName;
@@ -1348,21 +1312,51 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
     if (imgX < 0 || imgX >= m_currentImage.width() || imgY < 0 || imgY >= m_currentImage.height())
         return;
 
-    // Build working buffer directly from current image
-    ImageBuffer workingBuffer(m_currentImage.width(), m_currentImage.height());
-    for (int y = 0; y < m_currentImage.height(); ++y)
+    // Determine target layer: current selection in layers list or background (0)
+    int targetLayerIdx = 0;
+    std::uint64_t targetLayerId = 0u;
+    if (m_document && m_layersList)
     {
-        for (int x = 0; x < m_currentImage.width(); ++x)
+        if (auto cur = m_layersList->currentItem())
+            targetLayerIdx = cur->data(Qt::UserRole).toInt();
+        if (targetLayerIdx < 0)
+            targetLayerIdx = 0;
+        auto tl = m_document->layerAt(static_cast<size_t>(targetLayerIdx));
+        if (tl && tl->image())
+            targetLayerId = tl->id();
+    }
+
+    // Build working buffer from the target layer's image if available, otherwise fall back
+    ImageBuffer workingBuffer(m_currentImage.width(), m_currentImage.height());
+    if (m_document && targetLayerId != 0u)
+    {
+        auto layerPtr = m_document->layerAt(static_cast<size_t>(targetLayerIdx));
+        if (!layerPtr || !layerPtr->image())
         {
-            const QRgb p = m_currentImage.pixel(x, y);
-            const uint8_t r = qRed(p);
-            const uint8_t g = qGreen(p);
-            const uint8_t b = qBlue(p);
-            const uint8_t a = qAlpha(p);
-            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
-                                  (static_cast<uint32_t>(g) << 16) |
-                                  (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
-            workingBuffer.setPixel(x, y, rgba);
+            QMessageBox::information(this, tr("Information"),
+                                     tr("Calque invalide ou non modifiable."));
+            return;
+        }
+        // copy the layer buffer so flood fill can run on a working copy
+        workingBuffer = *layerPtr->image();
+    }
+    else
+    {
+        // fallback: build from composed current image
+        for (int y = 0; y < m_currentImage.height(); ++y)
+        {
+            for (int x = 0; x < m_currentImage.width(); ++x)
+            {
+                const QRgb p = m_currentImage.pixel(x, y);
+                const uint8_t r = qRed(p);
+                const uint8_t g = qGreen(p);
+                const uint8_t b = qBlue(p);
+                const uint8_t a = qAlpha(p);
+                const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
+                                      (static_cast<uint32_t>(g) << 16) |
+                                      (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
+                workingBuffer.setPixel(x, y, rgba);
+            }
         }
     }
 
@@ -1410,10 +1404,43 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
         changes.push_back(pc);
     }
 
-    // apply function updates the QImage from the given pixel changes
+    // apply function updates the target layer image (if present) or falls back to m_currentImage
     app::ApplyFn apply =
-        [this](std::uint64_t /*layerId*/, const std::vector<app::PixelChange>& ch, bool useBefore)
+        [this](std::uint64_t layerId, const std::vector<app::PixelChange>& ch, bool useBefore)
     {
+        bool appliedToLayer = false;
+        if (m_document)
+        {
+            // find layer by id
+            for (size_t i = 0; i < m_document->layerCount(); ++i)
+            {
+                auto lyr = m_document->layerAt(i);
+                if (!lyr)
+                    continue;
+                if (lyr->id() == layerId && lyr->image())
+                {
+                    auto img = lyr->image();
+                    for (const auto& c : ch)
+                    {
+                        const uint32_t v = useBefore ? c.before : c.after;
+                        if (c.x >= 0 && c.x < img->width() && c.y >= 0 && c.y < img->height())
+                            img->setPixel(c.x, c.y, v);
+                    }
+                    appliedToLayer = true;
+                    break;
+                }
+            }
+            if (appliedToLayer)
+            {
+                // regenerate composed image and UI
+                updateImageFromDocument();
+                // refresh layers panel thumbnails
+                populateLayersList();
+                return;
+            }
+        }
+
+        // fallback: modify the composed image directly
         for (const auto& c : ch)
         {
             const uint32_t v = useBefore ? c.before : c.after;
@@ -1429,7 +1456,8 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
     };
 
     // create command, execute redo and push to history
-    auto cmd = std::make_unique<app::DataCommand>(0ull, std::move(changes), apply);
+    // use the selected layer id when creating the command so undo/redo targets the correct layer
+    auto cmd = std::make_unique<app::DataCommand>(targetLayerId, std::move(changes), apply);
     cmd->redo();
     m_history.push(std::move(cmd));
 

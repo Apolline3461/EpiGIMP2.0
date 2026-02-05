@@ -36,3 +36,25 @@ ImageBuffer qImageToImageBuffer(const QImage& image, int width, int height)
 }
 
 }  // namespace ImageConversion
+
+QImage ImageConversion::imageBufferToQImage(const ImageBuffer& buf, QImage::Format fmt)
+{
+    QImage img(buf.width(), buf.height(), fmt);
+    // Initialize to transparent just in case
+    img.fill(Qt::transparent);
+
+    for (int y = 0; y < buf.height(); ++y)
+    {
+        for (int x = 0; x < buf.width(); ++x)
+        {
+            const uint32_t rgba = buf.getPixel(x, y);
+            const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
+            const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
+            const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
+            const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
+            img.setPixel(x, y, qRgba(r, g, b, a));
+        }
+    }
+
+    return img;
+}
