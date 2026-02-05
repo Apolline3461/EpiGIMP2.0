@@ -73,7 +73,7 @@ TEST_F(EpgTest, SaveAndOpenRoundTrip)
     removeTemp("epg_test_roundtrip.epg");
 }
 
-TEST_F(EpgTest, ExportPngCreatesFile)
+TEST_F(EpgTest, exportImageCreatesFile)
 {
     Document doc(8, 8, 72.0f);
 
@@ -85,7 +85,7 @@ TEST_F(EpgTest, ExportPngCreatesFile)
     std::string path = tmp.string();
     removeTemp("epg_export_test.png");
 
-    EXPECT_NO_THROW(storage.exportPng(doc, path));
+    EXPECT_NO_THROW(storage.exportImage(doc, path));
     EXPECT_TRUE(std::filesystem::exists(path));
 
     std::ifstream f(path, std::ios::binary);
@@ -213,7 +213,7 @@ TEST_F(EpgTest, SaveAndOpenPreserveLayerProperties)
     removeTemp("epg_test_props.epg");
 }
 
-TEST_F(EpgTest, ExportPng_CompositionWithOpacity)
+TEST_F(EpgTest, exportImage_CompositionWithOpacity)
 {
     Document doc(4, 4, 72.0f);
 
@@ -231,7 +231,7 @@ TEST_F(EpgTest, ExportPng_CompositionWithOpacity)
     std::string path = tmp.string();
     removeTemp("epg_comp_test.png");
 
-    EXPECT_NO_THROW(storage.exportPng(doc, path));
+    EXPECT_NO_THROW(storage.exportImage(doc, path));
     EXPECT_TRUE(std::filesystem::exists(path));
 
     int w, h, channels;
@@ -257,12 +257,12 @@ TEST_F(EpgTest, ExportPng_CompositionWithOpacity)
     removeTemp("epg_comp_test.png");
 }
 
-TEST(EpgFormatMore, ExportPng_ThrowsOnEmptyDocument)
+TEST(EpgFormatMore, exportImage_ThrowsOnEmptyDocument)
 {
     const Document doc(4, 4, 72.0f);
 
     ZipEpgStorage storage;
-    EXPECT_THROW(storage.exportPng(doc, "some_path.png"), std::runtime_error);
+    EXPECT_THROW(storage.exportImage(doc, "some_path.png"), std::runtime_error);
 }
 
 TEST(EpgFormatRAII, SaveCreatesPreviewAndLayerEntries)

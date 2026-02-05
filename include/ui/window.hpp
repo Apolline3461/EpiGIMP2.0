@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QAction>
+#include <QColor>
 #include <QEvent>
 #include <QImage>
 #include <QKeyEvent>
@@ -9,10 +10,24 @@
 #include <QMenu>
 #include <QObject>
 #include <QPoint>
+#include <QRect>
 #include <QScrollArea>
 #include <QString>
 
+#include "app/History.hpp"
+
+#include <core/Selection.hpp>
+
+// Définitions pour les analyseurs (clangd) qui ne connaissent pas la
+// macro `slots`. Ne pas redéfinir pour `moc`.
+#if !defined(Q_MOC_RUN)
+#if !defined(slots)
+#define slots
+#endif
+#endif
+
 class ImageActions;
+class ImageLabel;
 
 class MainWindow : public QMainWindow
 {
@@ -27,6 +42,11 @@ class MainWindow : public QMainWindow
     void zoomIn();
     void zoomOut();
     void resetZoom();
+
+    void onMouseSelection(const QRect& rect);
+
+    void clearSelection();
+    void toggleSelectionMode(bool enabled);
 
     void openEpg();
     void saveAsEpg();
@@ -44,7 +64,7 @@ class MainWindow : public QMainWindow
     void keyReleaseEvent(QKeyEvent* event) override;
 
     // Membres internes
-    QLabel* m_imageLabel;
+    ImageLabel* m_imageLabel;
     QScrollArea* m_scrollArea;
     QImage m_currentImage;
     QString m_currentFileName;
@@ -52,6 +72,7 @@ class MainWindow : public QMainWindow
 
     QMenu* m_fileMenu;
     QMenu* m_viewMenu;
+    QMenu* m_cmdMenu;
 
     QAction* m_newAct;
     QAction* m_openAct;
@@ -70,4 +91,20 @@ class MainWindow : public QMainWindow
     QPoint m_lastPanPos;
     QAction* m_openEpgAct;
     QAction* m_saveEpgAct;
+    QAction* m_clearSelectionAct;
+    QAction* m_selectToggleAct;
+    QAction* m_bucketAct;
+    bool m_bucketMode{false};
+    QAction* m_colorPickerAct;
+    QColor m_bucketColor{Qt::black};
+
+    // Sélection active pour l'image
+    Selection m_selection;
+    // remplissage pot de peinture
+    void bucketFillAt(const QPoint& viewportPos);
+    void updateColorPickerIcon();
+    // Historique des commandes (undo/redo)
+    app::History m_history{128};
+    QAction* m_undoAct{nullptr};
+    QAction* m_redoAct{nullptr};
 };
