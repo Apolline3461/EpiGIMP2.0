@@ -99,11 +99,11 @@ static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, i
     if (maxW <= 0 || maxH <= 0)
         return;
 
-    const int layerCount = doc.layerCount();
+    const size_t layerCount = doc.layerCount();
     if (layerCount == 0)
         return;
 
-    for (int i = 0; i < layerCount; ++i)
+    for (size_t i = 0; i < layerCount; ++i)
     {
         const auto layer = doc.layerAt(i);
         if (!layer)

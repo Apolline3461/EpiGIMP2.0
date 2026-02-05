@@ -433,7 +433,7 @@ void MainWindow::populateLayersList()
         return;
     }
     m_layersList->clear();
-    for (int i = m_document->layerCount() - 1; i >= 0; --i)
+    for (int i = static_cast<int>(m_document->layerCount()) - 1; i >= 0; --i)
     {
         auto layer = m_document->layerAt(i);
         if (!layer)
@@ -927,7 +927,7 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
                 else
                 {
                     // pick topmost editable visible layer under cursor (skip background idx 0)
-                    for (int i = m_document->layerCount() - 1; i >= 1; --i)
+                    for (auto i = m_document->layerCount() - 1; i >= 1; --i)
                     {
                         auto lyr = m_document->layerAt(i);
                         if (!lyr || !lyr->visible() || !lyr->image() || !lyr->isEditable())

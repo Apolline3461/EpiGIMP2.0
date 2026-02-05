@@ -91,7 +91,7 @@ void Document::reorderLayer(size_t from, size_t to)
     layers_.insert(layers_.begin() + static_cast<std::ptrdiff_t>(to), std::move(tmpLayer));
 }
 
-void Document::mergeDown(const size_t from)
+void Document::mergeDown(const int from)
 {
     const auto size = layers_.size();
 

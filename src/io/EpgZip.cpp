@@ -398,7 +398,7 @@ std::vector<unsigned char> ZipEpgStorage::composePreviewRGBA(const Document& doc
 
     std::vector<unsigned char> preview(static_cast<size_t>(w) * static_cast<size_t>(h) * 4u, 0);
 
-    for (int i = 0; i < doc.layerCount(); ++i)
+    for (size_t i = 0; i < doc.layerCount(); ++i)
     {
         auto layerPtr = doc.layerAt(i);
         if (!layerPtr || !layerPtr->visible() || !layerPtr->image())
