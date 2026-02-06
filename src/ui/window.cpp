@@ -1,14 +1,17 @@
 #include "ui/window.hpp"
 
+#include <QCheckBox>
 #include <QColor>
 #include <QColorDialog>
 #include <QContextMenuEvent>
 #include <QCursor>
 #include <QDateTime>
+#include <QDialog>
 #include <QDir>
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QImageReader>
@@ -21,16 +24,19 @@
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPalette>
 #include <QPixmap>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSlider>
+#include <QSpinBox>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QTextEdit>
 #include <QTextOption>
 #include <QToolBar>
+#include <QVBoxLayout>
 
 #include <vector>
 
@@ -273,13 +279,14 @@ void MainWindow::createMenus()
     m_fileMenu = menuBar()->addMenu(tr("&Fichier"));
     m_fileMenu->addAction(m_newAct);
     m_fileMenu->addAction(m_openAct);
-    m_fileMenu->addAction(m_addLayerAct);
-    m_fileMenu->addAction(m_addImageLayerAct);
     m_fileMenu->addAction(m_openEpgAct);
     m_fileMenu->addAction(m_saveAct);
     m_fileMenu->addAction(m_saveEpgAct);
-    m_fileMenu->addAction(m_closeAct);
     m_fileMenu->addSeparator();
+    m_fileMenu->addAction(m_addLayerAct);
+    m_fileMenu->addAction(m_addImageLayerAct);
+    m_fileMenu->addSeparator();
+    m_fileMenu->addAction(m_closeAct);
     m_fileMenu->addAction(m_exitAct);
 
     // Menu Vue
@@ -305,7 +312,6 @@ void MainWindow::addNewLayer()
 {
     if (!m_document)
     {
-        // If there's no Document but we have a current image, create a Document from it.
         if (m_currentImage.isNull())
             return;
 
@@ -318,13 +324,99 @@ void MainWindow::addNewLayer()
             std::make_shared<Layer>(1ull, std::string("Background"), imgPtr, true, false, 1.0f);
         m_document->addLayer(baseLayer);
     }
-    const int w = m_document->width();
-    const int h = m_document->height();
+    // Show a dialog to pick width, height and optional fill color
+    const int defW = m_document->width();
+    const int defH = m_document->height();
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(tr("Ajouter un calque"));
+    QVBoxLayout* dlgLayout = new QVBoxLayout(&dlg);
+
+    QHBoxLayout* sizeLayout = new QHBoxLayout();
+    QLabel* wLabel = new QLabel(tr("Largeur:"), &dlg);
+    QSpinBox* wSpin = new QSpinBox(&dlg);
+    wSpin->setRange(1, 10000);
+    wSpin->setValue(defW);
+    QLabel* hLabel = new QLabel(tr("Hauteur:"), &dlg);
+    QSpinBox* hSpin = new QSpinBox(&dlg);
+    hSpin->setRange(1, 10000);
+    hSpin->setValue(defH);
+    sizeLayout->addWidget(wLabel);
+    sizeLayout->addWidget(wSpin);
+    sizeLayout->addSpacing(8);
+    sizeLayout->addWidget(hLabel);
+    sizeLayout->addWidget(hSpin);
+    dlgLayout->addLayout(sizeLayout);
+
+    QHBoxLayout* colorLayout = new QHBoxLayout();
+    QCheckBox* fillCheck = new QCheckBox(tr("Remplir avec une couleur"), &dlg);
+    QPushButton* colorBtn = new QPushButton(tr("Choisir la couleur"), &dlg);
+    QLabel* colorPreview = new QLabel(&dlg);
+    colorPreview->setFixedSize(24, 24);
+    colorPreview->setFrameStyle(QFrame::Box | QFrame::Plain);
+    colorPreview->setAutoFillBackground(true);
+    QColor chosenColor = QColor(255, 255, 255, 255);
+    auto updatePreview = [&]()
+    {
+        QPalette pal = colorPreview->palette();
+        pal.setColor(QPalette::Window, chosenColor);
+        colorPreview->setPalette(pal);
+    };
+    updatePreview();
+    connect(colorBtn, &QPushButton::clicked, &dlg,
+            [&]()
+            {
+                QColor c = QColorDialog::getColor(chosenColor, &dlg, tr("Choisir la couleur"));
+                if (c.isValid())
+                {
+                    chosenColor = c;
+                    updatePreview();
+                }
+            });
+    colorLayout->addWidget(fillCheck);
+    colorLayout->addWidget(colorBtn);
+    colorLayout->addWidget(colorPreview);
+    dlgLayout->addLayout(colorLayout);
+
+    QHBoxLayout* buttons = new QHBoxLayout();
+    buttons->addStretch();
+    QPushButton* okBtn = new QPushButton(tr("OK"), &dlg);
+    QPushButton* cancelBtn = new QPushButton(tr("Annuler"), &dlg);
+    buttons->addWidget(okBtn);
+    buttons->addWidget(cancelBtn);
+    dlgLayout->addLayout(buttons);
+    connect(okBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+    connect(cancelBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
+
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    int w = wSpin->value();
+    int h = hSpin->value();
+    const bool fillWithColor = fillCheck->isChecked();
+
     if (w <= 0 || h <= 0)
         return;
 
     auto img = std::make_shared<ImageBuffer>(w, h);
-    img->fill(0u);  // transparent
+    if (fillWithColor)
+    {
+        const uint32_t colorVal = (static_cast<uint32_t>(chosenColor.red()) << 24) |
+                                  (static_cast<uint32_t>(chosenColor.green()) << 16) |
+                                  (static_cast<uint32_t>(chosenColor.blue()) << 8) |
+                                  static_cast<uint32_t>(chosenColor.alpha());
+        for (int yy = 0; yy < h; ++yy)
+        {
+            for (int xx = 0; xx < w; ++xx)
+            {
+                img->setPixel(xx, yy, colorVal);
+            }
+        }
+    }
+    else
+    {
+        img->fill(0u);  // transparent
+    }
 
     uint64_t id = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
     const std::string name = "Layer " + std::to_string(m_document->layerCount());
@@ -497,16 +589,16 @@ void MainWindow::populateLayersList()
         // start read-only for background or locked layers
         nameEdit->setReadOnly(isBottom || layer->locked());
 
-        QSlider* opacitySlider = new QSlider(Qt::Horizontal, row);
-        opacitySlider->setRange(0, 100);
-        opacitySlider->setValue(static_cast<int>(layer->opacity() * 100.0f));
-        opacitySlider->setFixedWidth(50);
-        opacitySlider->setEnabled(!layer->locked());
+        QSpinBox* opacitySpin = new QSpinBox(row);
+        opacitySpin->setRange(0, 100);
+        opacitySpin->setValue(static_cast<int>(layer->opacity() * 100.0f));
+        opacitySpin->setFixedWidth(50);
+        opacitySpin->setEnabled(!layer->locked());
 
         h->addWidget(eyeBtn);
         h->addWidget(lockBtn);
         h->addWidget(nameEdit);
-        h->addWidget(opacitySlider);
+        h->addWidget(opacitySpin);
         h->addWidget(thumb);
 
         m_layersList->setItemWidget(item, row);
@@ -525,14 +617,14 @@ void MainWindow::populateLayersList()
                 });
 
         connect(lockBtn, &QPushButton::clicked, this,
-                [this, layer, lockBtn, nameEdit, opacitySlider, item, isBottom, thumb]()
+                [this, layer, lockBtn, nameEdit, opacitySpin, item, isBottom, thumb]()
                 {
                     layer->setLocked(!layer->locked());
                     lockBtn->setIcon(
                         QIcon(layer->locked() ? ":/icons/lock.svg" : ":/icons/unlock.svg"));
                     // disable editing when locked
                     nameEdit->setReadOnly(isBottom || layer->locked());
-                    opacitySlider->setEnabled(!layer->locked());
+                    opacitySpin->setEnabled(!layer->locked());
                     // update item flags to reflect dragability
                     Qt::ItemFlags flags = item->flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable;
                     if (!isBottom && !layer->locked())
@@ -542,7 +634,7 @@ void MainWindow::populateLayersList()
                     thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
                 });
 
-        connect(opacitySlider, &QSlider::valueChanged, this,
+        connect(opacitySpin, &QSpinBox::valueChanged, this,
                 [this, layer, thumb](int v)
                 {
                     layer->setOpacity(static_cast<float>(v) / 100.0f);
@@ -641,18 +733,44 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
     }
     else if (act == resizeAct)
     {
-        bool okW = false;
-        bool okH = false;
         const int curW = m_document->width();
         const int curH = m_document->height();
-        int w = QInputDialog::getInt(this, tr("Redimensionner le calque"), tr("Largeur:"), curW, 1,
-                                     10000, 1, &okW);
-        if (!okW)
+
+        QDialog dlg(this);
+        dlg.setWindowTitle(tr("Redimensionner le calque"));
+        QVBoxLayout* dlgLayout = new QVBoxLayout(&dlg);
+
+        QHBoxLayout* sizeLayout = new QHBoxLayout();
+        QLabel* wLabel = new QLabel(tr("Largeur:"), &dlg);
+        QSpinBox* wSpin = new QSpinBox(&dlg);
+        wSpin->setRange(1, 10000);
+        wSpin->setValue(curW);
+        QLabel* hLabel = new QLabel(tr("Hauteur:"), &dlg);
+        QSpinBox* hSpin = new QSpinBox(&dlg);
+        hSpin->setRange(1, 10000);
+        hSpin->setValue(curH);
+        sizeLayout->addWidget(wLabel);
+        sizeLayout->addWidget(wSpin);
+        sizeLayout->addSpacing(8);
+        sizeLayout->addWidget(hLabel);
+        sizeLayout->addWidget(hSpin);
+        dlgLayout->addLayout(sizeLayout);
+
+        QHBoxLayout* buttons = new QHBoxLayout();
+        buttons->addStretch();
+        QPushButton* okBtn = new QPushButton(tr("OK"), &dlg);
+        QPushButton* cancelBtn = new QPushButton(tr("Annuler"), &dlg);
+        buttons->addWidget(okBtn);
+        buttons->addWidget(cancelBtn);
+        dlgLayout->addLayout(buttons);
+        connect(okBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+        connect(cancelBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
+
+        if (dlg.exec() != QDialog::Accepted)
             return;
-        int h = QInputDialog::getInt(this, tr("Redimensionner le calque"), tr("Hauteur:"), curH, 1,
-                                     10000, 1, &okH);
-        if (!okH)
-            return;
+
+        const int w = wSpin->value();
+        const int h = hSpin->value();
 
         auto lyr = m_document->layerAt(idx);
         if (lyr && lyr->image())
@@ -724,7 +842,6 @@ void MainWindow::onLayersRowsMoved(const QModelIndex& /*parent*/, int /*start*/,
 
     if (!newLayers.empty())
     {
-        // m_document->setLayers(std::move(newLayers));
         populateLayersList();
         updateImageFromDocument();
     }
@@ -734,7 +851,6 @@ void MainWindow::updateImageFromDocument()
 {
     if (!m_document || m_document->layerCount() == 0)
         return;
-    // Compose document into an ImageBuffer
     ImageBuffer outBuf(m_document->width(), m_document->height());
     Compositor comp;
     comp.compose(*m_document, outBuf);
@@ -761,7 +877,6 @@ QPixmap MainWindow::createLayerThumbnail(const std::shared_ptr<Layer>& layer,
     if (lb.width() <= 0 || lb.height() <= 0)
         return out;
 
-    // Convert the layer buffer to a QImage
     QImage img = ImageConversion::imageBufferToQImage(lb, QImage::Format_ARGB32_Premultiplied);
 
     QSize target = size;
@@ -771,7 +886,6 @@ QPixmap MainWindow::createLayerThumbnail(const std::shared_ptr<Layer>& layer,
 
     QImage scaled = img.scaled(scaledSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 
-    // Draw the scaled image centered on a transparent canvas of the target size
     QPixmap canvas(target);
     canvas.fill(Qt::transparent);
     QPainter painter(&canvas);
@@ -838,7 +952,6 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
     {
         if (event->type() == QEvent::Resize)
         {
-            // adjust document width so wrapping updates, then resize height to fit content
             te->document()->setTextWidth(te->viewport()->width());
             int h = static_cast<int>(te->document()->size().height()) + 8;
             QFontMetrics fm(te->font());
@@ -861,7 +974,6 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
         if (event->type() == QEvent::MouseButtonPress)
         {
             QMouseEvent* me = static_cast<QMouseEvent*>(event);
-            // Pot de peinture: clic gauche remplit
             if (me->button() == Qt::LeftButton && m_bucketMode)
             {
                 bucketFillAt(me->pos());
@@ -1328,6 +1440,11 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
 
     // Build working buffer from the target layer's image if available, otherwise fall back
     ImageBuffer workingBuffer(m_currentImage.width(), m_currentImage.height());
+    int localStartX = imgX;
+    int localStartY = imgY;
+    std::shared_ptr<ImageBuffer> layerImagePtr;
+    int layerOffsetX = 0;
+    int layerOffsetY = 0;
     if (m_document && targetLayerId != 0u)
     {
         auto layerPtr = m_document->layerAt(static_cast<size_t>(targetLayerIdx));
@@ -1337,8 +1454,21 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
                                      tr("Calque invalide ou non modifiable."));
             return;
         }
+        layerImagePtr = layerPtr->image();
+        layerOffsetX = layerPtr->offsetX();
+        layerOffsetY = layerPtr->offsetY();
+        // compute local coords inside the layer image
+        localStartX = imgX - layerOffsetX;
+        localStartY = imgY - layerOffsetY;
         // copy the layer buffer so flood fill can run on a working copy
-        workingBuffer = *layerPtr->image();
+        workingBuffer = *layerImagePtr;
+        // ensure the start point is inside the layer image bounds
+        if (localStartX < 0 || localStartY < 0 || localStartX >= workingBuffer.width() ||
+            localStartY >= workingBuffer.height())
+        {
+            statusBar()->showMessage(tr("Clic hors du calque — aucun remplissage"), 2000);
+            return;
+        }
     }
     else
     {
@@ -1369,20 +1499,51 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
     std::vector<std::tuple<int, int, uint32_t>> changedPixels;
     if (m_selection.hasMask())
     {
-        if (m_selection.t_at(imgX, imgY) != 0)
-        {
-            changedPixels = core::floodFillWithinMaskTracked(workingBuffer, *m_selection.mask(),
-                                                             imgX, imgY, core::Color{newColor});
-        }
-        else
+        // selection mask is in document coords; if filling a layer image with offsets
+        // we need to create a local mask aligned with the working buffer
+        if (m_selection.t_at(imgX, imgY) == 0)
         {
             statusBar()->showMessage(tr("Clic hors de la sélection — aucun remplissage"), 2000);
             return;
         }
+
+        if (layerImagePtr)
+        {
+            ImageBuffer localMask(workingBuffer.width(), workingBuffer.height());
+            localMask.fill(0u);
+            const auto selMaskPtr = m_selection.mask();
+            if (selMaskPtr)
+            {
+                for (int y = 0; y < localMask.height(); ++y)
+                {
+                    for (int x = 0; x < localMask.width(); ++x)
+                    {
+                        const int gx = x + layerOffsetX;
+                        const int gy = y + layerOffsetY;
+                        if (gx >= 0 && gy >= 0 && gx < selMaskPtr->width() &&
+                            gy < selMaskPtr->height())
+                        {
+                            if ((selMaskPtr->getPixel(gx, gy) & 0xFFu) != 0u)
+                                localMask.setPixel(x, y, 0x000000FFu);
+                        }
+                    }
+                }
+            }
+            changedPixels = core::floodFillWithinMaskTracked(workingBuffer, localMask, localStartX,
+                                                             localStartY, core::Color{newColor});
+        }
+        else
+        {
+            // working buffer is the composed image
+            changedPixels = core::floodFillWithinMaskTracked(workingBuffer, *m_selection.mask(),
+                                                             imgX, imgY, core::Color{newColor});
+        }
     }
     else
     {
-        changedPixels = core::floodFillTracked(workingBuffer, imgX, imgY, core::Color{newColor});
+        // no selection mask; fill within the working buffer
+        changedPixels =
+            core::floodFillTracked(workingBuffer, localStartX, localStartY, core::Color{newColor});
     }
 
     if (changedPixels.empty())
