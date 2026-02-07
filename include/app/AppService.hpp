@@ -13,6 +13,7 @@
 #include "io/IStorage.hpp"
 
 class Document;
+class ImageBuffer;
 
 namespace app
 {
@@ -64,6 +65,16 @@ class AppService
     void removeLayer(std::size_t idx);
     void reorderLayer(std::size_t from, std::size_t to);
     void mergeLayerDown(std::size_t from);
+
+    void renameLayer(std::size_t idx, const std::string& newName);
+
+    void previewLayerOffset(std::size_t idx, int x, int y);
+    void commitLayerOffset(std::size_t idx, int beforeX, int beforeY, int afterX, int afterY);
+
+    void resizeLayer(std::size_t idx, Size newSize);
+
+    void previewLayerOpacity(std::size_t idx, float alpha);
+    void commitLayerOpacity(std::size_t idx, float before, float after);
 
     void beginStroke(const ToolParams&, common::Point pStart);
     void moveStroke(common::Point p);

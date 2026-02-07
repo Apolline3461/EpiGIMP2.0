@@ -172,9 +172,9 @@ void AppService::setLayerVisible(std::size_t idx, bool visible)
     if (!doc_)
         throw std::runtime_error("setLayerVisible: document is null");
 
-    auto layer = doc_->layerAt(static_cast<int>(idx));
+    auto layer = doc_->layerAt(idx);
     if (!layer)
-        throw std::out_of_range("layer idx");
+        throw std::out_of_range("Invalid layer");
 
     if (layer->visible() == visible)
         return;
@@ -187,7 +187,7 @@ void AppService::setLayerOpacity(std::size_t idx, float alpha)
     if (!doc_)
         throw std::runtime_error("setLayerOpacity: document is null");
 
-    auto layer = doc_->layerAt(static_cast<int>(idx));
+    auto layer = doc_->layerAt(idx);
     if (!layer)
         throw std::out_of_range("layer idx");
 
@@ -202,7 +202,7 @@ void AppService::setLayerLocked(std::size_t idx, bool locked)
     if (!doc_)
         throw std::runtime_error("setLayerLocked: document is null");
 
-    auto layer = doc_->layerAt(static_cast<int>(idx));
+    auto layer = doc_->layerAt(idx);
     if (!layer)
         throw std::out_of_range("layer idx");
 
@@ -231,15 +231,14 @@ void AppService::removeLayer(std::size_t idx)
     if (!doc_)
         throw std::runtime_error("removeLayer: document is null");
 
-    auto layer = doc_->layerAt(static_cast<int>(idx));
+    auto layer = doc_->layerAt(idx);
     if (!layer)
         throw std::out_of_range("layer idx");
 
     if (layer->locked())
         throw std::runtime_error("Cannot remove locked layer");
 
-    apply(
-        commands::makeRemoveLayerCommand(doc_.get(), layer, static_cast<int>(idx), &activeLayer_));
+    apply(commands::makeRemoveLayerCommand(doc_.get(), layer, idx, &activeLayer_));
 }
 
 void AppService::reorderLayer(std::size_t from, std::size_t to)
@@ -254,12 +253,12 @@ void AppService::reorderLayer(std::size_t from, std::size_t to)
     if (from == to)
         return;
 
-    auto layer = doc_->layerAt(static_cast<int>(from));
+    auto layer = doc_->layerAt(from);
     if (!layer)
         throw std::out_of_range("reorderLayer: invalid from");
 
-    apply(commands::makeReorderLayerCommand(doc_.get(), layer->id(), static_cast<int>(from),
-                                            static_cast<int>(to), &activeLayer_));
+    apply(commands::makeReorderLayerCommand(doc_.get(), layer->id(), from, static_cast<int>(to),
+                                            &activeLayer_));
 }
 
 void AppService::mergeLayerDown(std::size_t from)
@@ -274,11 +273,113 @@ void AppService::mergeLayerDown(std::size_t from)
     if (from == 0)
         throw std::runtime_error("Cannot merge down background");
 
-    auto layer = doc_->layerAt(static_cast<int>(from));
+    auto layer = doc_->layerAt(from);
     if (!layer)
         throw std::out_of_range("mergeLayerDown: invalid index");
 
-    apply(commands::makeMergeDownCommand(doc_.get(), layer, static_cast<int>(from), &activeLayer_));
+    apply(commands::makeMergeDownCommand(doc_.get(), layer, from, &activeLayer_));
+}
+
+void AppService::renameLayer(std::size_t idx, const std::string& newName)
+{
+    if (!doc_)
+        throw std::runtime_error("renameLayer: document is null");
+    auto layer = doc_->layerAt(idx);
+    if (!layer)
+        throw std::runtime_error("Invalid layer");
+
+    const std::string before = layer->name();
+    if (before == newName)
+        return;
+
+    apply(app::commands::makeRenameLayerCommand(doc_.get(), layer->id(), before, newName));
+}
+
+void AppService::previewLayerOffset(std::size_t idx, int x, int y)
+{
+    if (!doc_)
+        return;
+    auto layer = doc_->layerAt(idx);
+    if (!layer)
+        return;
+    if (layer->locked())
+        return;
+
+    layer->setOffset(x, y);
+    documentChanged.notify();
+}
+
+void AppService::commitLayerOffset(std::size_t idx, int beforeX, int beforeY, int afterX,
+                                   int afterY)
+{
+    if (!doc_)
+        throw std::runtime_error("No document");
+    auto layer = doc_->layerAt(idx);
+    if (!layer)
+        throw std::runtime_error("Invalid layer");
+    if (beforeX == afterX && beforeY == afterY)
+        return;
+
+    apply(app::commands::makeSetLayerOffsetCommand(doc_.get(), layer->id(), beforeX, beforeY,
+                                                   afterX, afterY));
+}
+
+static std::shared_ptr<ImageBuffer> resizedCopy(const ImageBuffer& old, int w, int h)
+{
+    auto out = std::make_shared<ImageBuffer>(w, h);
+    out->fill(0u);
+
+    const int copyW = std::min(w, old.width());
+    const int copyH = std::min(h, old.height());
+
+    for (int y = 0; y < copyH; ++y)
+        for (int x = 0; x < copyW; ++x)
+            out->setPixel(x, y, old.getPixel(x, y));
+
+    return out;
+}
+
+void AppService::resizeLayer(std::size_t idx, Size newSize)
+{
+    if (!doc_)
+        throw std::runtime_error("No document");
+    auto layer = doc_->layerAt(idx);
+    if (!layer || !layer->image())
+        throw std::runtime_error("Invalid layer/image");
+    if (layer->locked())
+        throw std::runtime_error("Layer locked");
+
+    auto before = std::make_shared<ImageBuffer>(*layer->image());  // snapshot
+    auto after = resizedCopy(*layer->image(), newSize.w, newSize.h);
+
+    apply(app::commands::makeResizeLayerCommand(doc_.get(), layer->id(), before, after));
+}
+
+void AppService::previewLayerOpacity(std::size_t idx, float alpha)
+{
+    if (!doc_)
+        return;
+    auto layer = doc_->layerAt(idx);
+    if (!layer)
+        return;
+    if (layer->locked())
+        return;
+
+    layer->setOpacity(alpha);
+    documentChanged.notify();
+}
+
+void AppService::commitLayerOpacity(std::size_t idx, float before, float after)
+{
+    if (!doc_)
+        throw std::runtime_error("No document");
+    auto layer = doc_->layerAt(idx);
+    if (!layer)
+        throw std::runtime_error("Invalid layer");
+    if (before == after)
+        return;
+
+    apply(app::commands::makeSetLayerOpacityCommand(doc_.get(), layer->id(), before, after));
 }
 
 void AppService::beginStroke(const ToolParams& params, common::Point pStart)
@@ -332,6 +433,7 @@ void AppService::moveStroke(common::Point p)
         return;
     currentStroke_->addPoint(p);
 }
+
 void AppService::endStroke()
 {
     if (!currentStroke_)

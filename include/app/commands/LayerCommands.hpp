@@ -12,6 +12,7 @@
 
 class Document;
 class Layer;
+class ImageBuffer;
 
 namespace app::commands
 {
@@ -36,4 +37,16 @@ std::unique_ptr<Command> makeSetLayerVisibleCommand(Document* doc, std::uint64_t
 
 std::unique_ptr<Command> makeSetLayerOpacityCommand(Document* doc, std::uint64_t layerId,
                                                     float before, float after);
+
+std::unique_ptr<Command> makeRenameLayerCommand(Document* doc, std::uint64_t layerId,
+                                                std::string before, std::string after);
+
+std::unique_ptr<Command> makeSetLayerOffsetCommand(Document* doc, std::uint64_t layerId,
+                                                   int beforeX, int beforeY, int afterX,
+                                                   int afterY);
+
+std::unique_ptr<Command> makeResizeLayerCommand(Document* doc, std::uint64_t layerId,
+                                                std::shared_ptr<ImageBuffer> before,
+                                                std::shared_ptr<ImageBuffer> after);
+
 }  // namespace app::commands

@@ -293,7 +293,6 @@ class ReorderLayerCommand final : public Command
 class MergeDownCommand final : public Command
 {
    public:
-    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     MergeDownCommand(Document* doc, std::shared_ptr<Layer> removed, std::size_t from,
                      std::size_t* activeLayer)
         : doc_(doc), removed_(std::move(removed)), from_(from), activeLayer_(activeLayer)
@@ -334,6 +333,147 @@ class MergeDownCommand final : public Command
     std::shared_ptr<Layer> removed_;
     std::size_t from_{0};
     std::size_t* activeLayer_{nullptr};
+};
+
+class RenameLayerCommand final : public Command
+{
+   public:
+    RenameLayerCommand(Document* doc, std::uint64_t layerId, std::string before, std::string after)
+        : doc_(doc), layerId_(layerId), before_(std::move(before)), after_(std::move(after))
+    {
+    }
+
+    void redo() override
+    {
+        set(after_);
+    }
+    void undo() override
+    {
+        set(before_);
+    }
+
+   private:
+    void set(const std::string& v) const
+    {
+        if (!doc_)
+            return;
+
+        auto idx = findLayerIndexById(*doc_, layerId_);
+        if (!idx)
+            return;
+
+        if (*idx == 0)
+            throw std::runtime_error("Cannot rename background layer");
+
+        auto layer = doc_->layerAt(*idx);
+        if (!layer)
+            return;
+
+        if (layer->locked())
+            throw std::runtime_error("Cannot rename locked layer");
+
+        layer->setName(v);
+    }
+
+    Document* doc_{nullptr};
+    std::uint64_t layerId_{0};
+    std::string before_;
+    std::string after_;
+};
+
+class SetLayerOffsetCommand final : public Command
+{
+   public:
+    SetLayerOffsetCommand(Document* doc, std::uint64_t layerId, int beforeX, int beforeY,
+                          int afterX, int afterY)
+        : doc_(doc),
+          layerId_(layerId),
+          beforeX_(beforeX),
+          beforeY_(beforeY),
+          afterX_(afterX),
+          afterY_(afterY)
+    {
+    }
+
+    void redo() override
+    {
+        set(afterX_, afterY_);
+    }
+    void undo() override
+    {
+        set(beforeX_, beforeY_);
+    }
+
+   private:
+    void set(int x, int y) const
+    {
+        if (!doc_)
+            return;
+
+        auto idx = findLayerIndexById(*doc_, layerId_);
+        if (!idx)
+            return;
+
+        if (*idx == 0)
+            throw std::runtime_error("Cannot move background layer");
+
+        auto layer = doc_->layerAt(*idx);
+        if (!layer)
+            return;
+
+        if (layer->locked())
+            throw std::runtime_error("Cannot move locked layer");
+        layer->setOffset(x, y);
+    }
+
+    Document* doc_{nullptr};
+    std::uint64_t layerId_{0};
+    int beforeX_{0}, beforeY_{0};
+    int afterX_{0}, afterY_{0};
+};
+
+class ResizeLayerCommand final : public Command
+{
+   public:
+    ResizeLayerCommand(Document* doc, std::uint64_t layerId, std::shared_ptr<ImageBuffer> before,
+                       std::shared_ptr<ImageBuffer> after)
+        : doc_(doc), layerId_(layerId), before_(std::move(before)), after_(std::move(after))
+    {
+    }
+
+    void redo() override
+    {
+        set(after_);
+    }
+    void undo() override
+    {
+        set(before_);
+    }
+
+   private:
+    void set(const std::shared_ptr<ImageBuffer>& buf) const
+    {
+        if (!doc_ || !buf)
+            return;
+
+        auto idx = findLayerIndexById(*doc_, layerId_);
+        if (!idx)
+            return;
+
+        auto layer = doc_->layerAt(*idx);
+        if (!layer)
+            return;
+
+        if (layer->locked())
+            throw std::runtime_error("Cannot resize locked layer");
+
+        layer->setImageBuffer(buf);
+    }
+
+    Document* doc_{nullptr};
+    std::uint64_t layerId_{0};
+    std::shared_ptr<ImageBuffer> before_;
+    std::shared_ptr<ImageBuffer> after_;
 };
 
 }  // namespace
@@ -379,6 +519,25 @@ std::unique_ptr<Command> makeSetLayerOpacityCommand(Document* doc, std::uint64_t
                                                     float before, float after)
 {
     return std::make_unique<SetLayerOpacityCommand>(doc, layerId, before, after);
+}
+
+std::unique_ptr<Command> makeRenameLayerCommand(Document* doc, std::uint64_t layerId,
+                                                std::string before, std::string after)
+{
+    return std::make_unique<RenameLayerCommand>(doc, layerId, std::move(before), std::move(after));
+}
+
+std::unique_ptr<Command> makeSetLayerOffsetCommand(Document* doc, std::uint64_t layerId,
+                                                   int beforeX, int beforeY, int afterX, int afterY)
+{
+    return std::make_unique<SetLayerOffsetCommand>(doc, layerId, beforeX, beforeY, afterX, afterY);
+}
+
+std::unique_ptr<Command> makeResizeLayerCommand(Document* doc, std::uint64_t layerId,
+                                                std::shared_ptr<ImageBuffer> before,
+                                                std::shared_ptr<ImageBuffer> after)
+{
+    return std::make_unique<ResizeLayerCommand>(doc, layerId, std::move(before), std::move(after));
 }
 
 }  // namespace app::commands

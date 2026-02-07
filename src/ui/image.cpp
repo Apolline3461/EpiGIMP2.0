@@ -71,6 +71,7 @@ void ImageActions::newImage(MainWindow* window)
         window->myApp_->newDocument(app::Size{width, height}, 72.f, bg);
 
         window->m_currentFileName.clear();
+        window->populateLayersList();
         window->updateImageDisplay();
         window->m_scrollArea->setVisible(true);
 
@@ -129,6 +130,7 @@ void ImageActions::openImage(MainWindow* window)
 
     window->m_currentFileName = fileName;
 
+    window->populateLayersList();
     window->updateImageDisplay();
     window->m_scrollArea->setVisible(true);
 
@@ -216,6 +218,9 @@ void ImageActions::closeImage(MainWindow* window)
     window->m_imageLabel->clear();
     window->m_scrollArea->setVisible(false);
     window->m_scaleFactor = 1.0;
+    window->m_document.reset();
+    window->populateLayersList();
+    window->updateImageDisplay();
 
     window->setWindowTitle(QObject::tr("EpiGimp 2.0"));
     window->statusBar()->showMessage(QObject::tr("Image fermée"), 2000);

@@ -5,6 +5,7 @@
 #include "core/Compositor.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 #include "core/Document.hpp"
 #include "core/ImageBuffer.hpp"
@@ -37,17 +38,19 @@ static inline std::uint32_t makePixel(std::uint8_t r, std::uint8_t g, std::uint8
            (static_cast<std::uint32_t>(b) << 8) | static_cast<std::uint32_t>(a);
 }
 
-static std::uint32_t blendPixel(std::uint32_t src, std::uint32_t dst, float layerOpacity)
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+static std::uint32_t blendPixel(std::uint32_t src, std::uint32_t dst,
+                                float layerOpacity)  // NOLINT(bugprone-easily-swappable-parameters)
 {
-    const float srcR = extractR(src) / 255.0f;
-    const float srcG = extractG(src) / 255.0f;
-    const float srcB = extractB(src) / 255.0f;
-    const float srcA = extractA(src) / 255.0f;
+    const float srcR = static_cast<float>(extractR(src)) / 255.0f;
+    const float srcG = static_cast<float>(extractG(src)) / 255.0f;
+    const float srcB = static_cast<float>(extractB(src)) / 255.0f;
+    const float srcA = static_cast<float>(extractA(src)) / 255.0f;
 
-    const float dstR = extractR(dst) / 255.0f;
-    const float dstG = extractG(dst) / 255.0f;
-    const float dstB = extractB(dst) / 255.0f;
-    const float dstA = extractA(dst) / 255.0f;
+    const float dstR = static_cast<float>(extractR(dst)) / 255.0f;
+    const float dstG = static_cast<float>(extractG(dst)) / 255.0f;
+    const float dstB = static_cast<float>(extractB(dst)) / 255.0f;
+    const float dstA = static_cast<float>(extractA(dst)) / 255.0f;
 
     // On applique l'opacité du layer sur l'alpha source
     const float effA = srcA * std::clamp(layerOpacity, 0.0f, 1.0f);
@@ -66,7 +69,7 @@ static std::uint32_t blendPixel(std::uint32_t src, std::uint32_t dst, float laye
     const auto toByte = [](float v) -> std::uint8_t
     {
         float clamped = std::clamp(v, 0.0f, 1.0f);
-        return static_cast<std::uint8_t>(clamped * 255.0f + 0.5f);
+        return static_cast<std::uint8_t>(std::lround(clamped * 255.0f));
     };
 
     return makePixel(toByte(outR), toByte(outG), toByte(outB), toByte(outA));
@@ -79,8 +82,9 @@ static std::uint32_t blendPixel(std::uint32_t src, std::uint32_t dst, float laye
 // out          : image de sortie (roiW x roiH)
 // On assume que roi est dans les bornes du document (sinon on peut clamp).
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, int roiH,
-                          ImageBuffer& out)
+                          ImageBuffer& out)  // NOLINT(bugprone-easily-swappable-parameters)
 {
     if (roiW <= 0 || roiH <= 0)
         return;
@@ -95,11 +99,11 @@ static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, i
     if (maxW <= 0 || maxH <= 0)
         return;
 
-    const int layerCount = doc.layerCount();
+    const size_t layerCount = doc.layerCount();
     if (layerCount == 0)
         return;
 
-    for (int i = 0; i < layerCount; ++i)
+    for (size_t i = 0; i < layerCount; ++i)
     {
         const auto layer = doc.layerAt(i);
         if (!layer)
@@ -114,13 +118,26 @@ static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, i
         if (opacity <= 0.0f)
             continue;
 
+        const int ox = layer->offsetX();
+        const int oy = layer->offsetY();
+        const int imgW = imgPtr->width();
+        const int imgH = imgPtr->height();
+
         for (int sy = 0; sy < maxH; ++sy)
         {
             const int docY = docY0 + sy;
             for (int sx = 0; sx < maxW; ++sx)
             {
                 const int docX = docX0 + sx;
-                const std::uint32_t src = imgPtr->getPixel(docX, docY);
+                const int lx = docX - ox;  // local x in layer image
+                const int ly = docY - oy;  // local y in layer image
+
+                std::uint32_t src = 0u;  // transparent by default
+                if (lx >= 0 && lx < imgW && ly >= 0 && ly < imgH)
+                {
+                    src = imgPtr->getPixel(lx, ly);
+                }
+
                 const std::uint32_t dst = out.getPixel(sx, sy);
                 const std::uint32_t blended = blendPixel(src, dst, opacity);
                 out.setPixel(sx, sy, blended);
@@ -129,7 +146,7 @@ static void composeRegion(const Document& doc, int docX0, int docY0, int roiW, i
     }
 }
 
-void Compositor::compose(const Document& doc, ImageBuffer& out) const
+void Compositor::compose(const Document& doc, ImageBuffer& out)
 {
     const int width = doc.width();
     const int height = doc.height();
@@ -140,7 +157,7 @@ void Compositor::compose(const Document& doc, ImageBuffer& out) const
     composeRegion(doc, 0, 0, width, height, out);
 }
 
-void Compositor::composeROI(const Document& doc, int x, int y, int w, int h, ImageBuffer& out) const
+void Compositor::composeROI(const Document& doc, int x, int y, int w, int h, ImageBuffer& out)
 {
     if (w <= 0 || h <= 0)
         return;
