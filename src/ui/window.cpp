@@ -279,6 +279,8 @@ void MainWindow::createMenus()
     m_fileMenu = menuBar()->addMenu(tr("&Fichier"));
     m_fileMenu->addAction(m_newAct);
     m_fileMenu->addAction(m_openAct);
+    m_fileMenu->addAction(m_addLayerAct);
+    m_fileMenu->addAction(m_addImageLayerAct);
     m_fileMenu->addAction(m_openEpgAct);
     m_fileMenu->addAction(m_saveAct);
     m_fileMenu->addAction(m_saveEpgAct);
