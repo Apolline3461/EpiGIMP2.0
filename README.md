@@ -38,22 +38,25 @@ Développé en **C++20 / Qt 6**, il permet la création, la retouche et la gesti
 
 ### Calques
 
-- Ajout des calques (vides ou images), 
-- Suppression de calques
-- Réorganisation
-- Gestion de l'opacité, verrouillage et du nom pour chaques calques
+- Ajout de calques (vides ou à partir d'une image).
+- Suppression et réorganisation des calques (glisser / déposer dans le panneau Calques).
+- Gestion de l'opacité, du verrouillage et du nom pour chaque calque.
 - Fusion vers le bas.
 
 ### Sélection rectangulaire
 
-- Sélection limitant les outils.
-- Effacer la selection avec un bouton et la touche échap.
+- Sélection pour limiter l'action des outils au sein de la sélection.
+- Effacer la sélection via le bouton "Effacer la sélection" ou la touche Échap.
 
 ### Pot de peinture
 
-- Outils pot de peinture qui remplit une zone d'une seul couleur.
-- Palette de couleurs pour les outils.
+- Outil pot de peinture qui remplit une zone avec une seule couleur.
+- Palette de couleurs commune aux outils.
 
+### Historique
+
+- Annuler / Rétablir : icônes + raccourcis (Ctrl+Z / Ctrl+Y).
+- Limité à 20 actions d'annulation par défaut.
 
 > Le reste des fonctionnalités arrive progressivement.
 > Ce README se limite volontairement aux fonctionnalités déjà implémentées.
@@ -122,6 +125,20 @@ cmake --build build --parallel
 ./build/bin/epigimp
 ```
 
+### Tests & CI
+
+- Lancer un build de développement et la suite de tests unitaires localement :
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
+
+- Le dépôt contient une configuration GitHub Actions qui build et lance les tests automatiquement sur les pull request de dev et main.
+
+---
+
 ## Prise en main
 
 ### Raccourcis principaux
@@ -140,6 +157,8 @@ cmake --build build --parallel
 | Texte              | T                   |
 | Zoom +/-           | Ctrl + + / Ctrl + - |
 | Fermer             | Ctrl + W            |
+
+---
 
 ## Licence
 
