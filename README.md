@@ -58,6 +58,8 @@ Développé en **C++20 / Qt 6**, il permet la création, la retouche et la gesti
 - Annuler / Rétablir : icônes + raccourcis (Ctrl+Z / Ctrl+Y).
 - Limité à 20 actions d'annulation par défaut.
 
+---
+
 > Le reste des fonctionnalités arrive progressivement.
 > Ce README se limite volontairement aux fonctionnalités déjà implémentées.
 > La liste complète des fonctionnalités visées est détaillée dans le [cahier des charges](./EPIGIMP2.0%20cdc.pdf) du repo.
@@ -82,7 +84,7 @@ Plus d’informations : voir la **[documentation technique du format `.epg`](./d
 
 ### Télécharger une Release (recommandé)
 
-Les versions prêtes à l’emploi sont disponibles dans **GitHub Releases** :
+Les versions prêtes à l’emploi sont disponibles dans **[GitHub Releases](https://github.com/Apolline3461/EpiGIMP2.0/releases/)** :
 
 - **Linux** : `epigimp-linux-x86_64.AppImage`
 - **Windows** : `epigimp-windows-x86_64.zip` (portable)
