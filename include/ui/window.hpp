@@ -2,19 +2,26 @@
 
 #include <QAction>
 #include <QColor>
+#include <QDockWidget>
 #include <QEvent>
 #include <QImage>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QListWidget>
 #include <QMainWindow>
 #include <QMenu>
+#include <QModelIndex>
 #include <QObject>
+#include <QPixmap>
 #include <QPoint>
 #include <QRect>
 #include <QScrollArea>
 #include <QString>
 
+#include <memory>
+
 #include "app/History.hpp"
+#include "core/Document.hpp"
 
 #include <core/Selection.hpp>
 
@@ -38,6 +45,7 @@ class MainWindow : public QMainWindow
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() = default;
 
+    // NOLINTNEXTLINE(unknownMacro)
    private slots:
     void zoomIn();
     void zoomOut();
@@ -50,13 +58,27 @@ class MainWindow : public QMainWindow
 
     void openEpg();
     void saveAsEpg();
+    void addNewLayer();
+    void addImageAsLayer();
+    void onLayerItemChanged(QListWidgetItem* item);
+    void onLayerDoubleClicked(QListWidgetItem* item);
+    void onLayersRowsMoved(const QModelIndex& parent, int start, int end,
+                           const QModelIndex& destination, int row);
+    void onShowLayerContextMenu(const QPoint& pos);
+    void onMergeDown();
 
    private:
     void createActions();
     void createMenus();
+    void createLayersPanel();
     void updateImageDisplay();
     void scaleImage(double factor);
     void setScaleAndCenter(double newScale);
+
+    void populateLayersList();
+    void updateImageFromDocument();
+    QPixmap createLayerThumbnail(const std::shared_ptr<class Layer>& layer,
+                                 const QSize& size) const;
 
     // évènements et panning
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -91,6 +113,19 @@ class MainWindow : public QMainWindow
     QPoint m_lastPanPos;
     QAction* m_openEpgAct;
     QAction* m_saveEpgAct;
+    QAction* m_addLayerAct{nullptr};
+    QAction* m_addImageLayerAct{nullptr};
+
+    // Document and layers UI
+    std::unique_ptr<Document> m_document;
+    QDockWidget* m_layersDock{nullptr};
+    QListWidget* m_layersList{nullptr};
+    // layer dragging state (drag the selected layer on the canvas)
+    bool m_layerDragActive{false};
+    int m_dragLayerIndex{-1};
+    QPoint m_layerDragStartDocPos;  // in document pixel coords
+    int m_layerDragInitialOffsetX{0};
+    int m_layerDragInitialOffsetY{0};
     QAction* m_clearSelectionAct;
     QAction* m_selectToggleAct;
     QAction* m_bucketAct;

@@ -19,6 +19,10 @@
 #include <QStatusBar>
 #include <QVBoxLayout>
 
+#include "core/Document.hpp"
+#include "core/ImageBuffer.hpp"
+#include "core/Layer.hpp"
+#include "ui/ImageConversion.hpp"
 #include "ui/window.hpp"
 
 void ImageActions::newImage(MainWindow* window)
@@ -63,12 +67,20 @@ void ImageActions::newImage(MainWindow* window)
     {
         int width = widthSpinBox->value();
         int height = heightSpinBox->value();
-
         window->m_currentImage = QImage(width, height, QImage::Format_ARGB32);
         window->m_currentImage.fill(Qt::white);
         window->m_currentFileName.clear();
 
-        window->updateImageDisplay();
+        // create a Document and a base layer from the created image
+        ImageBuffer buf =
+            ImageConversion::qImageToImageBuffer(window->m_currentImage, width, height);
+        window->m_document = std::make_unique<Document>(width, height, 72.f);
+        auto imgPtr = std::make_shared<ImageBuffer>(buf);
+        auto layer =
+            std::make_shared<Layer>(1ull, std::string("Background"), imgPtr, true, false, 1.0f);
+        window->m_document->addLayer(layer);
+        window->populateLayersList();
+        window->updateImageFromDocument();
         window->m_scrollArea->setVisible(true);
 
         QString message = QObject::tr("Nouvelle image créée: %1x%2").arg(width).arg(height);
@@ -105,7 +117,17 @@ void ImageActions::openImage(MainWindow* window)
     window->m_currentImage = image;
     window->m_currentFileName = fileName;
 
-    window->updateImageDisplay();
+    // create a Document and base layer from the loaded image
+    const int width = window->m_currentImage.width();
+    const int height = window->m_currentImage.height();
+    ImageBuffer buf = ImageConversion::qImageToImageBuffer(window->m_currentImage, width, height);
+    window->m_document = std::make_unique<Document>(width, height, 72.f);
+    auto imgPtr = std::make_shared<ImageBuffer>(buf);
+    auto layer =
+        std::make_shared<Layer>(1ull, std::string("Background"), imgPtr, true, false, 1.0f);
+    window->m_document->addLayer(layer);
+    window->populateLayersList();
+    window->updateImageFromDocument();
     window->m_scrollArea->setVisible(true);
 
     QString message = QObject::tr("Image chargée: %1 (%2x%3)")
@@ -190,6 +212,9 @@ void ImageActions::closeImage(MainWindow* window)
     window->m_imageLabel->clear();
     window->m_scrollArea->setVisible(false);
     window->m_scaleFactor = 1.0;
+    window->m_document.reset();
+    window->populateLayersList();
+    window->updateImageDisplay();
 
     window->setWindowTitle(QObject::tr("EpiGimp 2.0"));
     window->statusBar()->showMessage(QObject::tr("Image fermée"), 2000);

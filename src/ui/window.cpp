@@ -1,32 +1,49 @@
 #include "ui/window.hpp"
 
+#include <QColor>
 #include <QColorDialog>
+#include <QContextMenuEvent>
 #include <QCursor>
+#include <QDateTime>
 #include <QDir>
+#include <QDockWidget>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QHBoxLayout>
 #include <QIcon>
+#include <QImageReader>
+#include <QInputDialog>
 #include <QKeyEvent>
+#include <QLineEdit>
+#include <QListWidget>
+#include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPixmap>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QSlider>
 #include <QStandardPaths>
 #include <QStatusBar>
+#include <QTextEdit>
+#include <QTextOption>
 #include <QToolBar>
 
 #include <vector>
 
 #include "app/Command.hpp"
 #include "core/BucketFill.hpp"
+#include "core/Compositor.hpp"
+#include "core/Document.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 #include "io/EpgFormat.hpp"
 #include "io/EpgJson.hpp"
 #include "ui/image.hpp"
+#include "ui/ImageConversion.hpp"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -53,6 +70,7 @@ MainWindow::MainWindow(QWidget* parent)
     // Création de l'interface
     createActions();
     createMenus();
+    createLayersPanel();
     // commande: barre d'outils pour sélection
     QToolBar* cmd = addToolBar(tr("Commande"));
     // show icons only and set a reasonable icon size
@@ -162,6 +180,15 @@ void MainWindow::createActions()
     m_saveEpgAct->setStatusTip(tr("Enregistrer l'image au format EpiGimp (.epg)"));
     connect(m_saveEpgAct, &QAction::triggered, this, &MainWindow::saveAsEpg);
 
+    m_addLayerAct = new QAction(tr("Ajouter un calque"), this);
+    m_addLayerAct->setStatusTip(tr("Ajouter un nouveau calque vide au document"));
+    connect(m_addLayerAct, &QAction::triggered, this, &MainWindow::addNewLayer);
+
+    m_addImageLayerAct = new QAction(tr("Ajouter une image en calque"), this);
+    m_addImageLayerAct->setStatusTip(
+        tr("Charger une image et l'ajouter en tant que nouveau calque"));
+    connect(m_addImageLayerAct, &QAction::triggered, this, &MainWindow::addImageAsLayer);
+
     // Menu Vue
     m_zoomInAct = new QAction(tr("Zoom &Avant"), this);
     m_zoomInAct->setShortcut(QKeySequence::ZoomIn);
@@ -246,6 +273,8 @@ void MainWindow::createMenus()
     m_fileMenu = menuBar()->addMenu(tr("&Fichier"));
     m_fileMenu->addAction(m_newAct);
     m_fileMenu->addAction(m_openAct);
+    m_fileMenu->addAction(m_addLayerAct);
+    m_fileMenu->addAction(m_addImageLayerAct);
     m_fileMenu->addAction(m_openEpgAct);
     m_fileMenu->addAction(m_saveAct);
     m_fileMenu->addAction(m_saveEpgAct);
@@ -270,6 +299,507 @@ void MainWindow::createMenus()
         m_viewMenu->addAction(m_redoAct);
     // set initial colored icon
     updateColorPickerIcon();
+}
+
+void MainWindow::addNewLayer()
+{
+    if (!m_document)
+    {
+        // If there's no Document but we have a current image, create a Document from it.
+        if (m_currentImage.isNull())
+            return;
+
+        const int width = m_currentImage.width();
+        const int height = m_currentImage.height();
+        ImageBuffer buf = ImageConversion::qImageToImageBuffer(m_currentImage, width, height);
+        m_document = std::make_unique<Document>(width, height, 72.f);
+        auto imgPtr = std::make_shared<ImageBuffer>(buf);
+        auto baseLayer =
+            std::make_shared<Layer>(1ull, std::string("Background"), imgPtr, true, false, 1.0f);
+        m_document->addLayer(baseLayer);
+    }
+    const int w = m_document->width();
+    const int h = m_document->height();
+    if (w <= 0 || h <= 0)
+        return;
+
+    auto img = std::make_shared<ImageBuffer>(w, h);
+    img->fill(0u);  // transparent
+
+    uint64_t id = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
+    const std::string name = "Layer " + std::to_string(m_document->layerCount());
+    auto layer = std::make_shared<Layer>(id, name, img, true, false, 1.0f);
+    m_document->addLayer(layer);
+    populateLayersList();
+    updateImageFromDocument();
+}
+
+void MainWindow::addImageAsLayer()
+{
+    QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+
+    QString fileName = QFileDialog::getOpenFileName(
+        this, tr("Ajouter une image en nouveau calque"), picturesPath,
+        tr("Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp);;Tous les fichiers (*)"));
+
+    if (fileName.isEmpty())
+        return;
+
+    QImageReader reader(fileName);
+    reader.setAutoTransform(true);
+    const QImage image = reader.read();
+
+    if (image.isNull())
+    {
+        QMessageBox::critical(this, tr("Erreur"),
+                              tr("Impossible de charger l'image %1:\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(reader.errorString()));
+        return;
+    }
+
+    // If there's no document yet, create one from the loaded image (same behavior as openImage)
+    if (!m_document)
+    {
+        m_currentImage = image;
+        m_currentFileName = fileName;
+
+        const int width = m_currentImage.width();
+        const int height = m_currentImage.height();
+        ImageBuffer buf = ImageConversion::qImageToImageBuffer(m_currentImage, width, height);
+        m_document = std::make_unique<Document>(width, height, 72.f);
+        auto imgPtr = std::make_shared<ImageBuffer>(buf);
+        auto layer =
+            std::make_shared<Layer>(1ull, std::string("Background"), imgPtr, true, false, 1.0f);
+        m_document->addLayer(layer);
+        populateLayersList();
+        updateImageFromDocument();
+        m_scrollArea->setVisible(true);
+        QString message = tr("Image chargée et ajoutée comme calque: %1 (%2x%3)")
+                              .arg(QFileInfo(fileName).fileName())
+                              .arg(m_currentImage.width())
+                              .arg(m_currentImage.height());
+        statusBar()->showMessage(message);
+        setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
+        return;
+    }
+
+    // Create a new transparent buffer matching document size and blit the loaded image at (0,0)
+    const int docW = m_document->width();
+    const int docH = m_document->height();
+    if (docW <= 0 || docH <= 0)
+        return;
+
+    auto imgBuf =
+        std::make_shared<ImageBuffer>(ImageConversion::qImageToImageBuffer(image, docW, docH));
+
+    uint64_t id = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
+    const std::string name = "Layer " + std::to_string(m_document->layerCount() + 1);
+    auto layer = std::make_shared<Layer>(id, name, imgBuf, true, false, 1.0f);
+    m_document->addLayer(layer);
+    populateLayersList();
+    updateImageFromDocument();
+    m_scrollArea->setVisible(true);
+    statusBar()->showMessage(
+        tr("Image ajoutée en tant que calque: %1").arg(QFileInfo(fileName).fileName()));
+}
+
+void MainWindow::createLayersPanel()
+{
+    m_layersDock = new QDockWidget(tr("Calques"), this);
+    m_layersList = new QListWidget(m_layersDock);
+    m_layersList->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_layersList->setDragDropMode(QAbstractItemView::InternalMove);
+    m_layersList->setDefaultDropAction(Qt::MoveAction);
+    m_layersList->setContextMenuPolicy(Qt::CustomContextMenu);
+
+    connect(m_layersList, &QListWidget::itemDoubleClicked, this, &MainWindow::onLayerDoubleClicked);
+    connect(m_layersList, &QListWidget::customContextMenuRequested, this,
+            &MainWindow::onShowLayerContextMenu);
+    // detect reorder by monitoring the model signals
+    connect(m_layersList->model(), &QAbstractItemModel::rowsMoved, this,
+            &MainWindow::onLayersRowsMoved);
+
+    m_layersDock->setWidget(m_layersList);
+    addDockWidget(Qt::RightDockWidgetArea, m_layersDock);
+}
+
+void MainWindow::populateLayersList()
+{
+    if (!m_document)
+    {
+        if (m_layersList)
+            m_layersList->clear();
+        return;
+    }
+    m_layersList->clear();
+    for (int i = static_cast<int>(m_document->layerCount()) - 1; i >= 0; --i)
+    {
+        auto layer = m_document->layerAt(i);
+        if (!layer)
+            continue;
+
+        QListWidgetItem* item = new QListWidgetItem(m_layersList);
+        // store the document index for this row
+        item->setData(Qt::UserRole, i);
+        const bool isBottom = (i == 0);
+        const bool isLocked = layer->locked();
+        Qt::ItemFlags flags = item->flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+        if (!isBottom && !isLocked)
+            flags = flags | Qt::ItemIsDragEnabled;
+        item->setFlags(flags);
+        m_layersList->addItem(item);
+
+        // Create a custom widget for the layer row
+        QWidget* row = new QWidget();
+        row->setFixedHeight(56);
+        QHBoxLayout* h = new QHBoxLayout(row);
+        h->setContentsMargins(4, 2, 4, 2);
+
+        QPushButton* eyeBtn = new QPushButton(row);
+        eyeBtn->setFlat(true);
+        eyeBtn->setIcon(QIcon(layer->visible() ? ":/icons/eye.svg" : ":/icons/eye_closed.svg"));
+        eyeBtn->setIconSize(QSize(16, 16));
+        eyeBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        eyeBtn->setFixedSize(28, 28);
+        QPushButton* lockBtn = new QPushButton(row);
+        lockBtn->setFlat(true);
+        lockBtn->setIcon(QIcon(layer->locked() ? ":/icons/lock.svg" : ":/icons/unlock.svg"));
+        lockBtn->setIconSize(QSize(16, 16));
+        lockBtn->setToolTip(tr("Verrouiller/déverrouiller"));
+        lockBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        lockBtn->setFixedSize(28, 28);
+
+        QLabel* thumb = new QLabel(row);
+        thumb->setFixedSize(48, 48);
+        thumb->setAlignment(Qt::AlignCenter);
+
+        eyeBtn->setToolTip(tr("Basculer visibilité"));
+
+        QTextEdit* nameEdit = new QTextEdit(row);
+        nameEdit->setAcceptRichText(false);
+        nameEdit->setPlainText(QString::fromStdString(layer->name()));
+        nameEdit->setStyleSheet("border: none; background: transparent;");
+        nameEdit->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+        nameEdit->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        nameEdit->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        nameEdit->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+        QFontMetrics fmName(nameEdit->font());
+        const int lineH = fmName.lineSpacing();
+        const int minNameH = lineH + 8;
+        const int maxNameH = lineH * 3 + 8;  // up to 3 lines
+        nameEdit->setFixedHeight(minNameH);
+        nameEdit->setMaximumHeight(maxNameH);
+        nameEdit->setFixedWidth(60);
+        // Disable the QTextEdit builtin context menu so right-click opens the
+        // layers list context menu (rename/resize/delete) instead of cut/copy/paste.
+        nameEdit->setContextMenuPolicy(Qt::NoContextMenu);
+        // start read-only for background or locked layers
+        nameEdit->setReadOnly(isBottom || layer->locked());
+
+        QSlider* opacitySlider = new QSlider(Qt::Horizontal, row);
+        opacitySlider->setRange(0, 100);
+        opacitySlider->setValue(static_cast<int>(layer->opacity() * 100.0f));
+        opacitySlider->setFixedWidth(50);
+        opacitySlider->setEnabled(!layer->locked());
+
+        h->addWidget(eyeBtn);
+        h->addWidget(lockBtn);
+        h->addWidget(nameEdit);
+        h->addWidget(opacitySlider);
+        h->addWidget(thumb);
+
+        m_layersList->setItemWidget(item, row);
+        item->setSizeHint(row->sizeHint());
+
+        thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
+
+        connect(eyeBtn, &QPushButton::clicked, this,
+                [this, layer, eyeBtn, thumb]()
+                {
+                    layer->setVisible(!layer->visible());
+                    eyeBtn->setIcon(
+                        QIcon(layer->visible() ? ":/icons/eye.svg" : ":/icons/eye_closed.svg"));
+                    updateImageFromDocument();
+                    thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
+                });
+
+        connect(lockBtn, &QPushButton::clicked, this,
+                [this, layer, lockBtn, nameEdit, opacitySlider, item, isBottom, thumb]()
+                {
+                    layer->setLocked(!layer->locked());
+                    lockBtn->setIcon(
+                        QIcon(layer->locked() ? ":/icons/lock.svg" : ":/icons/unlock.svg"));
+                    // disable editing when locked
+                    nameEdit->setReadOnly(isBottom || layer->locked());
+                    opacitySlider->setEnabled(!layer->locked());
+                    // update item flags to reflect dragability
+                    Qt::ItemFlags flags = item->flags() | Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+                    if (!isBottom && !layer->locked())
+                        flags = flags | Qt::ItemIsDragEnabled;
+                    item->setFlags(flags);
+                    updateImageFromDocument();
+                    thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
+                });
+
+        connect(opacitySlider, &QSlider::valueChanged, this,
+                [this, layer, thumb](int v)
+                {
+                    layer->setOpacity(static_cast<float>(v) / 100.0f);
+                    updateImageFromDocument();
+                    thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
+                });
+
+        // make background name read-only or if layer locked
+        if (isBottom || layer->locked())
+            nameEdit->setReadOnly(true);
+
+        connect(nameEdit, &QTextEdit::textChanged, this,
+                [layer, nameEdit, minNameH, maxNameH]()
+                {
+                    // update layer name and clamp displayed height to 3 lines
+                    layer->setName(nameEdit->toPlainText().toStdString());
+                    nameEdit->document()->setTextWidth(nameEdit->viewport()->width());
+                    int h = static_cast<int>(nameEdit->document()->size().height()) + 8;
+                    nameEdit->setFixedHeight(qMax(minNameH, qMin(maxNameH, h)));
+                });
+    }
+}
+
+void MainWindow::onLayerItemChanged(QListWidgetItem* item)
+{
+    if (!m_document || !item)
+        return;
+    const int idx = item->data(Qt::UserRole).toInt();
+    auto layer = m_document->layerAt(idx);
+    if (!layer)
+        return;
+    const bool visible = (item->checkState() == Qt::Checked);
+    layer->setVisible(visible);
+    updateImageFromDocument();
+}
+
+void MainWindow::onLayerDoubleClicked(QListWidgetItem* item)
+{
+    // Double-click on a layer item starts inline editing of the name (if editable)
+    if (!m_document || !item)
+        return;
+    const int idx = item->data(Qt::UserRole).toInt();
+    auto layer = m_document->layerAt(idx);
+    if (!layer)
+        return;
+
+    QWidget* row = m_layersList->itemWidget(item);
+    if (!row)
+        return;
+    if (auto nameEdit = row->findChild<QTextEdit*>())
+    {
+        if (idx == 0 || layer->locked())
+            return;  // background or locked layer not editable
+        nameEdit->setReadOnly(false);
+        nameEdit->setFocus(Qt::MouseFocusReason);
+        QTextCursor c = nameEdit->textCursor();
+        c.movePosition(QTextCursor::End);
+        nameEdit->setTextCursor(c);
+    }
+}
+
+void MainWindow::onShowLayerContextMenu(const QPoint& pos)
+{
+    QListWidgetItem* item = m_layersList->itemAt(pos);
+    if (!item)
+        item = m_layersList->currentItem();
+    QMenu menu(this);
+    QAction* renameAct = menu.addAction(tr("Renommer"));
+    QAction* resizeAct = menu.addAction(tr("Redimensionner..."));
+    QAction* deleteAct = menu.addAction(tr("Supprimer"));
+    menu.addSeparator();
+    QAction* mergeDownAct = menu.addAction(tr("Merge Down"));
+
+    const QAction* act = menu.exec(m_layersList->mapToGlobal(pos));
+    if (!item || !m_document)
+        return;
+
+    const int idx = item->data(Qt::UserRole).toInt();
+    auto layerPtr = m_document->layerAt(idx);
+    const bool isBottomLayer = (idx == 0);
+    const bool isLockedLayer = layerPtr ? layerPtr->locked() : false;
+    renameAct->setEnabled(!isBottomLayer && !isLockedLayer);
+    deleteAct->setEnabled(!isBottomLayer);
+
+    if (act == renameAct)
+    {
+        bool ok = false;
+        const QString current = QString::fromStdString(m_document->layerAt(idx)->name());
+        const QString text = QInputDialog::getText(this, tr("Renommer le calque"), tr("Nom:"),
+                                                   QLineEdit::Normal, current, &ok);
+        if (ok)
+        {
+            m_document->layerAt(idx)->setName(text.toStdString());
+            populateLayersList();
+        }
+    }
+    else if (act == resizeAct)
+    {
+        bool okW = false;
+        bool okH = false;
+        const int curW = m_document->width();
+        const int curH = m_document->height();
+        int w = QInputDialog::getInt(this, tr("Redimensionner le calque"), tr("Largeur:"), curW, 1,
+                                     10000, 1, &okW);
+        if (!okW)
+            return;
+        int h = QInputDialog::getInt(this, tr("Redimensionner le calque"), tr("Hauteur:"), curH, 1,
+                                     10000, 1, &okH);
+        if (!okH)
+            return;
+
+        auto lyr = m_document->layerAt(idx);
+        if (lyr && lyr->image())
+        {
+            ImageBuffer newBuf(w, h);
+            newBuf.fill(0u);
+            const ImageBuffer& old = *lyr->image();
+            const int copyW = std::min(w, old.width());
+            const int copyH = std::min(h, old.height());
+            for (int yy = 0; yy < copyH; ++yy)
+            {
+                for (int xx = 0; xx < copyW; ++xx)
+                {
+                    newBuf.setPixel(xx, yy, old.getPixel(xx, yy));
+                }
+            }
+            lyr->setImageBuffer(std::make_shared<ImageBuffer>(newBuf));
+            populateLayersList();
+            updateImageFromDocument();
+        }
+    }
+    else if (act == deleteAct)
+    {
+        const QString layerName = QString::fromStdString(m_document->layerAt(idx)->name());
+        const int ret = QMessageBox::question(this, tr("Supprimer le calque"),
+                                              tr("Supprimer le calque %1 ?").arg(layerName),
+                                              QMessageBox::Yes | QMessageBox::No);
+        if (ret == QMessageBox::Yes)
+        {
+            m_document->removeLayer(idx);
+            populateLayersList();
+            updateImageFromDocument();
+        }
+    }
+    else if (act == mergeDownAct)
+    {
+        m_document->mergeDown(idx);
+        populateLayersList();
+        updateImageFromDocument();
+    }
+}
+
+void MainWindow::onLayersRowsMoved(const QModelIndex& /*parent*/, int /*start*/, int /*end*/,
+                                   const QModelIndex& /*destination*/, int /*row*/)
+{
+    if (!m_document)
+        return;
+    const int cnt = m_layersList->count();
+    std::vector<std::shared_ptr<Layer>> oldLayers;
+    oldLayers.reserve(m_document->layerCount());
+    for (size_t i = 0; i < m_document->layerCount(); ++i)
+    {
+        oldLayers.push_back(m_document->layerAt(i));
+    }
+
+    // Rebuild document layers in bottom-to-top order. The visual list is top-first,
+    // so iterate the widget items from bottom to top to produce a bottom-first vector.
+    std::vector<std::shared_ptr<Layer>> newLayers;
+    newLayers.reserve(cnt);
+    for (int i = cnt - 1; i >= 0; --i)
+    {
+        QListWidgetItem* it = m_layersList->item(i);
+        if (!it)
+            continue;
+        const int oldIdx = it->data(Qt::UserRole).toInt();
+        if (oldIdx >= 0 && oldIdx < static_cast<int>(oldLayers.size()))
+            newLayers.push_back(oldLayers[static_cast<size_t>(oldIdx)]);
+    }
+
+    if (!newLayers.empty())
+    {
+        // m_document->setLayers(std::move(newLayers));
+        populateLayersList();
+        updateImageFromDocument();
+    }
+}
+
+void MainWindow::updateImageFromDocument()
+{
+    if (!m_document || m_document->layerCount() == 0)
+        return;
+    // Compose document into an ImageBuffer
+    ImageBuffer outBuf(m_document->width(), m_document->height());
+    Compositor comp;
+    comp.compose(*m_document, outBuf);
+
+    QImage img = ImageConversion::imageBufferToQImage(outBuf, QImage::Format_ARGB32);
+    m_currentImage = img;
+    updateImageDisplay();
+}
+
+QPixmap MainWindow::createLayerThumbnail(const std::shared_ptr<Layer>& layer,
+                                         const QSize& size) const
+{
+    QPixmap out(size);
+    out.fill(Qt::transparent);
+
+    if (!layer || !layer->image())
+    {
+        QPainter p(&out);
+        p.fillRect(out.rect(), QColor(200, 200, 200));
+        return out;
+    }
+
+    const ImageBuffer& lb = *layer->image();
+    if (lb.width() <= 0 || lb.height() <= 0)
+        return out;
+
+    // Convert the layer buffer to a QImage
+    QImage img = ImageConversion::imageBufferToQImage(lb, QImage::Format_ARGB32_Premultiplied);
+
+    QSize target = size;
+    QSize scaledSize = img.size();
+    if (img.width() > target.width() || img.height() > target.height())
+        scaledSize = img.size().scaled(target, Qt::KeepAspectRatio);
+
+    QImage scaled = img.scaled(scaledSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    // Draw the scaled image centered on a transparent canvas of the target size
+    QPixmap canvas(target);
+    canvas.fill(Qt::transparent);
+    QPainter painter(&canvas);
+    const int cx = (target.width() - scaled.width()) / 2;
+    const int cy = (target.height() - scaled.height()) / 2;
+    painter.drawImage(cx, cy, scaled);
+    painter.end();
+
+    if (!layer->visible())
+    {
+        QImage dim = canvas.toImage();
+        QPainter p(&dim);
+        p.fillRect(dim.rect(), QColor(0, 0, 0, 120));
+        return QPixmap::fromImage(dim);
+    }
+
+    return canvas;
+}
+
+void MainWindow::onMergeDown()
+{
+    QListWidgetItem* item = m_layersList->currentItem();
+    if (!item || !m_document)
+        return;
+    const int idx = item->data(Qt::UserRole).toInt();
+    m_document->mergeDown(idx);
+    populateLayersList();
+    updateImageFromDocument();
 }
 
 void MainWindow::zoomIn()
@@ -304,6 +834,28 @@ void MainWindow::updateImageDisplay()
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 {
+    if (auto te = qobject_cast<QTextEdit*>(watched))
+    {
+        if (event->type() == QEvent::Resize)
+        {
+            // adjust document width so wrapping updates, then resize height to fit content
+            te->document()->setTextWidth(te->viewport()->width());
+            int h = static_cast<int>(te->document()->size().height()) + 8;
+            QFontMetrics fm(te->font());
+            int minH = fm.height() + 8;
+            te->setFixedHeight(qMax(minH, h));
+        }
+        else if (event->type() == QEvent::FocusOut)
+        {
+            te->setReadOnly(true);
+            te->document()->setTextWidth(te->viewport()->width());
+            int h = static_cast<int>(te->document()->size().height()) + 8;
+            QFontMetrics fm(te->font());
+            int minH = fm.height() + 8;
+            te->setFixedHeight(qMax(minH, h));
+        }
+        return false;
+    }
     if (watched == m_scrollArea->viewport())
     {
         if (event->type() == QEvent::MouseButtonPress)
@@ -322,6 +874,78 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
                 m_scrollArea->viewport()->setCursor(Qt::ClosedHandCursor);
                 return true;
             }
+
+            // If not panning and left button pressed on the viewport, and a layer is selected,
+            // start dragging that layer in document coordinates.
+            if (me->button() == Qt::LeftButton && !m_handMode && m_document && m_layersList)
+            {
+                QListWidgetItem* cur = m_layersList->currentItem();
+                int pickedIdx = -1;
+
+                // compute doc coord under mouse
+                QPoint vpPos = me->pos();
+                int hVal = m_scrollArea->horizontalScrollBar()->value();
+                int vVal = m_scrollArea->verticalScrollBar()->value();
+                const int docX = static_cast<int>((hVal + vpPos.x()) / m_scaleFactor);
+                const int docY = static_cast<int>((vVal + vpPos.y()) / m_scaleFactor);
+
+                if (cur)
+                {
+                    pickedIdx = cur->data(Qt::UserRole).toInt();
+                    // Prevent starting a drag if the selected layer is not editable (e.g., locked)
+                    if (pickedIdx > 0)
+                    {
+                        auto selLayer = m_document->layerAt(pickedIdx);
+                        if (!selLayer || !selLayer->isEditable())
+                            return true;
+                    }
+                }
+                else
+                {
+                    // pick topmost editable visible layer under cursor (skip background idx 0)
+                    for (auto i = m_document->layerCount() - 1; i >= 1; --i)
+                    {
+                        auto lyr = m_document->layerAt(i);
+                        if (!lyr || !lyr->visible() || !lyr->image() || !lyr->isEditable())
+                            continue;
+                        const int lx = docX - lyr->offsetX();
+                        const int ly = docY - lyr->offsetY();
+                        if (lx < 0 || ly < 0 || lx >= lyr->image()->width() ||
+                            ly >= lyr->image()->height())
+                            continue;
+                        const uint32_t px = lyr->image()->getPixel(lx, ly);
+                        const uint8_t a = static_cast<uint8_t>(px & 0xFFu);
+                        if (a == 0)
+                            continue;
+                        pickedIdx = static_cast<int>(i);
+                        // update selection in the layers list to match picked layer
+                        for (int j = 0; j < m_layersList->count(); ++j)
+                        {
+                            auto it = m_layersList->item(j);
+                            if (it && it->data(Qt::UserRole).toInt() == pickedIdx)
+                            {
+                                m_layersList->setCurrentItem(it);
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                if (pickedIdx <= 0)
+                    return true;  // no valid layer picked or attempting to pick background
+
+                auto layer = m_document->layerAt(pickedIdx);
+                if (layer)
+                {
+                    m_layerDragActive = true;
+                    m_dragLayerIndex = pickedIdx;
+                    m_layerDragStartDocPos = QPoint(docX, docY);
+                    m_layerDragInitialOffsetX = layer->offsetX();
+                    m_layerDragInitialOffsetY = layer->offsetY();
+                    return true;
+                }
+            }
         }
         else if (event->type() == QEvent::MouseMove)
         {
@@ -336,6 +960,46 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
                     m_scrollArea->verticalScrollBar()->value() - delta.y());
                 return true;
             }
+
+            // Handle layer dragging
+            if (m_layerDragActive && m_document && m_dragLayerIndex >= 0)
+            {
+                QMouseEvent* me = static_cast<QMouseEvent*>(event);
+                QPoint vpPos = me->pos();
+                int hVal = m_scrollArea->horizontalScrollBar()->value();
+                int vVal = m_scrollArea->verticalScrollBar()->value();
+                const int docX = static_cast<int>((hVal + vpPos.x()) / m_scaleFactor);
+                const int docY = static_cast<int>((vVal + vpPos.y()) / m_scaleFactor);
+
+                const int dx = docX - m_layerDragStartDocPos.x();
+                const int dy = docY - m_layerDragStartDocPos.y();
+
+                auto layer = m_document->layerAt(m_dragLayerIndex);
+                if (layer)
+                {
+                    layer->setOffset(m_layerDragInitialOffsetX + dx,
+                                     m_layerDragInitialOffsetY + dy);
+                    // preserve selection
+                    QListWidgetItem* cur = m_layersList->currentItem();
+                    int selIdx = cur ? cur->data(Qt::UserRole).toInt() : -1;
+                    populateLayersList();
+                    // restore selection by matching stored document index
+                    if (selIdx >= 0)
+                    {
+                        for (int i = 0; i < m_layersList->count(); ++i)
+                        {
+                            QListWidgetItem* it = m_layersList->item(i);
+                            if (it && it->data(Qt::UserRole).toInt() == selIdx)
+                            {
+                                m_layersList->setCurrentItem(it);
+                                break;
+                            }
+                        }
+                    }
+                    updateImageFromDocument();
+                }
+                return true;
+            }
         }
         else if (event->type() == QEvent::MouseButtonRelease)
         {
@@ -344,6 +1008,13 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
             {
                 m_panningActive = false;
                 m_scrollArea->viewport()->setCursor(Qt::OpenHandCursor);
+                return true;
+            }
+
+            if (me->button() == Qt::LeftButton && m_layerDragActive)
+            {
+                m_layerDragActive = false;
+                m_dragLayerIndex = -1;
                 return true;
             }
         }
@@ -466,35 +1137,26 @@ void MainWindow::saveAsEpg()
         fileName += ".epg";
 
     // convert QImage -> ImageBuffer
-    ImageBuffer buf(m_currentImage.width(), m_currentImage.height());
-    for (int y = 0; y < m_currentImage.height(); ++y)
-    {
-        for (int x = 0; x < m_currentImage.width(); ++x)
-        {
-            const QRgb p = m_currentImage.pixel(x, y);
-            const uint8_t r = qRed(p);
-            const uint8_t g = qGreen(p);
-            const uint8_t bch = qBlue(p);
-            const uint8_t a = qAlpha(p);
-            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
-                                  (static_cast<uint32_t>(g) << 16) |
-                                  (static_cast<uint32_t>(bch) << 8) | static_cast<uint32_t>(a);
-            buf.setPixel(x, y, rgba);
-        }
-    }
-
-    // Build a Document with a single layer and save using ZipEpgStorage
-    Document doc(buf.width(), buf.height(), 72.f);
+    ImageBuffer buf = ImageConversion::qImageToImageBuffer(m_currentImage, m_currentImage.width(),
+                                                           m_currentImage.height());
 
     try
     {
-        auto imgPtr = std::make_shared<ImageBuffer>(buf);
-        auto layer =
-            std::make_shared<Layer>(1ull, std::string("Layer 1"), imgPtr, true, false, 1.0f);
-        doc.addLayer(layer);
-
         ZipEpgStorage storage;
-        storage.save(doc, fileName.toStdString());
+        if (m_document && m_document->layerCount() > 0)
+        {
+            storage.save(*m_document, fileName.toStdString());
+        }
+        else
+        {
+            // Build a Document with a single layer and save using ZipEpgStorage
+            Document doc(buf.width(), buf.height(), 72.f);
+            auto imgPtr = std::make_shared<ImageBuffer>(buf);
+            auto layer =
+                std::make_shared<Layer>(1ull, std::string("Background"), imgPtr, true, false, 1.0f);
+            doc.addLayer(layer);
+            storage.save(doc, fileName.toStdString());
+        }
     }
     catch (const std::exception& e)
     {
@@ -520,7 +1182,7 @@ void MainWindow::openEpg()
         return;
 
     ZipEpgStorage storage;
-    const auto res = storage.open(fileName.toStdString());
+    auto res = storage.open(fileName.toStdString());
     if (!res.success || !res.document)
     {
         const QString err = QString::fromLocal8Bit(
@@ -547,19 +1209,7 @@ void MainWindow::openEpg()
     }
     const ImageBuffer& ib = *firstLayer->image();
 
-    QImage img(ib.width(), ib.height(), QImage::Format_ARGB32);
-    for (int y = 0; y < ib.height(); ++y)
-    {
-        for (int x = 0; x < ib.width(); ++x)
-        {
-            const uint32_t rgba = ib.getPixel(x, y);
-            const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFF);
-            const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFF);
-            const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFF);
-            const uint8_t a = static_cast<uint8_t>(rgba & 0xFF);
-            img.setPixel(x, y, qRgba(r, g, b, a));
-        }
-    }
+    QImage img = ImageConversion::imageBufferToQImage(ib, QImage::Format_ARGB32);
 
     m_currentImage = img;
     m_currentFileName = fileName;
@@ -573,6 +1223,11 @@ void MainWindow::openEpg()
 
     statusBar()->showMessage(message);
     setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
+
+    // take ownership of document for editing in UI
+    m_document = std::move(res.document);
+    populateLayersList();
+    updateImageFromDocument();
 }
 
 void MainWindow::onMouseSelection(const QRect& rect)
@@ -657,21 +1312,51 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
     if (imgX < 0 || imgX >= m_currentImage.width() || imgY < 0 || imgY >= m_currentImage.height())
         return;
 
-    // Build working buffer directly from current image
-    ImageBuffer workingBuffer(m_currentImage.width(), m_currentImage.height());
-    for (int y = 0; y < m_currentImage.height(); ++y)
+    // Determine target layer: current selection in layers list or background (0)
+    int targetLayerIdx = 0;
+    std::uint64_t targetLayerId = 0u;
+    if (m_document && m_layersList)
     {
-        for (int x = 0; x < m_currentImage.width(); ++x)
+        if (auto cur = m_layersList->currentItem())
+            targetLayerIdx = cur->data(Qt::UserRole).toInt();
+        if (targetLayerIdx < 0)
+            targetLayerIdx = 0;
+        auto tl = m_document->layerAt(static_cast<size_t>(targetLayerIdx));
+        if (tl && tl->image())
+            targetLayerId = tl->id();
+    }
+
+    // Build working buffer from the target layer's image if available, otherwise fall back
+    ImageBuffer workingBuffer(m_currentImage.width(), m_currentImage.height());
+    if (m_document && targetLayerId != 0u)
+    {
+        auto layerPtr = m_document->layerAt(static_cast<size_t>(targetLayerIdx));
+        if (!layerPtr || !layerPtr->image())
         {
-            const QRgb p = m_currentImage.pixel(x, y);
-            const uint8_t r = qRed(p);
-            const uint8_t g = qGreen(p);
-            const uint8_t b = qBlue(p);
-            const uint8_t a = qAlpha(p);
-            const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
-                                  (static_cast<uint32_t>(g) << 16) |
-                                  (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
-            workingBuffer.setPixel(x, y, rgba);
+            QMessageBox::information(this, tr("Information"),
+                                     tr("Calque invalide ou non modifiable."));
+            return;
+        }
+        // copy the layer buffer so flood fill can run on a working copy
+        workingBuffer = *layerPtr->image();
+    }
+    else
+    {
+        // fallback: build from composed current image
+        for (int y = 0; y < m_currentImage.height(); ++y)
+        {
+            for (int x = 0; x < m_currentImage.width(); ++x)
+            {
+                const QRgb p = m_currentImage.pixel(x, y);
+                const uint8_t r = qRed(p);
+                const uint8_t g = qGreen(p);
+                const uint8_t b = qBlue(p);
+                const uint8_t a = qAlpha(p);
+                const uint32_t rgba = (static_cast<uint32_t>(r) << 24) |
+                                      (static_cast<uint32_t>(g) << 16) |
+                                      (static_cast<uint32_t>(b) << 8) | static_cast<uint32_t>(a);
+                workingBuffer.setPixel(x, y, rgba);
+            }
         }
     }
 
@@ -719,10 +1404,43 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
         changes.push_back(pc);
     }
 
-    // apply function updates the QImage from the given pixel changes
+    // apply function updates the target layer image (if present) or falls back to m_currentImage
     app::ApplyFn apply =
-        [this](std::uint64_t /*layerId*/, const std::vector<app::PixelChange>& ch, bool useBefore)
+        [this](std::uint64_t layerId, const std::vector<app::PixelChange>& ch, bool useBefore)
     {
+        bool appliedToLayer = false;
+        if (m_document)
+        {
+            // find layer by id
+            for (size_t i = 0; i < m_document->layerCount(); ++i)
+            {
+                auto lyr = m_document->layerAt(i);
+                if (!lyr)
+                    continue;
+                if (lyr->id() == layerId && lyr->image())
+                {
+                    auto img = lyr->image();
+                    for (const auto& c : ch)
+                    {
+                        const uint32_t v = useBefore ? c.before : c.after;
+                        if (c.x >= 0 && c.x < img->width() && c.y >= 0 && c.y < img->height())
+                            img->setPixel(c.x, c.y, v);
+                    }
+                    appliedToLayer = true;
+                    break;
+                }
+            }
+            if (appliedToLayer)
+            {
+                // regenerate composed image and UI
+                updateImageFromDocument();
+                // refresh layers panel thumbnails
+                populateLayersList();
+                return;
+            }
+        }
+
+        // fallback: modify the composed image directly
         for (const auto& c : ch)
         {
             const uint32_t v = useBefore ? c.before : c.after;
@@ -738,7 +1456,8 @@ void MainWindow::bucketFillAt(const QPoint& viewportPos)
     };
 
     // create command, execute redo and push to history
-    auto cmd = std::make_unique<app::DataCommand>(0ull, std::move(changes), apply);
+    // use the selected layer id when creating the command so undo/redo targets the correct layer
+    auto cmd = std::make_unique<app::DataCommand>(targetLayerId, std::move(changes), apply);
     cmd->redo();
     m_history.push(std::move(cmd));
 

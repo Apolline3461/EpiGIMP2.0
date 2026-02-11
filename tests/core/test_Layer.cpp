@@ -2,9 +2,10 @@
 // Created by apolline on 25/11/2025.
 //
 
-#include <gtest/gtest.h>
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
+
+#include <gtest/gtest.h>
 
 using std::make_shared;
 using std::string;
@@ -25,7 +26,6 @@ TEST(LayerTest, DefaultState)
 
     EXPECT_NE(layerTested.image(), nullptr);
     EXPECT_EQ(layerTested.image(), buffer);
-
 }
 
 TEST(LayerTest, GivenValue)
@@ -148,4 +148,67 @@ TEST(LayerTest, ImageSharedPtrIsKeptAndCanBeShared)
 
     EXPECT_EQ(l1.image(), otherImage);
     EXPECT_EQ(l2.image(), image);
+}
+
+TEST(LayerTest, OffsetDefaultAndMutable)
+{
+    constexpr std::uint64_t id = 77;
+    const string name = "offset-test";
+    auto buffer = make_shared<ImageBuffer>(5, 5);
+
+    Layer layer{id, name, buffer};
+
+    EXPECT_EQ(layer.offsetX(), 0);
+    EXPECT_EQ(layer.offsetY(), 0);
+
+    layer.setOffset(10, -3);
+    EXPECT_EQ(layer.offsetX(), 10);
+    EXPECT_EQ(layer.offsetY(), -3);
+}
+
+TEST(LayerTest, SetImageBufferToNull)
+{
+    constexpr std::uint64_t id = 80;
+    const string name = "null-image-test";
+    auto buffer = make_shared<ImageBuffer>(2, 2);
+
+    Layer layer{id, name, buffer};
+    EXPECT_NE(layer.image(), nullptr);
+
+    layer.setImageBuffer(nullptr);
+    EXPECT_EQ(layer.image(), nullptr);
+}
+
+TEST(LayerTest, EmptyNameIsAllowed)
+{
+    constexpr std::uint64_t id = 81;
+    const string name = "non-empty";
+    auto buffer = make_shared<ImageBuffer>(1, 1);
+
+    Layer layer{id, name, buffer};
+    layer.setName("");
+
+    EXPECT_EQ(layer.name(), "");
+    EXPECT_EQ(layer.id(), id);
+}
+
+TEST(LayerTest, CopyingCreatesIndependentNamesButSharedImageAndSameId)
+{
+    constexpr std::uint64_t id = 90;
+    const string name = "original";
+    auto buffer = make_shared<ImageBuffer>(3, 3);
+
+    Layer l1{id, name, buffer};
+    Layer l2 = l1;  // copy
+
+    // id is copied
+    EXPECT_EQ(l2.id(), l1.id());
+
+    // image shared_ptr points to the same buffer
+    EXPECT_EQ(l2.image(), l1.image());
+
+    // changing the name of the copy does not change the original
+    l2.setName("copied");
+    EXPECT_EQ(l2.name(), "copied");
+    EXPECT_EQ(l1.name(), name);
 }
