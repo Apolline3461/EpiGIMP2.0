@@ -9,6 +9,6 @@ class ImageBuffer;
 class Compositor
 {
    public:
-    void compose(const Document& doc, ImageBuffer& out) const;
-    void composeROI(const Document& doc, int x, int y, int w, int h, ImageBuffer& out) const;
+    static void compose(const Document& doc, ImageBuffer& out);
+    static void composeROI(const Document& doc, int x, int y, int w, int h, ImageBuffer& out);
 };
