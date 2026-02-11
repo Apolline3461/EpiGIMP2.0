@@ -62,7 +62,7 @@ Développé en **C++20 / Qt 6**, il permet la création, la retouche et la gesti
 
 > Le reste des fonctionnalités arrive progressivement.
 > Ce README se limite volontairement aux fonctionnalités déjà implémentées.
-> La liste complète des fonctionnalités visées est détaillée dans le [cahier des charges](./EPIGIMP2.0%20cdc.pdf) du repo.
+> La liste complète des fonctionnalités visées est détaillée dans le [cahier des charges](./docs/EPIGIMP2.0%20cdc.pdf) du repo.
 
 ---
 
