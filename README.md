@@ -9,15 +9,10 @@ Développé en **C++20 / Qt 6**, il permet la création, la retouche et la gesti
 
 - [Présentation](#-présentation)
 - [Fonctionnalités actuelles](#fonctionnalités-actuelles)
-- [Format `.epg`](#-format-epg)
-- [Installation](#-installation)
-<<<<<<< HEAD
+- [Format `.epg`](#format-epg)
+- [Installation](#installation)
     - [Télécharger une Release](#télécharger-une-release-recommandé)
     - [Build depuis les sources](#build-depuis-les-sources)
-=======
-  - [Télécharger une Release](#télécharger-une-release-recommandé)
-  - [Build depuis les sources](#build-depuis-les-sources)
->>>>>>> dev
 - [Prise en main](#prise-en-main)
 - [Licence](#-licence)
 
@@ -67,7 +62,7 @@ Développé en **C++20 / Qt 6**, il permet la création, la retouche et la gesti
 
 > Le reste des fonctionnalités arrive progressivement.
 > Ce README se limite volontairement aux fonctionnalités déjà implémentées.
-> La liste complète des fonctionnalités visées est détaillée dans le [cahier des charges](./EPIGIMP2.0%20cdc.pdf) du repo.
+> La liste complète des fonctionnalités visées est détaillée dans le [cahier des charges](./docs/EPIGIMP2.0%20cdc.pdf) du repo.
 
 ---
 
