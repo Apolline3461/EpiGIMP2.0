@@ -40,6 +40,14 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Setup vcpkg (Windows)
+        if: runner.os == 'Windows'
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: '**/vcpkg.json'
+          runVcpkgInstall: true
+
+
       - name: Install Qt6
         uses: jurplel/install-qt-action@v3
         with:
@@ -48,9 +56,11 @@ jobs:
           cache: true
 
       - name: Configure
-        run: >
-          cmake -B build -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            $([ "${RUNNER_OS}" = "Windows" ] && echo "-DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows")
 
       - name: Build
         run: cmake --build build --parallel
