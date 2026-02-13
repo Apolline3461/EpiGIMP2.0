@@ -10,8 +10,8 @@ Ce document présente l'essentiel pour utiliser EpiGimp2.0 : démarrage, créati
 - [Lancer le logiciel](#Lancer-le-logiciel)
 - [Interface principale](#Interface-principale)
 - [Créer un nouveau projet](#Créer-un-nouveau-projet)
-- [Ouvrir / Importer une image](#Ouvrir-/-Importer-une-image)
-- [Ouvrir / Enregistrer un projet (.epg)](#Ouvrir-/-Enregistrer-un-projet)
+- [Ouvrir et Importer une image](#Ouvrir-et-Importer-une-image)
+- [Ouvrir et Enregistrer un projet](#Ouvrir-et-Enregistrer-un-projet)
 - [Exporter l'image finale](#Exporter-l'image-finale)
 - [Gestion des calques](#Gestion-des-calques)
 - [Historique](#Historique)
@@ -60,7 +60,7 @@ chmod +x epigimp-linux-x86_64.AppImage
 ![Open](assets/open.png)
 ![New](assets/new.png)
 
-## Ouvrir / Importer une image
+## Ouvrir et Importer une image
 
 - Menu : `Fichier` → `Ouvrir` (Ctrl+O).
 - Formats supportés : PNG, JPEG, et format projet `.epg` (voir section dédiée).
@@ -68,7 +68,7 @@ chmod +x epigimp-linux-x86_64.AppImage
 
 ![Open](assets/open2.png)
 
-## Ouvrir / Enregistrer un projet
+## Ouvrir et Enregistrer un projet
 
 - Format `.epg` : archive ZIP contenant `project.json`, `preview.png` et `layers/NNNN.png`.
 - Enregistrer : `Fichier` → `Enregistrer` (Ctrl+S) ou `Enregistrer sous` pour choisir l'emplacement.
