@@ -11,7 +11,7 @@ chmod +x epigimp-linux-x86_64.AppImage
 ./epigimp-linux-x86_64.AppImage
 ```
 
-- Si vous avez buildé depuis les sources, exécutez `./build/bin/epigimp` depuis la racine du projet.
+- Si vous avez build depuis les sources, exécutez `./build/bin/epigimp` depuis la racine du projet.
 
 ## Interface principale (vue rapide)
 
@@ -21,6 +21,10 @@ chmod +x epigimp-linux-x86_64.AppImage
 - Canvas : zone centrale pour dessiner.
 - Palette de couleurs et historique (annuler/rétablir).
 
+![fichier](docs/assets/fichier.png)
+![vue](docs/assets/vue.png)
+![cmd](docs/assets/cmd.png)
+
 ## Créer un nouveau projet
 
 - Menu : `Fichier` → `Nouveau projet` (raccourci : Ctrl+N).
@@ -29,13 +33,16 @@ chmod +x epigimp-linux-x86_64.AppImage
   2.  Choisir couleur de fond (transparent par défaut) et confirmer.
   3.  Le système crée le canvas et un calque de base.
 
-Conseils : choisissez une taille adaptée à votre écran/mémoire (4K supporté, mais gourmand en RAM).
+![Open](docs/assets/open.png)
+![New](docs/assets/new.png)
 
 ## Ouvrir / Importer une image
 
 - Menu : `Fichier` → `Ouvrir` (Ctrl+O).
 - Formats supportés : PNG, JPEG, et format projet `.epg` (voir section dédiée).
 - Comportement : les images PNG/JPEG sont importées comme calque unique ; les `.epg` sont ouverts comme projet complet.
+
+![Open](docs/assets/open2.png)
 
 ## Ouvrir / Enregistrer un projet (.epg)
 
@@ -48,6 +55,8 @@ Conseils : choisissez une taille adaptée à votre écran/mémoire (4K supporté
 - Menu : `Fichier` → `Enregistrer sous` (Ctrl+Shift+S).
 - Options : choisir PNG (avec transparence) ou JPEG (qualité réglable).
 
+![Save](docs/assets/save.png)
+
 ## Gestion des calques
 
 - Ajouter un calque : bouton `ajouter un calque` dans le menu fichier.
@@ -55,6 +64,9 @@ Conseils : choisissez une taille adaptée à votre écran/mémoire (4K supporté
 - Réorganiser : glisser/déposer dans la liste des calques.
 - Propriétés : nom, opacité, verrouillage, visibilité.
 - Fusionner vers le bas : combine le calque avec celui inférieur.
+
+![Add layer](docs/assets/addlayer.png)
+![Calque](docs/assets/calque1.png)
 
 ## Historique
 
