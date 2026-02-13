@@ -21,9 +21,9 @@ chmod +x epigimp-linux-x86_64.AppImage
 - Canvas : zone centrale pour dessiner.
 - Palette de couleurs et historique (annuler/rétablir).
 
-![fichier](docs/assets/fichier.png)
-![vue](docs/assets/vue.png)
-![cmd](docs/assets/cmd.png)
+![fichier](../assets/fichier.png)
+![vue](../assets/vue.png)
+![cmd](../assets/cmd.png)
 
 ## Créer un nouveau projet
 
@@ -33,8 +33,8 @@ chmod +x epigimp-linux-x86_64.AppImage
   2.  Choisir couleur de fond (transparent par défaut) et confirmer.
   3.  Le système crée le canvas et un calque de base.
 
-![Open](docs/assets/open.png)
-![New](docs/assets/new.png)
+![Open](../assets/open.png)
+![New](../assets/new.png)
 
 ## Ouvrir / Importer une image
 
@@ -42,7 +42,7 @@ chmod +x epigimp-linux-x86_64.AppImage
 - Formats supportés : PNG, JPEG, et format projet `.epg` (voir section dédiée).
 - Comportement : les images PNG/JPEG sont importées comme calque unique ; les `.epg` sont ouverts comme projet complet.
 
-![Open](docs/assets/open2.png)
+![Open](../assets/open2.png)
 
 ## Ouvrir / Enregistrer un projet (.epg)
 
@@ -55,7 +55,7 @@ chmod +x epigimp-linux-x86_64.AppImage
 - Menu : `Fichier` → `Enregistrer sous` (Ctrl+Shift+S).
 - Options : choisir PNG (avec transparence) ou JPEG (qualité réglable).
 
-![Save](docs/assets/save.png)
+![Save](../assets/save.png)
 
 ## Gestion des calques
 
@@ -65,8 +65,8 @@ chmod +x epigimp-linux-x86_64.AppImage
 - Propriétés : nom, opacité, verrouillage, visibilité.
 - Fusionner vers le bas : combine le calque avec celui inférieur.
 
-![Add layer](docs/assets/addlayer.png)
-![Calque](docs/assets/calque1.png)
+![Add layer](../assets/addlayer.png)
+![Calque](../assets/calque1.png)
 
 ## Historique
 
@@ -92,4 +92,4 @@ chmod +x epigimp-linux-x86_64.AppImage
 ## Ressources
 
 - README du projet : [README.md](../README.md)
-- Format `.epg` : [docs/epgformat.md](epgformat.md)
+- Format `.epg` : [../epgformat.md](epgformat.md)
