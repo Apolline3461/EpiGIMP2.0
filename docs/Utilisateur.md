@@ -67,6 +67,7 @@ chmod +x epigimp-linux-x86_64.AppImage
 
 ![Add layer](assets/addlayer.png)
 ![Calque](assets/calque1.png)
+![add](assets/add.png)
 
 ## Historique
 
@@ -81,6 +82,10 @@ chmod +x epigimp-linux-x86_64.AppImage
 - Annuler / Rétablir : Ctrl+Z / Ctrl+Y
 - Pot de peinture : Maj+B
 
+## Exemple entier
+
+Ci dessous un exemple d'un projet
+![Exemple](assets/exemple1.png)
 
 ## Dépannage rapide
 
