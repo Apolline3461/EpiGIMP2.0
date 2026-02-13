@@ -2,6 +2,26 @@
 
 Ce document présente l'essentiel pour utiliser EpiGimp2.0 : démarrage, création et ouverture de projets, gestion des fichiers et des calques, outils principaux et conseils pratiques.
 
+
+---
+
+## Sommaire
+
+- [Lancer le logiciel](#Lancer-le-logiciel)
+- [Interface principale](#Interface-principale)
+- [Créer un nouveau projet](#Créer-un-nouveau-projet)
+- [Ouvrir / Importer une image](#Ouvrir-/-Importer-une-image)
+- [Ouvrir / Enregistrer un projet (.epg)](#Ouvrir-/-Enregistrer-un-projet)
+- [Exporter l'image finale](#Exporter-l'image-finale)
+- [Gestion des calques](#Gestion-des-calques)
+- [Historique](#Historique)
+- [Raccourcis principaux](#Raccourcis-principaux)
+- [Exemple entier](#Exemple-entier)
+- [Dépannage rapide](#Dépannage-rapide)
+- [Ressources](#Ressources)
+
+---
+
 ## Lancer le logiciel
 
 - Sur Linux (depuis release AppImage) : rendre exécutable puis lancer :
@@ -15,7 +35,7 @@ chmod +x epigimp-linux-x86_64.AppImage
 
 ---
 
-## Interface principale (vue rapide)
+## Interface principale
 
 - Barre de menus : Fichier, Vue.
 - Barre d'outils : accès rapide aux outils (pot de peinture, sélection).
@@ -48,7 +68,7 @@ chmod +x epigimp-linux-x86_64.AppImage
 
 ![Open](assets/open2.png)
 
-## Ouvrir / Enregistrer un projet (.epg)
+## Ouvrir / Enregistrer un projet
 
 - Format `.epg` : archive ZIP contenant `project.json`, `preview.png` et `layers/NNNN.png`.
 - Enregistrer : `Fichier` → `Enregistrer` (Ctrl+S) ou `Enregistrer sous` pour choisir l'emplacement.
