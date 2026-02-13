@@ -142,6 +142,8 @@ ctest --test-dir build --output-on-failure
 
 ## Prise en main
 
+Une version plus détailler d'une prise en main : [Utilisateur](docs/Utilisateur.md)
+
 ### Raccourcis principaux
 
 | Action             | Raccourci           |

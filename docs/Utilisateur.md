@@ -13,6 +13,8 @@ chmod +x epigimp-linux-x86_64.AppImage
 
 - Si vous avez build depuis les sources, exécutez `./build/bin/epigimp` depuis la racine du projet.
 
+---
+
 ## Interface principale (vue rapide)
 
 - Barre de menus : Fichier, Vue.
@@ -24,6 +26,8 @@ chmod +x epigimp-linux-x86_64.AppImage
 ![fichier](assets/fichier.png)
 ![vue](assets/vue.png)
 ![cmd](assets/cmd.png)
+
+---
 
 ## Créer un nouveau projet
 
@@ -57,6 +61,8 @@ chmod +x epigimp-linux-x86_64.AppImage
 
 ![Save](assets/save.png)
 
+---
+
 ## Gestion des calques
 
 - Ajouter un calque : bouton `ajouter un calque` dans le menu fichier.
@@ -73,14 +79,26 @@ chmod +x epigimp-linux-x86_64.AppImage
 
 - Annuler / Rétablir : Ctrl+Z / Ctrl+Y. Historique par défaut limité à 20 actions (configurable).
 
-## Raccourcis utiles
+---
 
-- Nouveau : Ctrl+N
-- Ouvrir : Ctrl+O
-- Enregistrer : Ctrl+S
-- Exporter : Ctrl+Shift+E
-- Annuler / Rétablir : Ctrl+Z / Ctrl+Y
-- Pot de peinture : Maj+B
+## Raccourcis principaux
+
+| Action             | Raccourci           |
+| ------------------ | ------------------- |
+| Nouveau projet     | Ctrl + N            |
+| Ouvrir             | Ctrl + O            |
+| Enregistrer        | Ctrl + S            |
+| Exporter           | Ctrl + Maj + E      |
+| Annuler / Rétablir | Ctrl + Z / Ctrl + Y |
+| Pinceau            | P                   |
+| Gomme              | Maj + E             |
+| Pot de peinture    | Maj + B             |
+| Pipette            | O                   |
+| Texte              | T                   |
+| Zoom +/-           | Ctrl + + / Ctrl + - |
+| Fermer             | Ctrl + W            |
+
+---
 
 ## Exemple entier
 
@@ -93,6 +111,7 @@ Ci dessous un exemple d'un projet
 - Espace disque insuffisant : libérer de l'espace ou choisir un autre emplacement.
 - Calque verrouillé : déverrouiller dans le panneau Calques pour modifier.
 
+---
 
 ## Ressources
 
