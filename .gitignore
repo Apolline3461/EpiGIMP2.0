@@ -48,3 +48,4 @@ build/
 cmake-build-debug
 .idea
 Testing/
+coverage.xml
