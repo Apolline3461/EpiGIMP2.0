@@ -172,5 +172,5 @@ Information contribution : **[Contribution](./CONTRIBUTING.md)**.
 ![C++](https://img.shields.io/badge/c++-%2300599C.svg?style=for-the-badge&logo=c%2B%2B&logoColor=white)
 [![🖼️ Build EpiGimp2.0](https://github.com/Apolline3461/EpiGIMP2.0/actions/workflows/github-actions-build.yaml/badge.svg?branch=main)](https://github.com/Apolline3461/EpiGIMP2.0/actions/workflows/github-actions-build.yaml)
 
-[![Coverage (Codecov)](https://github.com/Apolline3461/EpiGIMP2.0/actions/workflows/coverage.yaml/badge.svg?branch=feat/githubactioncoverage)](https://github.com/Apolline3461/EpiGIMP2.0/actions/workflows/coverage.yaml)
-[![codecov](https://codecov.io/gh/Apolline3461/EpiGIMP2.0/branch/feat/githubactioncoverage/graph/badge.svg)](https://codecov.io/gh/Apolline3461/EpiGIMP2.0)
+[![Coverage (Codecov)](https://github.com/Apolline3461/EpiGIMP2.0/actions/workflows/coverage.yaml/badge.svg?branch=main)](https://github.com/Apolline3461/EpiGIMP2.0/actions/workflows/coverage.yaml)
+[![codecov](https://codecov.io/gh/Apolline3461/EpiGIMP2.0/branch/main/graph/badge.svg)](https://codecov.io/gh/Apolline3461/EpiGIMP2.0)
