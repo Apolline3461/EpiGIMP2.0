@@ -34,7 +34,7 @@ struct LayerSpec  // TODO: put it in other file
     std::uint32_t color = 0xFFFFFFFFU;
     std::string name = "Layer ";
     bool visible = true;
-    bool locked = true;
+    bool locked = false;  // TODO: change tests with this new default value
     float opacity = 1.F;
 };
 
@@ -47,10 +47,11 @@ class AppService
     const Document& document() const;
 
     [[nodiscard]] bool hasDocument() const;
-    void newDocument(Size size, float dpi);
+    void newDocument(Size size, float dpi, std::uint32_t bgColor = common::colors::White);
     void open(const std::string& path);
     void save(const std::string& path);
     void exportImage(const std::string& path);
+    void closeDocument();
 
     std::size_t activeLayer() const;
     void setActiveLayer(std::size_t idx);

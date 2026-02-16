@@ -52,6 +52,11 @@ class MainWindow : public QMainWindow
     void clearSelection();
     void toggleSelectionMode(bool enabled);
 
+    void newImage();
+    void openImage();
+    void saveImage();
+    void closeImage();
+
     void openEpg();
     void saveAsEpg();
     void addNewLayer();

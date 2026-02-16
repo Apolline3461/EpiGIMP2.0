@@ -143,22 +143,22 @@ void MainWindow::createActions()
     m_newAct = new QAction(tr("&Nouveau..."), this);
     m_newAct->setShortcut(QKeySequence::New);
     m_newAct->setStatusTip(tr("Créer une nouvelle image"));
-    connect(m_newAct, &QAction::triggered, [this]() { ImageActions::newImage(this); });
+    connect(m_newAct, &QAction::triggered, this, &MainWindow::newImage);
 
     m_openAct = new QAction(tr("&Ouvrir..."), this);
     m_openAct->setShortcut(QKeySequence::Open);
     m_openAct->setStatusTip(tr("Ouvrir une image existante"));
-    connect(m_openAct, &QAction::triggered, [this]() { ImageActions::openImage(this); });
+    connect(m_openAct, &QAction::triggered, this, &MainWindow::openImage);
 
     m_saveAct = new QAction(tr("&Enregistrer sous..."), this);
     m_saveAct->setShortcut(QKeySequence::SaveAs);
     m_saveAct->setStatusTip(tr("Enregistrer l'image sous un nouveau nom"));
-    connect(m_saveAct, &QAction::triggered, [this]() { ImageActions::saveImage(this); });
+    connect(m_saveAct, &QAction::triggered, this, &MainWindow::saveImage);
 
     m_closeAct = new QAction(tr("&Fermer"), this);
     m_closeAct->setShortcut(QKeySequence::Close);
     m_closeAct->setStatusTip(tr("Fermer l'image actuelle"));
-    connect(m_closeAct, &QAction::triggered, [this]() { ImageActions::closeImage(this); });
+    connect(m_closeAct, &QAction::triggered, this, &MainWindow::closeImage);
 
     m_exitAct = new QAction(tr("&Quitter"), this);
     m_exitAct->setShortcut(QKeySequence::Quit);
@@ -967,6 +967,128 @@ void MainWindow::toggleSelectionMode(bool enabled)
         m_bucketAct->setChecked(false);
         m_bucketMode = false;
     }
+}
+
+void MainWindow::newImage()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Nouvelle image"));
+
+    QVBoxLayout* mainLayout = new QVBoxLayout(&dialog);
+
+    QSpinBox* wSpin = new QSpinBox(&dialog);
+    wSpin->setRange(1, 10000);
+    wSpin->setValue(800);
+
+    QSpinBox* hSpin = new QSpinBox(&dialog);
+    hSpin->setRange(1, 10000);
+    hSpin->setValue(600);
+
+    auto* wLay = new QHBoxLayout();
+    wLay->addWidget(new QLabel(tr("Largeur (px):"), &dialog));
+    wLay->addWidget(wSpin);
+    wLay->addStretch();
+
+    auto* hLay = new QHBoxLayout();
+    hLay->addWidget(new QLabel(tr("Hauteur (px):"), &dialog));
+    hLay->addWidget(hSpin);
+    hLay->addStretch();
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+    mainLayout->addLayout(wLay);
+    mainLayout->addLayout(hLay);
+    mainLayout->addWidget(buttons);
+
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    m_currentFileName.clear();
+    app().newDocument({wSpin->value(), hSpin->value()}, 72.f);
+    setWindowTitle(tr("Sans titre - EpiGimp 2.0"));
+    statusBar()->showMessage(
+        tr("Nouvelle image créée: %1x%2").arg(wSpin->value()).arg(hSpin->value()), 2000);
+}
+
+void MainWindow::openImage()
+{
+    QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+
+    QString fileName = QFileDialog::getOpenFileName(
+        this, tr("Ouvrir une image"), picturesPath,
+        tr("Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp);;Tous les fichiers (*)"));
+
+    if (fileName.isEmpty())
+        return;
+
+    QImageReader reader(fileName);
+    reader.setAutoTransform(true);
+    const QImage image = reader.read();
+    if (image.isNull())
+    {
+        QMessageBox::critical(this, tr("Erreur"),
+                              tr("Impossible de charger l'image %1:\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(reader.errorString()));
+        return;
+    }
+
+    m_currentFileName = fileName;
+
+    app().newDocument({image.width(), image.height()}, 72.f);
+
+    ImageBuffer buf = ImageConversion::qImageToImageBuffer(image, image.width(), image.height());
+    app().addImageLayer(buf, QFileInfo(fileName).baseName().toStdString());
+
+    setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
+    statusBar()->showMessage(tr("Image chargée: %1").arg(QFileInfo(fileName).fileName()), 2000);
+}
+
+void MainWindow::saveImage()
+{
+    if (!app().hasDocument())
+    {
+        QMessageBox::information(this, tr("Information"), tr("Aucune image à sauvegarder."));
+        return;
+    }
+
+    const QString startDir =
+        m_currentFileName.isEmpty()
+            ? QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)
+            : QFileInfo(m_currentFileName).absolutePath();
+
+    QString fileName = QFileDialog::getSaveFileName(
+        this, tr("Exporter l'image"), startDir + "/untitled.png",
+        tr("PNG (*.png);;JPEG (*.jpg *.jpeg);;BMP (*.bmp);;Tous les fichiers (*)"));
+
+    if (fileName.isEmpty())
+        return;
+
+    try
+    {
+        app().exportImage(fileName.toStdString());
+        m_currentFileName = fileName;
+        statusBar()->showMessage(tr("Image exportée: %1").arg(QFileInfo(fileName).fileName()),
+                                 3000);
+    }
+    catch (const std::exception& e)
+    {
+        QMessageBox::critical(this, tr("Erreur"),
+                              tr("Impossible d'exporter %1.\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(QString::fromLocal8Bit(e.what())));
+    }
+}
+
+void MainWindow::closeImage()
+{
+    if (!app().hasDocument())
+        return;
+    app().closeDocument();
+    setWindowTitle(tr("EpiGimp 2.0"));
+    statusBar()->showMessage(tr("Image fermée"), 2000);
 }
 
 void MainWindow::openEpg()

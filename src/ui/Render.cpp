@@ -2,12 +2,11 @@
 // Created by apolline on 16/02/2026.
 //
 
-#include "Render.hpp"
+#include "ui/Render.hpp"
 
 #include "core/Compositor.hpp"
 #include "core/ImageBuffer.hpp"
 #include "ui/ImageConversion.hpp"
-#include "ui/Renderer.hpp"
 
 QImage Renderer::render(const Document& doc)
 {
