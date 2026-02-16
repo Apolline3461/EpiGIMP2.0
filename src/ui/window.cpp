@@ -8,6 +8,7 @@
 #include <QCursor>
 #include <QDateTime>
 #include <QDialog>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QDockWidget>
 #include <QFileDialog>
