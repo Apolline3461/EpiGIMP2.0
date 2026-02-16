@@ -17,6 +17,8 @@
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 
+#include <core/BucketFill.hpp>
+
 namespace app
 {
 
@@ -38,6 +40,13 @@ AppService::AppService(std::unique_ptr<IStorage> storage) : storage_(std::move(s
 const Document& AppService::document() const
 {
     return *doc_;
+}
+
+bool AppService::hasDocument() const
+{
+    if (doc_ == nullptr)
+        return false;
+    return true;
 }
 
 void AppService::newDocument(Size size, float dpi)
@@ -158,6 +167,22 @@ void AppService::setLayerLocked(std::size_t idx, bool locked)
     apply(commands::makeSetLayerLockedCommand(doc_.get(), layer->id(), layer->locked(), locked));
 }
 
+void AppService::setLayerName(std::size_t idx, std::string name)  // TODO: use apply command
+{
+    if (!doc_)
+        throw std::runtime_error("setLayerName: document is null");
+    auto layer = doc_->layerAt(static_cast<int>(idx));
+    if (!layer)
+        throw std::out_of_range("layer idx");
+    if (layer->locked())
+        throw std::runtime_error("Cannot rename locked layer");
+    if (layer->name() == name)
+        return;
+
+    layer->setName(std::move(name));
+    documentChanged.emit();
+}
+
 void AppService::addLayer(const LayerSpec& spec)
 {
     if (!doc_)
@@ -168,6 +193,32 @@ void AppService::addLayer(const LayerSpec& spec)
 
     auto layer = std::make_shared<Layer>(nextLayerId_++, spec.name, img, spec.visible, spec.locked,
                                          spec.opacity);
+
+    apply(commands::makeAddLayerCommand(doc_.get(), std::move(layer), &activeLayer_));
+}
+
+void AppService::addImageLayer(const ImageBuffer& img, std::string name, bool visible, bool locked,
+                               float opacity)
+{
+    if (!doc_)
+        throw std::runtime_error("addImageLayer: document is null");
+    auto out = std::make_shared<ImageBuffer>(doc_->width(), doc_->height());
+    out->fill(0u);
+
+    const int copyW = std::min(out->width(), img.width());
+    const int copyH = std::min(out->height(), img.height());
+
+    for (int y = 0; y < copyH; ++y)
+    {
+        for (int x = 0; x < copyW; ++x)
+        {
+            out->setPixel(x, y, img.getPixel(x, y));
+        }
+    }
+
+    auto layer = std::make_shared<Layer>(nextLayerId_++,
+                                         name.empty() ? std::string("Layer") : std::move(name), out,
+                                         visible, locked, opacity);
 
     apply(commands::makeAddLayerCommand(doc_.get(), std::move(layer), &activeLayer_));
 }
@@ -329,6 +380,28 @@ void AppService::clearSelectionRect()
     if (!doc_)
         throw std::runtime_error("clearSelectionRect: document is null");
     doc_->selection().clear();
+    documentChanged.emit();
+}
+
+void AppService::bucketFill(common::Point p, std::uint32_t rgba)  // TODO: use with apply cmd
+{
+    if (!doc_)
+        throw std::runtime_error("bucketFill: document is null");
+    const auto n = doc_->layerCount();
+    if (n == 0 || activeLayer_ >= n)
+        return;
+
+    auto layer = doc_->layerAt(activeLayer_);
+    if (!layer || !layer->image())
+        return;
+    if (layer->locked())
+        throw std::runtime_error("bucketFill: layer locked");
+
+    auto img = layer->image();
+    if (p.x < 0 || p.y < 0 || p.x >= img->width() || p.y >= img->height())
+        return;
+
+    core::floodFill(*img, p.x, p.y, core::Color{rgba});
     documentChanged.emit();
 }
 

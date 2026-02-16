@@ -15,9 +15,9 @@ struct Point
 
 struct Rect
 {
-    int x{};
-    int y{};
-    int w{};
-    int h{};
+    mutable int x{};
+    mutable int y{};
+    mutable int w{};
+    mutable int h{};
 };
 }  // namespace common
