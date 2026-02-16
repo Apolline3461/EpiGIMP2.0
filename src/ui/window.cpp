@@ -1,5 +1,6 @@
 #include "ui/window.hpp"
 
+#include <QActionGroup>
 #include <QCheckBox>
 #include <QColor>
 #include <QColorDialog>
@@ -54,9 +55,13 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
     canvas_ = new CanvasWidget(this);
     setCentralWidget(canvas_);
 
+    resize(1080, 720);
     // Interface creation
     createActions();
+    m_bucketColor = QColor(0, 0, 0, 255);
+    updateColorPickerIcon();
     createMenus();
+    createToolBar();
     createLayersPanel();
 
     connect(canvas_, &CanvasWidget::selectionFinishedDoc, this,
@@ -67,8 +72,22 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
             {
                 if (!app().hasDocument())
                     return;
+                if (m_pickMode)
+                {
+                    const uint32_t rgba = app().pickColorAt(p);
+                    const int r = (rgba >> 24) & 0xFF;
+                    const int g = (rgba >> 16) & 0xFF;
+                    const int b = (rgba >> 8) & 0xFF;
+                    const int a = (rgba) & 0xFF;
+
+                    m_bucketColor = QColor(r, g, b, a);
+                    updateColorPickerIcon();
+                    if (m_pickAct)
+                        m_pickAct->setChecked(false);
+                    return;
+                }
                 if (!m_bucketMode)
-                    return;  // ou un outil actif
+                    return;
                 const uint32_t newColor = (static_cast<uint32_t>(m_bucketColor.red()) << 24) |
                                           (static_cast<uint32_t>(m_bucketColor.green()) << 16) |
                                           (static_cast<uint32_t>(m_bucketColor.blue()) << 8) |
@@ -212,6 +231,30 @@ void MainWindow::createActions()
     // TODO: m_layerMergeDown
 
     /* Color Picker */
+    m_pickAct = new QAction(tr("Pipette"), this);
+    m_pickAct->setCheckable(true);
+    m_pickAct->setIcon(QIcon(":/icons/color_picker.svg"));
+
+    connect(m_pickAct, &QAction::toggled, this,
+            [this](bool on)
+            {
+                m_pickMode = on;
+                if (on)
+                {
+                    if (m_bucketAct)
+                        m_bucketAct->setChecked(false);
+                    if (m_selectToggleAct)
+                        m_selectToggleAct->setChecked(false);
+                    m_bucketMode = false;
+                    if (canvas_)
+                        canvas_->setSelectionEnable(false);
+                    m_pickAct->setIcon(QIcon(":/icons/color_picker_selec.svg"));
+                }
+                else
+                {
+                    m_pickAct->setIcon(QIcon(":/icons/color_picker.svg"));
+                }
+            });
     m_colorPickerAct = new QAction(tr("Couleur de remplissage"), this);
     m_colorPickerAct->setStatusTip(tr("Choisir la couleur utilisée par le pot de peinture"));
     m_colorPickerAct->setIcon(QIcon(":/icons/color_picker.svg"));
@@ -283,7 +326,12 @@ void MainWindow::createActions()
             {
                 m_bucketMode = on;
                 if (on && m_selectToggleAct)
+                {
                     m_selectToggleAct->setChecked(false);
+                    m_bucketAct->setIcon(QIcon(":/icons/bucket_selec.svg"));
+                }
+                else
+                    m_bucketAct->setIcon(QIcon(":/icons/bucket.svg"));
             });
 }
 
@@ -504,6 +552,63 @@ void MainWindow::createLayersPanel()
 
     m_layersDock->setWidget(m_layersList);
     addDockWidget(Qt::RightDockWidgetArea, m_layersDock);
+}
+
+void MainWindow::createToolBar()
+{
+    m_toolsTb = addToolBar(tr("Outils"));
+    m_toolsTb->setMovable(false);
+    m_toolsTb->setFloatable(false);
+    m_toolsTb->setIconSize(QSize(22, 22));
+
+    m_toolsGroup = new QActionGroup(this);
+    m_toolsGroup->setExclusive(true);
+
+    if (m_selectToggleAct)
+    {
+        m_selectToggleAct->setIcon(QIcon(":/icons/selection.svg"));
+        m_selectToggleAct->setToolTip(tr("Sélection rectangulaire"));
+        m_selectToggleAct->setCheckable(true);
+        m_toolsGroup->addAction(m_selectToggleAct);
+        m_toolsTb->addAction(m_selectToggleAct);
+    }
+    if (m_clearSelectionAct)
+    {
+        m_clearSelectionAct->setIcon(QIcon(":/icons/clear_selection.svg"));
+        m_clearSelectionAct->setToolTip(tr("Effacer la sélection"));
+        m_toolsTb->addAction(m_clearSelectionAct);
+    }
+
+    m_toolsTb->addSeparator();
+
+    if (m_bucketAct)
+    {
+        m_bucketAct->setIcon(QIcon(":/icons/bucket.svg"));
+        m_bucketAct->setToolTip(tr("Pot de peinture"));
+        m_bucketAct->setCheckable(true);
+        m_toolsGroup->addAction(m_bucketAct);
+        m_toolsTb->addAction(m_bucketAct);
+    }
+
+    if (m_colorPickerAct)
+    {
+        m_colorPickerAct->setToolTip(tr(
+            "Couleur de remplissage"));  // image de la pipette et ca modifie juste la couleur courante
+        m_toolsTb->addAction(m_colorPickerAct);
+    }
+
+    if (m_pickAct)
+    {
+        m_toolsGroup->addAction(m_pickAct);
+        m_toolsTb->addAction(m_pickAct);
+    }
+
+    m_toolsTb->addSeparator();
+
+    if (m_undoAct)
+        m_toolsTb->addAction(m_undoAct);
+    if (m_redoAct)
+        m_toolsTb->addAction(m_redoAct);
 }
 
 void MainWindow::populateLayersList()

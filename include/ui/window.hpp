@@ -34,6 +34,8 @@
 class ImageActions;
 class ImageLabel;
 class CanvasWidget;
+class QToolBar;
+class QActionGroup;
 
 class MainWindow : public QMainWindow
 {
@@ -87,6 +89,7 @@ class MainWindow : public QMainWindow
     void createActions();
     void createMenus();
     void createLayersPanel();
+    void createToolBar();
 
     void populateLayersList();
     QPixmap createLayerThumbnail(const std::shared_ptr<class Layer>& layer,
@@ -104,6 +107,9 @@ class MainWindow : public QMainWindow
     QMenu* m_fileMenu{nullptr};
     QMenu* m_viewMenu{nullptr};
     QMenu* m_cmdMenu{nullptr};
+
+    QToolBar* m_toolsTb = nullptr;
+    QActionGroup* m_toolsGroup = nullptr;
 
     QAction* m_newAct{nullptr};
     QAction* m_openAct{nullptr};
@@ -124,7 +130,9 @@ class MainWindow : public QMainWindow
     QAction* m_selectToggleAct{nullptr};
     QAction* m_bucketAct{nullptr};
     QAction* m_colorPickerAct{nullptr};
+    QAction* m_pickAct{nullptr};
     bool m_bucketMode{false};
+    bool m_pickMode{false};
     QColor m_bucketColor{Qt::black};
 
     bool m_handMode{false};

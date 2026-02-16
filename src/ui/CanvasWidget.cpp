@@ -159,7 +159,7 @@ void CanvasWidget::paintEvent(QPaintEvent*)
 
     if (hasSel_)
     {
-        QPen pen(Qt::white);
+        QPen pen(QColor(220, 0, 0));
         pen.setStyle(Qt::DashLine);
         pen.setWidth(1);
         p.setPen(pen);
