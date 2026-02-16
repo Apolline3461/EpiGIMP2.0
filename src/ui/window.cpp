@@ -76,10 +76,10 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
                 if (m_pickMode)
                 {
                     const uint32_t rgba = app().pickColorAt(p);
-                    const int r = (rgba >> 24) & 0xFF;
-                    const int g = (rgba >> 16) & 0xFF;
-                    const int b = (rgba >> 8) & 0xFF;
-                    const int a = (rgba) & 0xFF;
+                    const uint8_t r = static_cast<uint8_t>((rgba >> 24) & 0xFFu);
+                    const uint8_t g = static_cast<uint8_t>((rgba >> 16) & 0xFFu);
+                    const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFFu);
+                    const uint8_t a = static_cast<uint8_t>(rgba & 0xFFu);
 
                     m_bucketColor = QColor(r, g, b, a);
                     updateColorPickerIcon();
@@ -627,7 +627,7 @@ void MainWindow::populateLayersList()
     if (count == 0)
         return;
 
-    for (int i = count - 1; i >= 0; --i)
+    for (std::size_t i = count; i-- > 0; --i)
     {
         auto layer = app().document().layerAt(i);
         if (!layer)
