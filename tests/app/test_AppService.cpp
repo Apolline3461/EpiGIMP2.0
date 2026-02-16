@@ -620,6 +620,130 @@ TEST(AppService_Signals, Stroke_End_Undo_Redo_EmitsOnceEach)
     EXPECT_EQ(hits, before + 3);
 }
 
+TEST(AppService_Signals, BucketFill_NoSelection_EmitsOnce)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{6, 6}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    app->bucketFill(common::Point{2, 2}, 0xFF112233u);
+    EXPECT_EQ(hits, 1);
+}
+
+TEST(AppService_Signals, BucketFill_UndoRedo_EmitsOnceEach)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{6, 6}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    app->bucketFill(common::Point{3, 3}, 0xFF00AA11u); // +1
+    app->undo();                                      // +1
+    app->redo();                                      // +1
+
+    EXPECT_EQ(hits, 3);
+}
+
+TEST(AppService_Signals, BucketFill_WithSelection_ClickOutside_DoesNotEmit)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{6, 6}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    // sélection au centre (2..3,2..3)
+    app->setSelectionRect(Selection::Rect{2, 2, 2, 2});
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    // clic hors sélection => no-op
+    app->bucketFill(common::Point{0, 0}, 0xFF0000FFu);
+
+    EXPECT_EQ(hits, 0);
+}
+
+TEST(AppService_Signals, BucketFill_WithSelection_ClickInside_EmitsOnceEachWithUndoRedo)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{6, 6}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    app->setSelectionRect(Selection::Rect{1, 1, 4, 4});
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    app->bucketFill(common::Point{2, 2}, 0xFF123456u); // +1
+    app->undo();                                       // +1
+    app->redo();                                       // +1
+
+    EXPECT_EQ(hits, 3);
+}
+
+TEST(AppService_Signals, BucketFill_OutOfBounds_DoesNotEmit)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{4, 4}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    app->bucketFill(common::Point{-1, 0}, 0xFF010203u);
+    app->bucketFill(common::Point{0, -1}, 0xFF010203u);
+    app->bucketFill(common::Point{4, 0}, 0xFF010203u);
+    app->bucketFill(common::Point{0, 4}, 0xFF010203u);
+
+    EXPECT_EQ(hits, 0);
+}
+
+TEST(AppService_Signals, BucketFill_LockedLayer_ThrowsAndDoesNotEmit)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{4, 4}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = true;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    EXPECT_THROW(app->bucketFill(common::Point{1, 1}, 0xFF000000u), std::runtime_error);
+    EXPECT_EQ(hits, 0);
+}
 
 TEST(AppService_Picking, pickColorAt_ReadsPixelFromActiveLayer)
 {
@@ -769,4 +893,119 @@ TEST(AppService_Stroke, BeginStroke_OnLockedLayer_Throws)
 
     app::ToolParams tp{};
     EXPECT_THROW(app->beginStroke(tp, common::Point{0, 0}), std::runtime_error);
+}
+
+TEST(AppService_BucketFill, NoSelection_FillsAndUndoRedoWorks)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{5, 5}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = common::colors::Transparent;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    auto img = app->document().layerAt(1)->image();
+    ASSERT_NE(img, nullptr);
+
+    img->setPixel(2, 2, 0xFF000000u); // zone source
+    const uint32_t fill = 0xFFFF0000u;
+
+    app->bucketFill(common::Point{2, 2}, fill);
+
+    EXPECT_TRUE(app->canUndo());
+    EXPECT_EQ(img->getPixel(2, 2), fill);
+
+    app->undo();
+    EXPECT_EQ(img->getPixel(2, 2), 0xFF000000u);
+
+    app->redo();
+    EXPECT_EQ(img->getPixel(2, 2), fill);
+}
+
+TEST(AppService_BucketFill, WithSelection_ClickOutside_IsNoOpAndNoHistory)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{6, 6}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFF00FF00u; // vert
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    // sélection au centre (2..3, 2..3)
+    app->setSelectionRect(Selection::Rect{2, 2, 2, 2});
+
+    const bool beforeUndo = app->canUndo();
+    const bool beforeRedo = app->canRedo();
+
+    // clic hors sélection
+    app->bucketFill(common::Point{0, 0}, 0xFFFF0000u);
+
+    // rien ne doit changer côté history
+    EXPECT_EQ(app->canUndo(), beforeUndo);
+    EXPECT_EQ(app->canRedo(), beforeRedo);
+}
+
+TEST(AppService_BucketFill, WithSelection_FillsOnlyInsideMask)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{6, 6}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFu; // blanc partout
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    auto img = app->document().layerAt(1)->image();
+    ASSERT_NE(img, nullptr);
+
+    // sélection (1..4,1..4) => 4x4
+    app->setSelectionRect(Selection::Rect{1, 1, 4, 4});
+
+    const uint32_t fill = 0xFF112233u;
+    app->bucketFill(common::Point{2, 2}, fill);
+
+    // dans la sélection
+    EXPECT_EQ(img->getPixel(2, 2), fill);
+
+    // hors sélection (0,0) doit rester blanc
+    EXPECT_EQ(img->getPixel(0, 0), 0xFFFFFFFFu);
+}
+
+TEST(AppService_BucketFill, LockedLayer_Throws)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{4, 4}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = true;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    EXPECT_THROW(app->bucketFill(common::Point{1, 1}, 0xFF000000u), std::runtime_error);
+}
+
+TEST(AppService_BucketFill, OutOfBounds_IsNoOpAndNoHistory)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{4, 4}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    const bool beforeUndo = app->canUndo();
+    app->bucketFill(common::Point{-1, 0}, 0xFF000000u);
+    app->bucketFill(common::Point{0, -1}, 0xFF000000u);
+    app->bucketFill(common::Point{4, 0}, 0xFF000000u);
+    app->bucketFill(common::Point{0, 4}, 0xFF000000u);
+
+    EXPECT_EQ(app->canUndo(), beforeUndo);
 }
