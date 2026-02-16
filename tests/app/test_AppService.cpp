@@ -93,7 +93,7 @@ TEST(AppService_State, newDocumentInitialLayer_CountIsOne) {
     ASSERT_NE(bgLayer, nullptr);
 
     EXPECT_TRUE(bgLayer->visible());
-    EXPECT_TRUE(bgLayer->locked());
+    EXPECT_FALSE(bgLayer->locked());
     EXPECT_FLOAT_EQ(bgLayer->opacity(), 1.f);
 
     ASSERT_NE(bgLayer->image(), nullptr);
@@ -196,6 +196,7 @@ TEST(AppService_Layers, RemoveLayer_WhenLocked_Throws) {
     const auto app = makeApp();
     app->newDocument(app::Size{10, 10}, 72.f);
 
+    app->document().layerAt(0)->setLocked(true);
     EXPECT_THROW(app->removeLayer(0), std::runtime_error);
     EXPECT_EQ(app->document().layerCount(), 1);
 }
@@ -284,20 +285,20 @@ TEST(AppService_UndoRedo, SetLayerLocked_UndoRedo_RestoresPreviousValue)
     const auto app = makeApp();
     app->newDocument(app::Size{10, 10}, 72.f);
 
-    ASSERT_TRUE(app->document().layerAt(0)->locked());
+    ASSERT_FALSE(app->document().layerAt(0)->locked());
 
-    app->setLayerLocked(0, false);
-    EXPECT_FALSE(app->document().layerAt(0)->locked());
+    app->setLayerLocked(0, true);
+    EXPECT_TRUE(app->document().layerAt(0)->locked());
     EXPECT_TRUE(app->canUndo());
     EXPECT_FALSE(app->canRedo());
 
     app->undo();
-    EXPECT_TRUE(app->document().layerAt(0)->locked());
+    EXPECT_FALSE(app->document().layerAt(0)->locked());
     EXPECT_FALSE(app->canUndo());
     EXPECT_TRUE(app->canRedo());
 
     app->redo();
-    EXPECT_FALSE(app->document().layerAt(0)->locked());
+    EXPECT_TRUE(app->document().layerAt(0)->locked());
     EXPECT_TRUE(app->canUndo());
     EXPECT_FALSE(app->canRedo());
 }
@@ -448,7 +449,7 @@ TEST(AppService_Signals, SetLayerLocked_UndoRedo_EmitsDocumentChangedOnceEach)
     int hits = 0;
     app->documentChanged.connect([&]() { ++hits; });
 
-    app->setLayerLocked(0, false); // +1
+    app->setLayerLocked(0, true); // +1
     EXPECT_EQ(hits, 1);
 
     app->undo(); // +1
@@ -558,8 +559,7 @@ TEST(AppService_Signals, SetLayerLocked_NoChange_DoesNotEmit)
     int hits = 0;
     app->documentChanged.connect([&]() { ++hits; });
 
-    // background est déjà locked=true
-    app->setLayerLocked(0, true);
+    app->setLayerLocked(0, false);
 
     EXPECT_EQ(hits, 0);
 }
@@ -763,7 +763,10 @@ TEST(AppService_Stroke, BeginStroke_OnLockedLayer_Throws)
     const auto app = makeApp();
     app->newDocument(app::Size{3, 3}, 72.f);
 
-    // active layer = 0 (Background locked)
+    app::LayerSpec spec{};
+    spec.locked = true;
+    app->addLayer(spec);
+
     app::ToolParams tp{};
     EXPECT_THROW(app->beginStroke(tp, common::Point{0, 0}), std::runtime_error);
 }
