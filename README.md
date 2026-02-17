@@ -11,8 +11,8 @@ Développé en **C++20 / Qt 6**, il permet la création, la retouche et la gesti
 - [Fonctionnalités actuelles](#fonctionnalités-actuelles)
 - [Format `.epg`](#format-epg)
 - [Installation](#installation)
-  - [Télécharger une Release](#télécharger-une-release-recommandé)
-  - [Build depuis les sources](#build-depuis-les-sources)
+    - [Télécharger une Release](#télécharger-une-release-recommandé)
+    - [Build depuis les sources](#build-depuis-les-sources)
 - [Prise en main](#prise-en-main)
 - [Licence](#-licence)
 
