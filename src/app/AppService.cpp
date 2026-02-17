@@ -189,6 +189,7 @@ void AppService::setLayerLocked(std::size_t idx, bool locked)
     apply(commands::makeSetLayerLockedCommand(doc_.get(), layer->id(), layer->locked(), locked));
 }
 
+// cppcheck-suppress functionConst
 void AppService::setLayerName(std::size_t idx, std::string name)  // TODO: use apply command
 {
     if (!doc_)
@@ -433,9 +434,6 @@ void AppService::bucketFill(common::Point p, std::uint32_t rgba)
         throw std::runtime_error("bucketFill: layer locked");
 
     auto img = layer->image();
-    if (!img)
-        return;
-
     if (p.x < 0 || p.y < 0 || p.x >= img->width() || p.y >= img->height())
         return;
 

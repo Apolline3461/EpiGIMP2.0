@@ -43,7 +43,7 @@ class CanvasWidget : public QWidget
     QPointF pan() const;
 
     // conversions
-    common::Point screenToDoc(const QPoint& p) const;
+    common::Point screenToDoc(const QPoint& sp) const;
     QPoint docToScreen(common::Point p) const;
 
    signals:
