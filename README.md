@@ -9,10 +9,10 @@ Développé en **C++20 / Qt 6**, il permet la création, la retouche et la gesti
 
 - [Présentation](#-présentation)
 - [Fonctionnalités actuelles](#fonctionnalités-actuelles)
-- [Format `.epg`](#-format-epg)
-- [Installation](#-installation)
-  - [Télécharger une Release](#télécharger-une-release-recommandé)
-  - [Build depuis les sources](#build-depuis-les-sources)
+- [Format `.epg`](#format-epg)
+- [Installation](#installation)
+    - [Télécharger une Release](#télécharger-une-release-recommandé)
+    - [Build depuis les sources](#build-depuis-les-sources)
 - [Prise en main](#prise-en-main)
 - [Licence](#-licence)
 
@@ -62,7 +62,7 @@ Développé en **C++20 / Qt 6**, il permet la création, la retouche et la gesti
 
 > Le reste des fonctionnalités arrive progressivement.
 > Ce README se limite volontairement aux fonctionnalités déjà implémentées.
-> La liste complète des fonctionnalités visées est détaillée dans le [cahier des charges](./EPIGIMP2.0%20cdc.pdf) du repo.
+> La liste complète des fonctionnalités visées est détaillée dans le [cahier des charges](./docs/EPIGIMP2.0%20cdc.pdf) du repo.
 
 ---
 
@@ -171,3 +171,6 @@ Information contribution : **[Contribution](./CONTRIBUTING.md)**.
 
 ![C++](https://img.shields.io/badge/c++-%2300599C.svg?style=for-the-badge&logo=c%2B%2B&logoColor=white)
 [![🖼️ Build EpiGimp2.0](https://github.com/Apolline3461/EpiGIMP2.0/actions/workflows/github-actions-build.yaml/badge.svg?branch=main)](https://github.com/Apolline3461/EpiGIMP2.0/actions/workflows/github-actions-build.yaml)
+
+[![Coverage (Codecov)](https://github.com/Apolline3461/EpiGIMP2.0/actions/workflows/coverage.yaml/badge.svg?branch=main)](https://github.com/Apolline3461/EpiGIMP2.0/actions/workflows/coverage.yaml)
+[![codecov](https://codecov.io/gh/Apolline3461/EpiGIMP2.0/branch/main/graph/badge.svg)](https://codecov.io/gh/Apolline3461/EpiGIMP2.0)
