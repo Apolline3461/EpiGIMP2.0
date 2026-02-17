@@ -1,5 +1,4 @@
 file(GLOB RENDER_HEADERS
-        ${EPIGIMP_ROOT_INCLUDE_DIR}/render/*.h
         ${EPIGIMP_ROOT_INCLUDE_DIR}/render/*.hpp
 )
 

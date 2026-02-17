@@ -93,7 +93,7 @@ TEST(AppService_State, newDocumentInitialLayer_CountIsOne) {
     ASSERT_NE(bgLayer, nullptr);
 
     EXPECT_TRUE(bgLayer->visible());
-    EXPECT_TRUE(bgLayer->locked());
+    EXPECT_FALSE(bgLayer->locked());
     EXPECT_FLOAT_EQ(bgLayer->opacity(), 1.f);
 
     ASSERT_NE(bgLayer->image(), nullptr);
@@ -196,6 +196,7 @@ TEST(AppService_Layers, RemoveLayer_WhenLocked_Throws) {
     const auto app = makeApp();
     app->newDocument(app::Size{10, 10}, 72.f);
 
+    app->document().layerAt(0)->setLocked(true);
     EXPECT_THROW(app->removeLayer(0), std::runtime_error);
     EXPECT_EQ(app->document().layerCount(), 1);
 }
@@ -284,20 +285,20 @@ TEST(AppService_UndoRedo, SetLayerLocked_UndoRedo_RestoresPreviousValue)
     const auto app = makeApp();
     app->newDocument(app::Size{10, 10}, 72.f);
 
-    ASSERT_TRUE(app->document().layerAt(0)->locked());
+    ASSERT_FALSE(app->document().layerAt(0)->locked());
 
-    app->setLayerLocked(0, false);
-    EXPECT_FALSE(app->document().layerAt(0)->locked());
+    app->setLayerLocked(0, true);
+    EXPECT_TRUE(app->document().layerAt(0)->locked());
     EXPECT_TRUE(app->canUndo());
     EXPECT_FALSE(app->canRedo());
 
     app->undo();
-    EXPECT_TRUE(app->document().layerAt(0)->locked());
+    EXPECT_FALSE(app->document().layerAt(0)->locked());
     EXPECT_FALSE(app->canUndo());
     EXPECT_TRUE(app->canRedo());
 
     app->redo();
-    EXPECT_FALSE(app->document().layerAt(0)->locked());
+    EXPECT_TRUE(app->document().layerAt(0)->locked());
     EXPECT_TRUE(app->canUndo());
     EXPECT_FALSE(app->canRedo());
 }
@@ -448,7 +449,7 @@ TEST(AppService_Signals, SetLayerLocked_UndoRedo_EmitsDocumentChangedOnceEach)
     int hits = 0;
     app->documentChanged.connect([&]() { ++hits; });
 
-    app->setLayerLocked(0, false); // +1
+    app->setLayerLocked(0, true); // +1
     EXPECT_EQ(hits, 1);
 
     app->undo(); // +1
@@ -558,8 +559,7 @@ TEST(AppService_Signals, SetLayerLocked_NoChange_DoesNotEmit)
     int hits = 0;
     app->documentChanged.connect([&]() { ++hits; });
 
-    // background est déjà locked=true
-    app->setLayerLocked(0, true);
+    app->setLayerLocked(0, false);
 
     EXPECT_EQ(hits, 0);
 }
@@ -620,6 +620,146 @@ TEST(AppService_Signals, Stroke_End_Undo_Redo_EmitsOnceEach)
     EXPECT_EQ(hits, before + 3);
 }
 
+TEST(AppService_Signals, BucketFill_NoSelection_EmitsOnce)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{6, 6}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    app->bucketFill(common::Point{2, 2}, 0xFF112233u);
+    EXPECT_EQ(hits, 1);
+}
+
+TEST(AppService_Signals, BucketFill_UndoRedo_EmitsOnceEach)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{6, 6}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    app->bucketFill(common::Point{3, 3}, 0xFF00AA11u); // +1
+    app->undo();                                      // +1
+    app->redo();                                      // +1
+
+    EXPECT_EQ(hits, 3);
+}
+
+TEST(AppService_Signals, BucketFill_WithSelection_ClickOutside_DoesNotEmit)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{6, 6}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    // sélection au centre (2..3,2..3)
+    app->setSelectionRect(Selection::Rect{2, 2, 2, 2});
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    // clic hors sélection => no-op
+    app->bucketFill(common::Point{0, 0}, 0xFF0000FFu);
+
+    EXPECT_EQ(hits, 0);
+}
+
+TEST(AppService_Signals, BucketFill_WithSelection_ClickInside_EmitsOnceEachWithUndoRedo)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{6, 6}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    app->setSelectionRect(Selection::Rect{1, 1, 4, 4});
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    app->bucketFill(common::Point{2, 2}, 0xFF123456u); // +1
+    app->undo();                                       // +1
+    app->redo();                                       // +1
+
+    EXPECT_EQ(hits, 3);
+}
+
+TEST(AppService_Signals, BucketFill_OutOfBounds_DoesNotEmit)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{4, 4}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    app->bucketFill(common::Point{-1, 0}, 0xFF010203u);
+    app->bucketFill(common::Point{0, -1}, 0xFF010203u);
+    app->bucketFill(common::Point{4, 0}, 0xFF010203u);
+    app->bucketFill(common::Point{0, 4}, 0xFF010203u);
+
+    EXPECT_EQ(hits, 0);
+}
+
+TEST(AppService_Signals, BucketFill_LockedLayer_ThrowsAndDoesNotEmit)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{4, 4}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = true;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    EXPECT_THROW(app->bucketFill(common::Point{1, 1}, 0xFF000000u), std::runtime_error);
+    EXPECT_EQ(hits, 0);
+}
+
+TEST(AppService_Signals, ReplaceBackgroundWithImage_EmitsDocumentChangedOnce)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{3, 3}, 72.f, common::colors::Transparent);
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    ImageBuffer src(3, 3);
+    src.fill(0xFF445566u);
+
+    app->replaceBackgroundWithImage(src, "opened");
+
+    EXPECT_EQ(hits, 1);
+}
 
 TEST(AppService_Picking, pickColorAt_ReadsPixelFromActiveLayer)
 {
@@ -763,7 +903,196 @@ TEST(AppService_Stroke, BeginStroke_OnLockedLayer_Throws)
     const auto app = makeApp();
     app->newDocument(app::Size{3, 3}, 72.f);
 
-    // active layer = 0 (Background locked)
+    app::LayerSpec spec{};
+    spec.locked = true;
+    app->addLayer(spec);
+
     app::ToolParams tp{};
     EXPECT_THROW(app->beginStroke(tp, common::Point{0, 0}), std::runtime_error);
 }
+
+TEST(AppService_BucketFill, NoSelection_FillsAndUndoRedoWorks)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{5, 5}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = common::colors::Transparent;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    auto img = app->document().layerAt(1)->image();
+    ASSERT_NE(img, nullptr);
+
+    img->setPixel(2, 2, 0xFF000000u); // zone source
+    const uint32_t fill = 0xFFFF0000u;
+
+    app->bucketFill(common::Point{2, 2}, fill);
+
+    EXPECT_TRUE(app->canUndo());
+    EXPECT_EQ(img->getPixel(2, 2), fill);
+
+    app->undo();
+    EXPECT_EQ(img->getPixel(2, 2), 0xFF000000u);
+
+    app->redo();
+    EXPECT_EQ(img->getPixel(2, 2), fill);
+}
+
+TEST(AppService_BucketFill, WithSelection_ClickOutside_IsNoOpAndNoHistory)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{6, 6}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFF00FF00u; // vert
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    // sélection au centre (2..3, 2..3)
+    app->setSelectionRect(Selection::Rect{2, 2, 2, 2});
+
+    const bool beforeUndo = app->canUndo();
+    const bool beforeRedo = app->canRedo();
+
+    // clic hors sélection
+    app->bucketFill(common::Point{0, 0}, 0xFFFF0000u);
+
+    // rien ne doit changer côté history
+    EXPECT_EQ(app->canUndo(), beforeUndo);
+    EXPECT_EQ(app->canRedo(), beforeRedo);
+}
+
+TEST(AppService_BucketFill, WithSelection_FillsOnlyInsideMask)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{6, 6}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFu; // blanc partout
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    auto img = app->document().layerAt(1)->image();
+    ASSERT_NE(img, nullptr);
+
+    // sélection (1..4,1..4) => 4x4
+    app->setSelectionRect(Selection::Rect{1, 1, 4, 4});
+
+    const uint32_t fill = 0xFF112233u;
+    app->bucketFill(common::Point{2, 2}, fill);
+
+    // dans la sélection
+    EXPECT_EQ(img->getPixel(2, 2), fill);
+
+    // hors sélection (0,0) doit rester blanc
+    EXPECT_EQ(img->getPixel(0, 0), 0xFFFFFFFFu);
+}
+
+TEST(AppService_BucketFill, LockedLayer_Throws)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{4, 4}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = true;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    EXPECT_THROW(app->bucketFill(common::Point{1, 1}, 0xFF000000u), std::runtime_error);
+}
+
+TEST(AppService_BucketFill, OutOfBounds_IsNoOpAndNoHistory)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{4, 4}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = 0xFFFFFFFFu;
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    const bool beforeUndo = app->canUndo();
+    app->bucketFill(common::Point{-1, 0}, 0xFF000000u);
+    app->bucketFill(common::Point{0, -1}, 0xFF000000u);
+    app->bucketFill(common::Point{4, 0}, 0xFF000000u);
+    app->bucketFill(common::Point{0, 4}, 0xFF000000u);
+
+    EXPECT_EQ(app->canUndo(), beforeUndo);
+}
+
+TEST(AppService_OpenImageFlow, ReplaceBackgroundWithImage_KeepsSingleLayerAndCopiesPixels)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{3, 2}, 72.f, common::colors::Transparent);
+
+    ASSERT_EQ(app->document().layerCount(), 1);
+    auto bg = app->document().layerAt(0);
+    ASSERT_NE(bg, nullptr);
+    ASSERT_NE(bg->image(), nullptr);
+
+    ImageBuffer src(3, 2);
+    src.fill(0u);
+    src.setPixel(0, 0, 0xFF112233u);
+    src.setPixel(2, 1, 0xFFABCDEFu);
+
+    app->replaceBackgroundWithImage(src, "opened");
+
+    ASSERT_EQ(app->document().layerCount(), 1);
+    bg = app->document().layerAt(0);
+    ASSERT_NE(bg, nullptr);
+    ASSERT_NE(bg->image(), nullptr);
+
+    EXPECT_EQ(bg->name(), "opened");
+    EXPECT_EQ(bg->image()->getPixel(0, 0), 0xFF112233u);
+    EXPECT_EQ(bg->image()->getPixel(2, 1), 0xFFABCDEFu);
+    EXPECT_EQ(app->activeLayer(), 0u);
+}
+
+TEST(AppService_OpenImageFlow, ReplaceBackgroundWithImage_SmallerSource_LeavesRestTransparent)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{4, 4}, 72.f, common::colors::Transparent);
+
+    // source 2x2 seulement
+    ImageBuffer src(2, 2);
+    src.fill(0u);
+    src.setPixel(1, 1, 0xFF010203u);
+
+    app->replaceBackgroundWithImage(src, "opened");
+
+    auto bg = app->document().layerAt(0);
+    ASSERT_NE(bg, nullptr);
+    ASSERT_NE(bg->image(), nullptr);
+
+    // pixel copié
+    EXPECT_EQ(bg->image()->getPixel(1, 1), 0xFF010203u);
+
+    // zone hors source -> transparent (car on remplit out->fill(0u))
+    EXPECT_EQ(bg->image()->getPixel(3, 3), 0u);
+}
+
+TEST(AppService_OpenImageFlow, ReplaceBackgroundWithImage_ClearsUndoRedo)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{3, 3}, 72.f, common::colors::Transparent);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    app->addLayer(spec);
+    ASSERT_TRUE(app->canUndo());
+
+    ImageBuffer src(3, 3);
+    src.fill(0xFF0000FFu);
+
+    app->replaceBackgroundWithImage(src, "opened");
+
+    EXPECT_FALSE(app->canUndo());
+    EXPECT_FALSE(app->canRedo());
+}
+
