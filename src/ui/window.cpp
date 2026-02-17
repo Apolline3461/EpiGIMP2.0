@@ -47,7 +47,6 @@
 #include "io/EpgFormat.hpp"
 #include "io/EpgJson.hpp"
 #include "ui/CanvasWidget.hpp"
-#include "ui/image.hpp"
 #include "ui/ImageConversion.hpp"
 #include "ui/Render.hpp"
 
