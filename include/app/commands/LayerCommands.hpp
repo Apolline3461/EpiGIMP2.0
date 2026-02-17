@@ -36,4 +36,8 @@ std::unique_ptr<Command> makeSetLayerVisibleCommand(Document* doc, std::uint64_t
 
 std::unique_ptr<Command> makeSetLayerOpacityCommand(Document* doc, std::uint64_t layerId,
                                                     float before, float after);
+
+std::unique_ptr<Command> makeSetLayerNameCommand(Document* doc, std::uint64_t layerId,
+                                                 std::string before, std::string after);
+
 }  // namespace app::commands

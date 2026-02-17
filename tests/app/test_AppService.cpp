@@ -55,6 +55,17 @@ static std::unique_ptr<app::AppService> makeApp(SpyStorage** outSpy = nullptr) {
     return std::make_unique<app::AppService>(std::move(spy));
 }
 
+static void addOneEditableLayer(app::AppService& svc, std::string name = "Layer 1")
+{
+    app::LayerSpec spec;
+    spec.name = std::move(name);
+    spec.visible = true;
+    spec.locked = false;
+    spec.opacity = 1.f;
+    spec.color = 0x00000000u;
+    svc.addLayer(spec);
+}
+
 TEST(AppService_State, documentReturnsConstRef) {
     const auto app = makeApp();
     app->newDocument(app::Size{10, 10}, 72.f);
@@ -1094,5 +1105,68 @@ TEST(AppService_OpenImageFlow, ReplaceBackgroundWithImage_ClearsUndoRedo)
 
     EXPECT_FALSE(app->canUndo());
     EXPECT_FALSE(app->canRedo());
+}
+
+TEST(AppService_SetLayerName, ChangesNameAndUndoRedoWorks)
+{
+    app::AppService svc(nullptr);
+    svc.newDocument({32, 32}, 72.f);
+
+    // addLayer pushes a command -> canUndo() is expected to be true now
+    addOneEditableLayer(svc, "Layer 1");
+    ASSERT_EQ(svc.document().layerCount(), 2u);
+    ASSERT_TRUE(svc.canUndo());
+
+    // Rename (this should add ONE more command if implemented via apply)
+    svc.setLayerName(1, "Renamed");
+    EXPECT_EQ(svc.document().layerAt(1)->name(), std::string("Renamed"));
+
+    // Undo #1: should undo rename, NOT remove the layer
+    svc.undo();
+    ASSERT_EQ(svc.document().layerCount(), 2u);
+    EXPECT_EQ(svc.document().layerAt(1)->name(), std::string("Layer 1"));
+
+    // Redo: should redo rename
+    svc.redo();
+    ASSERT_EQ(svc.document().layerCount(), 2u);
+    EXPECT_EQ(svc.document().layerAt(1)->name(), std::string("Renamed"));
+
+    // Undo twice: 1) undo rename, 2) undo addLayer -> back to background only
+    svc.undo();
+    svc.undo();
+    EXPECT_EQ(svc.document().layerCount(), 1u);
+}
+
+
+TEST(AppService_SetLayerName, ThrowsOnLockedLayerAndDoesNotRename)
+{
+    app::AppService svc(nullptr);
+    svc.newDocument({32, 32}, 72.f);
+
+    addOneEditableLayer(svc, "Layer 1");
+    ASSERT_EQ(svc.document().layerCount(), 2u);
+
+    svc.setLayerLocked(1, true);
+    ASSERT_TRUE(svc.document().layerAt(1)->locked());
+
+    EXPECT_THROW(svc.setLayerName(1, "ShouldFail"), std::runtime_error);
+    EXPECT_EQ(svc.document().layerAt(1)->name(), std::string("Layer 1"));
+}
+
+TEST(AppService_SetLayerName, NoOpIfSameNameDoesNotPushHistory)
+{
+    app::AppService svc(nullptr);
+    svc.newDocument({32, 32}, 72.f);
+
+    addOneEditableLayer(svc, "Layer 1");
+    ASSERT_EQ(svc.document().layerCount(), 2u);
+
+    // No-op rename (same name)
+    svc.setLayerName(1, "Layer 1");
+    EXPECT_EQ(svc.document().layerAt(1)->name(), std::string("Layer 1"));
+
+    // If no command was pushed, the next undo should undo addLayer and remove the layer
+    svc.undo();
+    EXPECT_EQ(svc.document().layerCount(), 1u);
 }
 

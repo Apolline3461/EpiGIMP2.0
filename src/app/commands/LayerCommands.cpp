@@ -5,6 +5,7 @@
 #include "app/commands/LayerCommands.hpp"
 
 #include <stdexcept>
+#include <utility>
 
 #include "app/commands/CommandUtils.hpp"
 #include "core/Document.hpp"
@@ -185,6 +186,47 @@ class SetLayerOpacityCommand final : public Command
     std::uint64_t layerId_{0};
     float before_{1.f};
     float after_{1.f};
+};
+
+class SetLayerNameCommand final : public Command
+{
+   public:
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    SetLayerNameCommand(Document* doc, std::uint64_t layerId, std::string before, std::string after)
+        : doc_(doc), layerId_(layerId), before_(std::move(before)), after_(std::move(after))
+    {
+    }
+
+    void redo() override
+    {
+        set(after_);
+    }
+    void undo() override
+    {
+        set(before_);
+    }
+
+   private:
+    void set(std::string v) const
+    {
+        if (!doc_)
+            return;
+
+        auto idx = findLayerIndexById(*doc_, layerId_);
+        if (!idx)
+            return;
+
+        auto layer = doc_->layerAt(*idx);
+        if (!layer)
+            return;
+
+        layer->setName(std::move(v));
+    }
+
+    Document* doc_{nullptr};
+    std::uint64_t layerId_{0};
+    std::string before_;
+    std::string after_;
 };
 
 class RemoveLayerCommand final : public Command
@@ -379,6 +421,12 @@ std::unique_ptr<Command> makeSetLayerOpacityCommand(Document* doc, std::uint64_t
                                                     float before, float after)
 {
     return std::make_unique<SetLayerOpacityCommand>(doc, layerId, before, after);
+}
+
+std::unique_ptr<Command> makeSetLayerNameCommand(Document* doc, std::uint64_t layerId,
+                                                 std::string before, std::string after)
+{
+    return std::make_unique<SetLayerNameCommand>(doc, layerId, before, after);
 }
 
 }  // namespace app::commands

@@ -220,7 +220,7 @@ void AppService::setLayerLocked(std::size_t idx, bool locked)
     apply(commands::makeSetLayerLockedCommand(doc_.get(), layer->id(), layer->locked(), locked));
 }
 
-void AppService::setLayerName(std::size_t idx, std::string name)  // TODO: use apply command
+void AppService::setLayerName(std::size_t idx, std::string name)
 {
     if (!doc_)
         throw std::runtime_error("setLayerName: document is null");
@@ -232,8 +232,7 @@ void AppService::setLayerName(std::size_t idx, std::string name)  // TODO: use a
     if (layer->name() == name)
         return;
 
-    layer->setName(std::move(name));
-    documentChanged.notify();
+    apply(commands::makeSetLayerNameCommand(doc_.get(), layer->id(), layer->name(), name));
 }
 
 void AppService::addLayer(const LayerSpec& spec)
