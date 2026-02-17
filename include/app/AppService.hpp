@@ -49,6 +49,7 @@ class AppService
     [[nodiscard]] bool hasDocument() const;
     void newDocument(Size size, float dpi, std::uint32_t bgColor = common::colors::White);
     void open(const std::string& path);
+    void replaceBackgroundWithImage(const ImageBuffer& img, std::string name = "Background");
     void save(const std::string& path);
     void exportImage(const std::string& path);
     void closeDocument();

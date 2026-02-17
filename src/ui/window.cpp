@@ -627,7 +627,7 @@ void MainWindow::populateLayersList()
     if (count == 0)
         return;
 
-    for (std::size_t i = count; i-- > 0; --i)
+    for (std::size_t i = count; i-- > 0;)
     {
         auto layer = app().document().layerAt(i);
         if (!layer)
@@ -1143,10 +1143,10 @@ void MainWindow::openImage()
 
     m_currentFileName = fileName;
 
-    app().newDocument({image.width(), image.height()}, 72.f);
+    app().newDocument({image.width(), image.height()}, 72.f, common::colors::Transparent);
 
     ImageBuffer buf = ImageConversion::qImageToImageBuffer(image, image.width(), image.height());
-    app().addImageLayer(buf, QFileInfo(fileName).baseName().toStdString());
+    app().replaceBackgroundWithImage(buf, QFileInfo(fileName).baseName().toStdString());
 
     setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
     statusBar()->showMessage(tr("Image chargée: %1").arg(QFileInfo(fileName).fileName()), 2000);

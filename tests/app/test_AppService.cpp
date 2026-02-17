@@ -745,6 +745,22 @@ TEST(AppService_Signals, BucketFill_LockedLayer_ThrowsAndDoesNotEmit)
     EXPECT_EQ(hits, 0);
 }
 
+TEST(AppService_Signals, ReplaceBackgroundWithImage_EmitsDocumentChangedOnce)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{3, 3}, 72.f, common::colors::Transparent);
+
+    int hits = 0;
+    app->documentChanged.connect([&]() { ++hits; });
+
+    ImageBuffer src(3, 3);
+    src.fill(0xFF445566u);
+
+    app->replaceBackgroundWithImage(src, "opened");
+
+    EXPECT_EQ(hits, 1);
+}
+
 TEST(AppService_Picking, pickColorAt_ReadsPixelFromActiveLayer)
 {
     const auto app = makeApp();
@@ -1009,3 +1025,74 @@ TEST(AppService_BucketFill, OutOfBounds_IsNoOpAndNoHistory)
 
     EXPECT_EQ(app->canUndo(), beforeUndo);
 }
+
+TEST(AppService_OpenImageFlow, ReplaceBackgroundWithImage_KeepsSingleLayerAndCopiesPixels)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{3, 2}, 72.f, common::colors::Transparent);
+
+    ASSERT_EQ(app->document().layerCount(), 1);
+    auto bg = app->document().layerAt(0);
+    ASSERT_NE(bg, nullptr);
+    ASSERT_NE(bg->image(), nullptr);
+
+    ImageBuffer src(3, 2);
+    src.fill(0u);
+    src.setPixel(0, 0, 0xFF112233u);
+    src.setPixel(2, 1, 0xFFABCDEFu);
+
+    app->replaceBackgroundWithImage(src, "opened");
+
+    ASSERT_EQ(app->document().layerCount(), 1);
+    bg = app->document().layerAt(0);
+    ASSERT_NE(bg, nullptr);
+    ASSERT_NE(bg->image(), nullptr);
+
+    EXPECT_EQ(bg->name(), "opened");
+    EXPECT_EQ(bg->image()->getPixel(0, 0), 0xFF112233u);
+    EXPECT_EQ(bg->image()->getPixel(2, 1), 0xFFABCDEFu);
+    EXPECT_EQ(app->activeLayer(), 0u);
+}
+
+TEST(AppService_OpenImageFlow, ReplaceBackgroundWithImage_SmallerSource_LeavesRestTransparent)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{4, 4}, 72.f, common::colors::Transparent);
+
+    // source 2x2 seulement
+    ImageBuffer src(2, 2);
+    src.fill(0u);
+    src.setPixel(1, 1, 0xFF010203u);
+
+    app->replaceBackgroundWithImage(src, "opened");
+
+    auto bg = app->document().layerAt(0);
+    ASSERT_NE(bg, nullptr);
+    ASSERT_NE(bg->image(), nullptr);
+
+    // pixel copié
+    EXPECT_EQ(bg->image()->getPixel(1, 1), 0xFF010203u);
+
+    // zone hors source -> transparent (car on remplit out->fill(0u))
+    EXPECT_EQ(bg->image()->getPixel(3, 3), 0u);
+}
+
+TEST(AppService_OpenImageFlow, ReplaceBackgroundWithImage_ClearsUndoRedo)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{3, 3}, 72.f, common::colors::Transparent);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    app->addLayer(spec);
+    ASSERT_TRUE(app->canUndo());
+
+    ImageBuffer src(3, 3);
+    src.fill(0xFF0000FFu);
+
+    app->replaceBackgroundWithImage(src, "opened");
+
+    EXPECT_FALSE(app->canUndo());
+    EXPECT_FALSE(app->canRedo());
+}
+

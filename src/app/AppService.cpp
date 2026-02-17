@@ -108,6 +108,37 @@ void AppService::open(const std::string& path)
     documentChanged.notify();
 }
 
+void AppService::replaceBackgroundWithImage(const ImageBuffer& img, std::string name)
+{
+    if (!doc_)
+        throw std::runtime_error("replaceBackgroundWithImage: document is null");
+
+    if (doc_->layerCount() == 0)
+        throw std::runtime_error("replaceBackgroundWithImage: no layers");
+
+    auto bg = doc_->layerAt(0);
+    if (!bg || !bg->image())
+        throw std::runtime_error("replaceBackgroundWithImage: background layer invalid");
+
+    // copie dans un buffer à la taille du doc
+    auto out = std::make_shared<ImageBuffer>(doc_->width(), doc_->height());
+    out->fill(0u);
+
+    const int copyW = std::min(out->width(), img.width());
+    const int copyH = std::min(out->height(), img.height());
+
+    for (int y = 0; y < copyH; ++y)
+        for (int x = 0; x < copyW; ++x)
+            out->setPixel(x, y, img.getPixel(x, y));
+
+    bg->setImageBuffer(out);
+    bg->setName(std::move(name));
+
+    activeLayer_ = 0;  // logique : on travaille sur le BG qui contient l’image
+    history_.clear();  // ouvrir une image = nouvel état, pas d’historique
+    documentChanged.notify();
+}
+
 void AppService::save(const std::string& path)
 {
     if (!storage_)
