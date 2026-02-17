@@ -59,7 +59,7 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
     resize(1080, 720);
     // Interface creation
     createActions();
-    m_bucketColor = QColor(0, 0, 0, 255);
+    m_toolColor = QColor(0, 0, 0, 255);
     updateColorPickerIcon();
     createMenus();
     createToolBar();
@@ -81,7 +81,7 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
                     const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFFu);
                     const uint8_t a = static_cast<uint8_t>(rgba & 0xFFu);
 
-                    m_bucketColor = QColor(r, g, b, a);
+                    m_toolColor = QColor(r, g, b, a);
                     updateColorPickerIcon();
                     if (m_pickAct)
                         m_pickAct->setChecked(false);
@@ -89,12 +89,45 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
                 }
                 if (!m_bucketMode)
                     return;
-                const uint32_t newColor = (static_cast<uint32_t>(m_bucketColor.red()) << 24) |
-                                          (static_cast<uint32_t>(m_bucketColor.green()) << 16) |
-                                          (static_cast<uint32_t>(m_bucketColor.blue()) << 8) |
-                                          static_cast<uint32_t>(m_bucketColor.alpha());
+                const uint32_t newColor = (static_cast<uint32_t>(m_toolColor.red()) << 24) |
+                                          (static_cast<uint32_t>(m_toolColor.green()) << 16) |
+                                          (static_cast<uint32_t>(m_toolColor.blue()) << 8) |
+                                          static_cast<uint32_t>(m_toolColor.alpha());
 
                 app().bucketFill(p, newColor);
+            });
+
+    // Brush stroke signals -> AppService (only when brush tool is active)
+    connect(canvas_, &CanvasWidget::beginStroke, this,
+            [this](common::Point p)
+            {
+                if (!m_brushAct || !m_brushAct->isChecked())
+                    return;
+                app::ToolParams params;
+                params.tool = app::ToolKind::Brush;
+                params.size = (m_brushSizeSpin) ? m_brushSizeSpin->value() : 8;
+                (void)0;  // hardness removed
+                params.color = (static_cast<uint32_t>(m_toolColor.red()) << 24) |
+                               (static_cast<uint32_t>(m_toolColor.green()) << 16) |
+                               (static_cast<uint32_t>(m_toolColor.blue()) << 8) |
+                               static_cast<uint32_t>(m_toolColor.alpha());
+                app().beginStroke(params, p);
+            });
+
+    connect(canvas_, &CanvasWidget::moveStroke, this,
+            [this](common::Point p)
+            {
+                if (!m_brushAct || !m_brushAct->isChecked())
+                    return;
+                app().moveStroke(p);
+            });
+
+    connect(canvas_, &CanvasWidget::endStroke, this,
+            [this]()
+            {
+                if (!m_brushAct || !m_brushAct->isChecked())
+                    return;
+                app().endStroke();
             });
 
     app().documentChanged.connect([this]() { refreshUIAfterDocChange(); });
@@ -262,12 +295,28 @@ void MainWindow::createActions()
     connect(m_colorPickerAct, &QAction::triggered, this,
             [this]()
             {
-                QColor chosen =
-                    QColorDialog::getColor(m_bucketColor, this, tr("Choisir la couleur"));
+                QColor chosen = QColorDialog::getColor(m_toolColor, this, tr("Choisir la couleur"));
                 if (chosen.isValid())
                 {
-                    m_bucketColor = chosen;
+                    m_toolColor = chosen;
                     updateColorPickerIcon();
+                }
+            });
+
+    m_brushAct = new QAction(tr("Pinceau"), this);
+    m_brushAct->setCheckable(true);
+    m_brushAct->setIcon(QIcon(":/icons/brush.svg"));
+    connect(m_brushAct, &QAction::toggled, this,
+            [this](bool on)
+            {
+                if (on)
+                {
+                    if (m_bucketAct)
+                        m_bucketAct->setChecked(false);
+                    if (m_selectToggleAct)
+                        m_selectToggleAct->setChecked(false);
+                    if (canvas_)
+                        canvas_->setSelectionEnable(false);
                 }
             });
 
@@ -604,12 +653,94 @@ void MainWindow::createToolBar()
         m_toolsTb->addAction(m_pickAct);
     }
 
+    if (m_brushAct)
+    {
+        m_brushAct->setToolTip(tr("Pinceau"));
+        m_toolsGroup->addAction(m_brushAct);
+        m_toolsTb->addAction(m_brushAct);
+    }
+
+    // Create a small popup menu for brush sizes when clicking the brush icon
+    QMenu* brushSizeMenu = new QMenu(this);
+    const std::vector<int> sizes = {1, 2, 4, 8, 16};
+    for (int s : sizes)
+    {
+        QAction* a = new QAction(QString::number(s), brushSizeMenu);
+        a->setData(s);
+        brushSizeMenu->addAction(a);
+        connect(a, &QAction::triggered, this,
+                [this, s]()
+                {
+                    if (m_brushSizeSpin)
+                        m_brushSizeSpin->setValue(s);
+                    if (m_brushAct)
+                        m_brushAct->setChecked(true);
+                });
+    }
+    brushSizeMenu->addSeparator();
+    QAction* otherAct = new QAction(tr("Autre…"), brushSizeMenu);
+    brushSizeMenu->addAction(otherAct);
+    connect(otherAct, &QAction::triggered, this,
+            [this]()
+            {
+                bool ok = false;
+                const int cur = (m_brushSizeSpin) ? m_brushSizeSpin->value() : 8;
+                const int v = QInputDialog::getInt(this, tr("Taille personnalisée"),
+                                                   tr("Taille (px):"), cur, 1, 2000, 1, &ok);
+                if (ok)
+                {
+                    if (m_brushSizeSpin)
+                        m_brushSizeSpin->setValue(v);
+                    if (m_brushAct)
+                        m_brushAct->setChecked(true);
+                }
+            });
+    // Show menu when brush action is triggered
+    connect(m_brushAct, &QAction::triggered, this,
+            [this, brushSizeMenu]()
+            {
+                if (!m_toolsTb || !m_brushAct)
+                {
+                    brushSizeMenu->popup(QCursor::pos());
+                    return;
+                }
+                QWidget* w = m_toolsTb->widgetForAction(m_brushAct);
+                if (w)
+                {
+                    const QPoint pos = w->mapToGlobal(QPoint(0, w->height()));
+                    brushSizeMenu->popup(pos);
+                }
+                else
+                {
+                    brushSizeMenu->popup(QCursor::pos());
+                }
+            });
+
     m_toolsTb->addSeparator();
 
     if (m_undoAct)
         m_toolsTb->addAction(m_undoAct);
     if (m_redoAct)
         m_toolsTb->addAction(m_redoAct);
+
+    // Brush properties dock
+    m_brushDock = new QDockWidget(tr("Pinceau"), this);
+    QWidget* brushWidget = new QWidget(m_brushDock);
+    QHBoxLayout* bv = new QHBoxLayout(brushWidget);
+    bv->setContentsMargins(6, 6, 6, 6);
+
+    QLabel* sizeLbl = new QLabel(tr("Taille"), brushWidget);
+    m_brushSizeSpin = new QSpinBox(brushWidget);
+    m_brushSizeSpin->setRange(1, 200);
+    m_brushSizeSpin->setValue(8);
+    bv->addWidget(sizeLbl);
+    bv->addWidget(m_brushSizeSpin);
+
+    brushWidget->setLayout(bv);
+    m_brushDock->setWidget(brushWidget);
+    addDockWidget(Qt::TopDockWidgetArea, m_brushDock);
+    // Hide the full brush dock; size selection is via the popup on icon click
+    m_brushDock->setVisible(false);
 }
 
 void MainWindow::populateLayersList()
@@ -1258,7 +1389,7 @@ void MainWindow::updateColorPickerIcon()
     pix.fill(Qt::transparent);
     QPainter p(&pix);
     p.setRenderHint(QPainter::Antialiasing, true);
-    p.setBrush(QBrush(m_bucketColor));
+    p.setBrush(QBrush(m_toolColor));
     p.setPen(Qt::black);
     p.drawRect(0, 0, sz - 1, sz - 1);
     p.end();

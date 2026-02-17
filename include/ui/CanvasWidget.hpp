@@ -49,6 +49,9 @@ class CanvasWidget : public QWidget
    signals:
     void selectionFinishedDoc(common::Rect r);
     void clickedDoc(common::Point p);
+    void beginStroke(common::Point p);
+    void moveStroke(common::Point p);
+    void endStroke();
     // void beginDragDoc(common::Point p);
     // void dragDoc(common::Point p);
     // void endDragDoc(common::Point p);
@@ -71,6 +74,7 @@ class CanvasWidget : public QWidget
     bool hasSel_ = false;
     QRect selScreen_;
     bool selectionEnabled_ = false;
+    bool drawing_ = false;
 
     void drawChecker(QPainter& p);
 };

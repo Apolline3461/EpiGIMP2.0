@@ -223,10 +223,13 @@ void CanvasWidget::mousePressEvent(QMouseEvent* e)
             return;
         }
 
-        // clic outil (bucket etc.)
+        // start stroke for painting tools
         if (!img_.isNull())
         {
+            drawing_ = true;
             common::Point pDoc = screenToDoc(e->pos());
+            emit beginStroke(pDoc);
+            // also emit a click for tools that rely on single-click behavior (bucket/pick)
             emit clickedDoc(pDoc);
         }
         e->accept();
@@ -254,6 +257,15 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* e)
     {
         selScreen_.setBottomRight(cur);
         update();
+        e->accept();
+        return;
+    }
+
+    // painting stroke in progress
+    if (drawing_ && (e->buttons() & Qt::LeftButton))
+    {
+        common::Point pDoc = screenToDoc(cur);
+        emit moveStroke(pDoc);
         e->accept();
         return;
     }
@@ -306,6 +318,13 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* e)
                 }
             }
 
+            e->accept();
+            return;
+        }
+        if (drawing_)
+        {
+            drawing_ = false;
+            emit endStroke();
             e->accept();
             return;
         }
