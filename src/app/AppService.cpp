@@ -189,7 +189,6 @@ void AppService::setLayerLocked(std::size_t idx, bool locked)
     apply(commands::makeSetLayerLockedCommand(doc_.get(), layer->id(), layer->locked(), locked));
 }
 
-// cppcheck-suppress functionConst
 void AppService::setLayerName(std::size_t idx, std::string name)  // TODO: use apply command
 {
     if (!doc_)
