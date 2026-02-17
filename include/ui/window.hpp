@@ -19,11 +19,9 @@
 #include <QString>
 
 #include <memory>
+#include <optional>
 
-#include "app/History.hpp"
-#include "core/Document.hpp"
-
-#include <core/Selection.hpp>
+#include "app/AppService.hpp"
 
 // Définitions pour les analyseurs (clangd) qui ne connaissent pas la
 // macro `slots`. Ne pas redéfinir pour `moc`.
@@ -35,6 +33,9 @@
 
 class ImageActions;
 class ImageLabel;
+class CanvasWidget;
+class QToolBar;
+class QActionGroup;
 
 class MainWindow : public QMainWindow
 {
@@ -42,104 +43,113 @@ class MainWindow : public QMainWindow
     friend class ImageActions;
 
    public:
-    explicit MainWindow(QWidget* parent = nullptr);
-    ~MainWindow() = default;
+    explicit MainWindow(app::AppService& svc, QWidget* parent = nullptr);
+    ~MainWindow() override {}
 
-    // NOLINTNEXTLINE(unknownMacro)
    private slots:
     void zoomIn();
     void zoomOut();
     void resetZoom();
 
-    void onMouseSelection(const QRect& rect);
-
     void clearSelection();
     void toggleSelectionMode(bool enabled);
+
+    void newImage();
+    void openImage();
+    void saveImage();
+    void closeImage();
 
     void openEpg();
     void saveAsEpg();
     void addNewLayer();
     void addImageAsLayer();
-    void onLayerItemChanged(QListWidgetItem* item);
     void onLayerDoubleClicked(QListWidgetItem* item);
-    void onLayersRowsMoved(const QModelIndex& parent, int start, int end,
-                           const QModelIndex& destination, int row);
+
+    void moveLayerUp();
+    void moveLayerDown();
     void onShowLayerContextMenu(const QPoint& pos);
     void onMergeDown();
 
    private:
+    app::AppService& svc_;
+    app::AppService& app()
+    {
+        return svc_;
+    }
+    const app::AppService& app() const
+    {
+        return svc_;
+    }
+
+    CanvasWidget* canvas_{nullptr};
+
+    void refreshUIAfterDocChange();
+    void clearUiStateOnClose();
+
     void createActions();
     void createMenus();
     void createLayersPanel();
-    void updateImageDisplay();
-    void scaleImage(double factor);
-    void setScaleAndCenter(double newScale);
+    void createToolBar();
 
     void populateLayersList();
-    void updateImageFromDocument();
     QPixmap createLayerThumbnail(const std::shared_ptr<class Layer>& layer,
                                  const QSize& size) const;
 
-    // évènements et panning
-    bool eventFilter(QObject* watched, QEvent* event) override;
-    void keyPressEvent(QKeyEvent* event) override;
-    void keyReleaseEvent(QKeyEvent* event) override;
+    // void keyPressEvent(QKeyEvent* event) override;
+    // void keyReleaseEvent(QKeyEvent* event) override;
+
+    void selectLayerInListById(std::uint64_t id);
+    void updateColorPickerIcon();
 
     // Membres internes
-    ImageLabel* m_imageLabel;
-    QScrollArea* m_scrollArea;
-    QImage m_currentImage;
     QString m_currentFileName;
-    double m_scaleFactor;
 
-    QMenu* m_fileMenu;
-    QMenu* m_viewMenu;
-    QMenu* m_cmdMenu;
+    QMenu* m_fileMenu{nullptr};
+    QMenu* m_viewMenu{nullptr};
+    QMenu* m_cmdMenu{nullptr};
 
-    QAction* m_newAct;
-    QAction* m_openAct;
-    QAction* m_saveAct;
-    QAction* m_closeAct;
-    QAction* m_exitAct;
-    QAction* m_zoomInAct;
-    QAction* m_zoomOutAct;
-    QAction* m_resetZoomAct;
-    QAction* m_zoom05Act;
-    QAction* m_zoom1Act;
-    QAction* m_zoom2Act;
-    // panning state
+    QToolBar* m_toolsTb = nullptr;
+    QActionGroup* m_toolsGroup = nullptr;
+
+    QAction* m_newAct{nullptr};
+    QAction* m_openAct{nullptr};
+    QAction* m_saveAct{nullptr};
+    QAction* m_closeAct{nullptr};
+    QAction* m_exitAct{nullptr};
+    QAction* m_zoomInAct{nullptr};
+    QAction* m_zoomOutAct{nullptr};
+    QAction* m_resetZoomAct{nullptr};
+    QAction* m_zoom05Act{nullptr};
+    QAction* m_zoom1Act{nullptr};
+    QAction* m_zoom2Act{nullptr};
+
+    QAction* m_openEpgAct{nullptr};
+    QAction* m_saveEpgAct{nullptr};
+
+    QAction* m_clearSelectionAct{nullptr};
+    QAction* m_selectToggleAct{nullptr};
+    QAction* m_bucketAct{nullptr};
+    QAction* m_colorPickerAct{nullptr};
+    QAction* m_pickAct{nullptr};
+    bool m_bucketMode{false};
+    bool m_pickMode{false};
+    QColor m_bucketColor{Qt::black};
+
     bool m_handMode{false};
     bool m_panningActive{false};
     QPoint m_lastPanPos;
-    QAction* m_openEpgAct;
-    QAction* m_saveEpgAct;
+
     QAction* m_addLayerAct{nullptr};
     QAction* m_addImageLayerAct{nullptr};
-
-    // Document and layers UI
-    std::unique_ptr<Document> m_document;
     QDockWidget* m_layersDock{nullptr};
     QListWidget* m_layersList{nullptr};
-    // layer dragging state (drag the selected layer on the canvas)
-    bool m_layerDragActive{false};
-    int m_dragLayerIndex{-1};
-    QPoint m_layerDragStartDocPos;  // in document pixel coords
-    int m_layerDragInitialOffsetX{0};
-    int m_layerDragInitialOffsetY{0};
-    QAction* m_clearSelectionAct;
-    QAction* m_selectToggleAct;
-    QAction* m_bucketAct;
-    bool m_bucketMode{false};
-    QAction* m_colorPickerAct;
-    QColor m_bucketColor{Qt::black};
+    QAction* m_layerUpAct{nullptr};
+    QAction* m_layerDownAct{nullptr};
 
-    // Sélection active pour l'image
-    Selection m_selection;
-    // remplissage pot de peinture
-    void bucketFillAt(const QPoint& viewportPos);
-    void updateColorPickerIcon();
+    // Document and layers UI
+    std::optional<std::uint64_t> m_pendingSelectLayerId_;
+
     // Historique des commandes (undo/redo)
-    app::History m_history{128};
     QAction* m_undoAct{nullptr};
     QAction* m_redoAct{nullptr};
 };

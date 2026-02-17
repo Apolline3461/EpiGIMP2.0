@@ -1,6 +1,9 @@
 #include <QApplication>
 
+#include "app/AppService.hpp"
 #include "ui/window.hpp"
+
+#include <io/EpgFormat.hpp>
 
 int main(int argc, char* argv[])
 {
@@ -11,7 +14,10 @@ int main(int argc, char* argv[])
     QApplication::setApplicationVersion("1.0");
     QApplication::setOrganizationName("Epitech");
 
-    MainWindow window;
+    auto storage = std::make_unique<ZipEpgStorage>();
+    app::AppService svc(std::move(storage));
+
+    MainWindow window(svc);
     window.show();
 
     return app.exec();
