@@ -178,7 +178,7 @@ jobs:
             --project=build/compile_commands.json \
             --cppcheck-build-dir=cppcheck-cache \
             --library=qt \
-            --suppress=functionConst
+            --suppress=functionConst \
             "${args[@]}"
 
       - name: clang-tidy advisory (export fixes)
