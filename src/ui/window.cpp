@@ -63,6 +63,8 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
     updateColorPickerIcon();
     createMenus();
     createToolBar();
+    if (canvas_)
+        canvas_->setBrushColor(m_toolColor);
     createLayersPanel();
 
     connect(canvas_, &CanvasWidget::selectionFinishedDoc, this,
@@ -83,6 +85,8 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
 
                     m_toolColor = QColor(r, g, b, a);
                     updateColorPickerIcon();
+                    if (canvas_)
+                        canvas_->setBrushColor(m_toolColor);
                     if (m_pickAct)
                         m_pickAct->setChecked(false);
                     return;
@@ -300,6 +304,8 @@ void MainWindow::createActions()
                 {
                     m_toolColor = chosen;
                     updateColorPickerIcon();
+                    if (canvas_)
+                        canvas_->setBrushColor(m_toolColor);
                 }
             });
 
@@ -735,6 +741,19 @@ void MainWindow::createToolBar()
     m_brushSizeSpin->setValue(8);
     bv->addWidget(sizeLbl);
     bv->addWidget(m_brushSizeSpin);
+
+    // connect brush size to canvas preview
+    if (m_brushSizeSpin && canvas_)
+    {
+        connect(m_brushSizeSpin, qOverload<int>(&QSpinBox::valueChanged), this,
+                [this](int v)
+                {
+                    if (canvas_)
+                        canvas_->setBrushSize(v);
+                });
+        // initialize canvas size
+        canvas_->setBrushSize(m_brushSizeSpin->value());
+    }
 
     brushWidget->setLayout(bv);
     m_brushDock->setWidget(brushWidget);

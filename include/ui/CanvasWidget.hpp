@@ -3,11 +3,13 @@
 //
 
 #pragma once
+#include <QColor>
 #include <QImage>
 #include <QPointF>
 #include <QWidget>
 
 #include <optional>
+#include <vector>
 
 #include "common/Geometry.hpp"
 
@@ -45,6 +47,14 @@ class CanvasWidget : public QWidget
     // conversions
     common::Point screenToDoc(const QPoint& sp) const;
     QPoint docToScreen(common::Point p) const;
+    void setBrushSize(int s)
+    {
+        brushSize_ = s;
+    }
+    void setBrushColor(const QColor& c)
+    {
+        brushColor_ = c;
+    }
 
    signals:
     void selectionFinishedDoc(common::Rect r);
@@ -75,6 +85,9 @@ class CanvasWidget : public QWidget
     QRect selScreen_;
     bool selectionEnabled_ = false;
     bool drawing_ = false;
+    std::vector<common::Point> previewPoints_;
+    QColor brushColor_ = QColor(0, 0, 0, 255);
+    int brushSize_ = 1;
 
     void drawChecker(QPainter& p);
 };
