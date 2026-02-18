@@ -29,7 +29,6 @@
 #include <QPalette>
 #include <QPixmap>
 #include <QPushButton>
-#include <QScrollArea>
 #include <QScrollBar>
 #include <QSlider>
 #include <QSpinBox>
@@ -44,8 +43,6 @@
 #include "common/Geometry.hpp"
 #include "core/Document.hpp"
 #include "core/Layer.hpp"
-#include "io/EpgFormat.hpp"
-#include "io/EpgJson.hpp"
 #include "ui/CanvasWidget.hpp"
 #include "ui/ImageConversion.hpp"
 #include "ui/Render.hpp"
@@ -149,11 +146,20 @@ void MainWindow::clearUiStateOnClose()
 {
     m_currentFileName.clear();
     if (canvas_)
+    {
         canvas_->clear();
+        canvas_->setSelectionEnable(false);
+    }
     if (m_layersList)
         m_layersList->clear();
-
-    // TODO: reset bucket/selection tool state in UI (actions checked etc.)
+    if (m_bucketAct)
+        m_bucketAct->setChecked(false);
+    if (m_pickAct)
+        m_pickAct->setChecked(false);
+    if (m_selectToggleAct)
+        m_selectToggleAct->setChecked(false);
+    m_bucketMode = false;
+    m_pickMode = false;
 }
 
 void MainWindow::createActions()
@@ -178,6 +184,7 @@ void MainWindow::createActions()
     m_closeAct->setShortcut(QKeySequence::Close);
     m_closeAct->setStatusTip(tr("Fermer l'image actuelle"));
     connect(m_closeAct, &QAction::triggered, this, &MainWindow::closeImage);
+    m_closeAct->setObjectName("act.close");
 
     m_exitAct = new QAction(tr("&Quitter"), this);
     m_exitAct->setShortcut(QKeySequence::Quit);
@@ -255,6 +262,8 @@ void MainWindow::createActions()
                     m_pickAct->setIcon(QIcon(":/icons/color_picker.svg"));
                 }
             });
+    m_pickAct->setObjectName("act.picker");
+
     m_colorPickerAct = new QAction(tr("Couleur de remplissage"), this);
     m_colorPickerAct->setStatusTip(tr("Choisir la couleur utilisée par le pot de peinture"));
     m_colorPickerAct->setIcon(QIcon(":/icons/color_picker.svg"));
@@ -269,6 +278,7 @@ void MainWindow::createActions()
                     updateColorPickerIcon();
                 }
             });
+    m_colorPickerAct->setObjectName("act.colorPick");
 
     /* Zoom actions */
     m_zoomInAct = new QAction(tr("Zoom &Avant"), this);
@@ -315,9 +325,11 @@ void MainWindow::createActions()
     m_selectToggleAct = new QAction(tr("Mode sélection"), this);
     m_selectToggleAct->setCheckable(true);
     connect(m_selectToggleAct, &QAction::toggled, this, &MainWindow::toggleSelectionMode);
+    m_selectToggleAct->setObjectName("act.select");
 
     m_clearSelectionAct = new QAction(tr("Effacer sélection"), this);
     connect(m_clearSelectionAct, &QAction::triggered, this, &MainWindow::clearSelection);
+    m_clearSelectionAct->setObjectName("act.clearSelection");
 
     m_bucketAct = new QAction(tr("Pot de peinture"), this);
     m_bucketAct->setCheckable(true);
@@ -333,6 +345,7 @@ void MainWindow::createActions()
                 else
                     m_bucketAct->setIcon(QIcon(":/icons/bucket.svg"));
             });
+    m_bucketAct->setObjectName("act.bucket");
 }
 
 void MainWindow::createMenus()

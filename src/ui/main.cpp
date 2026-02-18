@@ -1,9 +1,8 @@
 #include <QApplication>
 
 #include "app/AppService.hpp"
+#include "io/EpgFormat.hpp"
 #include "ui/window.hpp"
-
-#include <io/EpgFormat.hpp>
 
 int main(int argc, char* argv[])
 {
