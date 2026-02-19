@@ -1170,3 +1170,31 @@ TEST(AppService_SetLayerName, NoOpIfSameNameDoesNotPushHistory)
     EXPECT_EQ(svc.document().layerCount(), 1u);
 }
 
+TEST(AppService_Layers, MergeLayerDown_BackgroundThrows)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    EXPECT_THROW(app->mergeLayerDown(0), std::runtime_error);
+}
+
+TEST(AppService_Layers, ReorderLayer_ActiveLayerFollowsMovedLayer)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+
+    app->addLayer(spec); // idx 1
+    app->addLayer(spec); // idx 2
+    app->addLayer(spec); // idx 3
+
+    app->setActiveLayer(3);
+    ASSERT_EQ(app->activeLayer(), 3u);
+
+    // Move active layer from 3 to 1
+    app->reorderLayer(3, 1);
+
+    EXPECT_EQ(app->activeLayer(), 1u);
+}

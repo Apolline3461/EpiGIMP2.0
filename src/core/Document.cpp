@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <memory>
 #include <stdexcept>
 
 #include "core/ImageBuffer.hpp"
@@ -39,7 +41,7 @@ float Document::dpi() const noexcept
 
 size_t Document::layerCount() const noexcept
 {
-    return static_cast<int>(layers_.size());
+    return layers_.size();
 }
 
 std::shared_ptr<Layer> Document::layerAt(const size_t index) const
@@ -49,21 +51,21 @@ std::shared_ptr<Layer> Document::layerAt(const size_t index) const
     return layers_[index];
 }
 
-size_t Document::addLayer(std::shared_ptr<Layer> layer)
+std::optional<std::size_t> Document::addLayer(std::shared_ptr<Layer> layer)
 {
     if (!layer)
-        return -1;
+        return std::nullopt;
     layers_.push_back(std::move(layer));
     return layers_.size() - 1;
 }
 
-size_t Document::addLayer(std::shared_ptr<Layer> layer, const size_t idx)
+std::optional<std::size_t> Document::addLayer(std::shared_ptr<Layer> layer, const size_t idx)
 {
     if (!layer)
-        return -1;
+        return std::nullopt;
 
     if (idx > layers_.size())
-        return -1;
+        return std::nullopt;
 
     layers_.insert(layers_.begin() + static_cast<std::ptrdiff_t>(idx), std::move(layer));
     return idx;
@@ -86,12 +88,10 @@ void Document::reorderLayer(size_t from, size_t to)
 
     auto tmpLayer = layers_[from];
     layers_.erase(layers_.begin() + static_cast<std::ptrdiff_t>(from));
-    if (to > layers_.size())
-        to = layers_.size();
     layers_.insert(layers_.begin() + static_cast<std::ptrdiff_t>(to), std::move(tmpLayer));
 }
 
-void Document::mergeDown(const int from)
+void Document::mergeDown(const std::size_t from)
 {
     const auto size = layers_.size();
 
@@ -192,9 +192,3 @@ void Document::mergeDown(const int from)
 
     layers_.erase(layers_.begin() + from);
 }
-
-// void Document::setLayers(std::vector<std::shared_ptr<Layer>> layers)
-// {
-//     layers_ = std::move(layers);
-//     layers_.erase(layers_.begin() + static_cast<std::ptrdiff_t>(from));
-// }

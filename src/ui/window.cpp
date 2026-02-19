@@ -5,8 +5,6 @@
 #include <QColor>
 #include <QColorDialog>
 #include <QContextMenuEvent>
-#include <QCursor>
-#include <QDateTime>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
@@ -18,24 +16,19 @@
 #include <QIcon>
 #include <QImageReader>
 #include <QInputDialog>
-#include <QKeyEvent>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
-#include <QMouseEvent>
 #include <QPainter>
 #include <QPalette>
 #include <QPixmap>
 #include <QPushButton>
-#include <QScrollBar>
-#include <QSlider>
 #include <QSpinBox>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QTextEdit>
-#include <QTextOption>
 #include <QToolBar>
 #include <QVBoxLayout>
 
@@ -114,6 +107,17 @@ void MainWindow::refreshUIAfterDocChange()
     if (m_zoom2Act)
         m_zoom2Act->setEnabled(hasDoc);
 
+    if (m_bucketAct)
+        m_bucketAct->setEnabled(hasDoc);
+    if (m_pickAct)
+        m_pickAct->setEnabled(hasDoc);
+    if (m_selectToggleAct)
+        m_selectToggleAct->setEnabled(hasDoc);
+    if (m_clearSelectionAct)
+        m_clearSelectionAct->setEnabled(hasDoc);
+    if (m_colorPickerAct)
+        m_colorPickerAct->setEnabled(hasDoc);
+
     if (!hasDoc)
     {
         clearUiStateOnClose();
@@ -122,6 +126,7 @@ void MainWindow::refreshUIAfterDocChange()
     canvas_->setImage(Renderer::render(app().document()));
 
     populateLayersList();
+    updateLayerHeaderButtonsEnabled();
 
     if (m_pendingSelectLayerId_)
     {
@@ -234,8 +239,6 @@ void MainWindow::createActions()
     m_layerDownAct->setStatusTip(tr("Déplacer le calque vers le bas (en dessous)"));
     m_layerDownAct->setShortcut(QKeySequence("Ctrl+["));
     connect(m_layerDownAct, &QAction::triggered, this, &MainWindow::moveLayerDown);
-
-    // TODO: m_layerMergeDown
 
     /* Color Picker */
     m_pickAct = new QAction(tr("Pipette"), this);
@@ -538,12 +541,97 @@ void MainWindow::addImageAsLayer()
 void MainWindow::createLayersPanel()
 {
     m_layersDock = new QDockWidget(tr("Calques"), this);
-    m_layersList = new QListWidget(m_layersDock);
+
+    auto* root = new QWidget(m_layersDock);
+    auto* v = new QVBoxLayout(root);
+    v->setContentsMargins(6, 6, 6, 6);
+    v->setSpacing(6);
+
+    // --- header bar ---
+    auto* header = new QWidget(root);
+    auto* h = new QHBoxLayout(header);
+    h->setContentsMargins(0, 0, 0, 0);
+    h->setSpacing(4);
+
+    m_layerAddBtn = new QToolButton(header);
+    m_layerAddBtn->setIcon(QIcon(":/icons/add_layer.svg"));
+    m_layerAddBtn->setToolTip(tr("Ajouter un calque"));
+    m_layerAddBtn->setObjectName("btn.layer.add");
+
+    m_layerDeleteBtn = new QToolButton(header);
+    m_layerDeleteBtn->setIcon(QIcon(":/icons/remove_layer.svg"));
+    m_layerDeleteBtn->setToolTip(tr("Supprimer le calque"));
+    m_layerDeleteBtn->setObjectName("btn.layer.del");
+
+    m_layerUpBtn = new QToolButton(header);
+    m_layerUpBtn->setIcon(QIcon(":/icons/layer_up.svg"));
+    m_layerUpBtn->setToolTip(tr("Monter"));
+    m_layerUpBtn->setObjectName("btn.layer.up");
+
+    m_layerDownBtn = new QToolButton(header);
+    m_layerDownBtn->setIcon(QIcon(":/icons/layer_down.svg"));
+    m_layerDownBtn->setToolTip(tr("Descendre"));
+    m_layerDownBtn->setObjectName("btn.layer.down");
+
+    m_layerMergeDownBtn = new QToolButton(header);
+    m_layerMergeDownBtn->setIcon(QIcon(":/icons/merge_layer_down.svg"));
+    m_layerMergeDownBtn->setToolTip(tr("Fusionner vers le bas"));
+    m_layerMergeDownBtn->setObjectName("btn.layer.mergeDown");
+
+    h->addWidget(m_layerAddBtn);
+    h->addWidget(m_layerDeleteBtn);
+    h->addSpacing(8);
+    h->addWidget(m_layerUpBtn);
+    h->addWidget(m_layerDownBtn);
+    h->addWidget(m_layerMergeDownBtn);
+    h->addStretch();
+
+    // --- list ---
+    m_layersList = new QListWidget(root);
     m_layersList->setSelectionMode(QAbstractItemView::SingleSelection);
-
-    m_layersList->setDragDropMode(QAbstractItemView::NoDragDrop);  //disable for the moment
-
+    m_layersList->setDragDropMode(QAbstractItemView::NoDragDrop);
     m_layersList->setContextMenuPolicy(Qt::CustomContextMenu);
+
+    v->addWidget(header);
+    v->addWidget(m_layersList);
+
+    m_layersDock->setWidget(root);
+    addDockWidget(Qt::RightDockWidgetArea, m_layersDock);
+
+    // --- connections ---
+    connect(m_layerAddBtn, &QToolButton::clicked, this, &MainWindow::addNewLayer);
+
+    connect(m_layerUpBtn, &QToolButton::clicked, this, &MainWindow::moveLayerUp);
+    connect(m_layerDownBtn, &QToolButton::clicked, this, &MainWindow::moveLayerDown);
+
+    connect(m_layerMergeDownBtn, &QToolButton::clicked, this, &MainWindow::onMergeDown);
+
+    connect(m_layerDeleteBtn, &QToolButton::clicked, this,
+            [this]()
+            {
+                if (!app().hasDocument())
+                    return;
+
+                auto idxOpt = currentLayerIndexFromSelection();
+                if (!idxOpt.has_value())
+                    return;
+
+                const std::size_t idx = *idxOpt;
+                if (idx == 0)  // background
+                    return;
+
+                auto layer = app().document().layerAt(idx);
+                if (!layer || layer->locked())
+                    return;
+
+                const QString layerName = QString::fromStdString(layer->name());
+                if (QMessageBox::question(this, tr("Supprimer le calque"),
+                                          tr("Supprimer le calque %1 ?").arg(layerName),
+                                          QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
+                {
+                    app().removeLayer(idx);
+                }
+            });
 
     connect(m_layersList, &QListWidget::currentItemChanged, this,
             [this](QListWidgetItem* current, QListWidgetItem*)
@@ -553,18 +641,18 @@ void MainWindow::createLayersPanel()
 
                 const auto layerId =
                     static_cast<std::uint64_t>(current->data(Qt::UserRole).toULongLong());
-                std::optional<std::size_t> idx =
-                    app::commands::findLayerIndexById(app().document(), layerId);
+                auto idx = app::commands::findLayerIndexById(app().document(), layerId);
                 if (idx.has_value())
                     app().setActiveLayer(*idx);
+
+                updateLayerHeaderButtonsEnabled();
             });
 
     connect(m_layersList, &QListWidget::itemDoubleClicked, this, &MainWindow::onLayerDoubleClicked);
     connect(m_layersList, &QListWidget::customContextMenuRequested, this,
             &MainWindow::onShowLayerContextMenu);
 
-    m_layersDock->setWidget(m_layersList);
-    addDockWidget(Qt::RightDockWidgetArea, m_layersDock);
+    updateLayerHeaderButtonsEnabled();
 }
 
 void MainWindow::createToolBar()
@@ -976,6 +1064,72 @@ QPixmap MainWindow::createLayerThumbnail(const std::shared_ptr<Layer>& layer,
     }
 
     return canvas;
+}
+
+std::optional<std::size_t> MainWindow::currentLayerIndexFromSelection() const
+{
+    if (!m_layersList || !app().hasDocument())
+        return std::nullopt;
+
+    auto* cur = m_layersList->currentItem();
+    if (!cur)
+        return std::nullopt;
+
+    const auto layerId = static_cast<std::uint64_t>(cur->data(Qt::UserRole).toULongLong());
+    return app::commands::findLayerIndexById(app().document(), layerId);
+}
+
+void MainWindow::updateLayerHeaderButtonsEnabled()
+{
+    const bool hasDoc = app().hasDocument();
+    if (!hasDoc)
+    {
+        if (m_layerDeleteBtn)
+            m_layerDeleteBtn->setEnabled(false);
+        if (m_layerUpBtn)
+            m_layerUpBtn->setEnabled(false);
+        if (m_layerDownBtn)
+            m_layerDownBtn->setEnabled(false);
+        if (m_layerMergeDownBtn)
+            m_layerMergeDownBtn->setEnabled(false);
+        if (m_layerAddBtn)
+            m_layerAddBtn->setEnabled(false);
+        return;
+    }
+
+    if (m_layerAddBtn)
+        m_layerAddBtn->setEnabled(true);
+
+    auto idxOpt = currentLayerIndexFromSelection();
+    if (!idxOpt.has_value())
+    {
+        if (m_layerDeleteBtn)
+            m_layerDeleteBtn->setEnabled(false);
+        if (m_layerUpBtn)
+            m_layerUpBtn->setEnabled(false);
+        if (m_layerDownBtn)
+            m_layerDownBtn->setEnabled(false);
+        if (m_layerMergeDownBtn)
+            m_layerMergeDownBtn->setEnabled(false);
+        return;
+    }
+
+    const std::size_t idx = *idxOpt;
+    const auto n = app().document().layerCount();
+    auto layer = app().document().layerAt(idx);
+
+    const bool isBottom = (idx == 0);
+    const bool isLocked = (layer && layer->locked());
+
+    if (m_layerDeleteBtn)
+        m_layerDeleteBtn->setEnabled(!isBottom && !isLocked);
+    if (m_layerMergeDownBtn)
+        m_layerMergeDownBtn->setEnabled(!isBottom && !isLocked);
+
+    if (m_layerUpBtn)
+        m_layerUpBtn->setEnabled(idx + 1 < n);
+    if (m_layerDownBtn)
+        m_layerDownBtn->setEnabled(idx > 0);
 }
 
 void MainWindow::onMergeDown()

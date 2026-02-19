@@ -13,5 +13,12 @@
     <file>icons/color_picker_selec.svg</file>
     <file>icons/undo.svg</file>
     <file>icons/redo.svg</file>
+
+    <file>icons/add_layer.svg</file>
+    <file>icons/remove_layer.svg</file>
+    <file>icons/merge_layer_down.svg</file>
+    <file>icons/layer_up.svg</file>
+    <file>icons/layer_down.svg</file>
+
   </qresource>
 </RCC>

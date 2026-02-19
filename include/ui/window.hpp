@@ -17,6 +17,7 @@
 #include <QRect>
 #include <QScrollArea>
 #include <QString>
+#include <QToolButton>
 
 #include <memory>
 #include <optional>
@@ -95,6 +96,8 @@ class MainWindow : public QMainWindow
     void populateLayersList();
     QPixmap createLayerThumbnail(const std::shared_ptr<class Layer>& layer,
                                  const QSize& size) const;
+    std::optional<std::size_t> currentLayerIndexFromSelection() const;
+    void updateLayerHeaderButtonsEnabled();
 
     // void keyPressEvent(QKeyEvent* event) override;
     // void keyReleaseEvent(QKeyEvent* event) override;
@@ -110,6 +113,12 @@ class MainWindow : public QMainWindow
     QMenu* m_cmdMenu{nullptr};
 
     QToolBar* m_toolsTb = nullptr;
+    QToolButton* m_layerAddBtn = nullptr;
+    QToolButton* m_layerDeleteBtn = nullptr;
+    QToolButton* m_layerUpBtn = nullptr;
+    QToolButton* m_layerDownBtn = nullptr;
+    QToolButton* m_layerMergeDownBtn = nullptr;
+
     QActionGroup* m_toolsGroup = nullptr;
 
     QAction* m_newAct{nullptr};
