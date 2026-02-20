@@ -10,6 +10,8 @@
 
 #include <algorithm>
 
+#include "ui/PanClamp.hpp"
+
 namespace
 {
 static double clampScale(double s)
@@ -51,9 +53,6 @@ static common::Rect clampRectToImage(common::Rect r, int w, int h)
     return out;
 }
 }  // namespace
-
-// TODO: clamp pan so image doesn't get lost completely off-screen
-// TODO: draw selection in doc space (and reproject to screen) to remain stable under zoom/pan changes during drag
 
 CanvasWidget::CanvasWidget(QWidget* parent) : QWidget(parent)
 {
@@ -112,6 +111,7 @@ void CanvasWidget::clearSelectionRect()
 void CanvasWidget::setScale(double s)
 {
     scale_ = clampScale(s);
+    clampPan();
     update();
 }
 
@@ -214,7 +214,7 @@ void CanvasWidget::wheelEvent(QWheelEvent* e)
     scale_ = newScale;
     pan_.setX(mousePos.x() - docX * scale_);
     pan_.setY(mousePos.y() - docY * scale_);
-
+    clampPan();
     update();
     e->accept();
 }
@@ -264,6 +264,7 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* e)
     if (panning_)
     {
         pan_ += QPointF(delta);
+        clampPan();
         update();
         e->accept();
         return;
@@ -346,4 +347,16 @@ void CanvasWidget::drawChecker(QPainter& p)
             p.fillRect(QRect(x, y, tile, tile), odd ? c1 : c2);
         }
     }
+}
+
+void CanvasWidget::clampPan()
+{
+    if (img_.isNull())
+        return;
+
+    const auto r = computeClampedPan(pan_.x(), pan_.y(), img_.width(), img_.height(), scale_,
+                                     width(), height(), 32.0);
+
+    pan_.setX(r.x);
+    pan_.setY(r.y);
 }

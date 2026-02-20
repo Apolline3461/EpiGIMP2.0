@@ -75,4 +75,5 @@ class CanvasWidget : public QWidget
     std::optional<common::Rect> selectionOverlay_;
 
     void drawChecker(QPainter& p);
+    void clampPan();
 };
