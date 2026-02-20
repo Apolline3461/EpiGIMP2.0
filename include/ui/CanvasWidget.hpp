@@ -29,6 +29,7 @@ class CanvasWidget : public QWidget
     void clear();
 
     void setSelectionEnable(bool enable);
+    void setSelectionRectOverlay(std::optional<common::Rect> r);
 
     void setSelectionRect(const QRect& r);
     void clearSelectionRect();
@@ -71,6 +72,7 @@ class CanvasWidget : public QWidget
     bool hasSel_ = false;
     QRect selScreen_;
     bool selectionEnabled_ = false;
+    std::optional<common::Rect> selectionOverlay_;
 
     void drawChecker(QPainter& p);
 };

@@ -88,6 +88,12 @@ void CanvasWidget::setSelectionEnable(bool enable)
     }
 }
 
+void CanvasWidget::setSelectionRectOverlay(std::optional<common::Rect> r)
+{
+    selectionOverlay_ = r;
+    update();
+}
+
 void CanvasWidget::setSelectionRect(const QRect& r)
 {
     hasSel_ = !r.isNull() && r.isValid();
@@ -99,6 +105,7 @@ void CanvasWidget::clearSelectionRect()
 {
     hasSel_ = false;
     selScreen_ = QRect();
+    selectionOverlay_.reset();
     update();
 }
 
@@ -155,6 +162,18 @@ void CanvasWidget::paintEvent(QPaintEvent*)
     p.translate(pan_);
     p.scale(scale_, scale_);
     p.drawImage(0, 0, img_);
+
+    if (selectionOverlay_)
+    {
+        QPen pen(QColor(220, 0, 0));
+        pen.setStyle(Qt::DashLine);
+        pen.setWidth(1 / scale_);
+        p.setPen(pen);
+        p.setBrush(Qt::NoBrush);
+        const auto& r = *selectionOverlay_;
+        p.drawRect(r.x, r.y, r.w, r.h);
+    }
+
     p.restore();
 
     if (hasSel_)
@@ -292,20 +311,19 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* e)
                 common::Rect r = makeRectFromTwoPoints(a, b);
                 r = clampRectToImage(r, img_.width(), img_.height());
 
+                hasSel_ = false;
+                selScreen_ = QRect();
+
                 if (r.w <= 0 || r.h <= 0)
                 {
-                    hasSel_ = false;
-                    selScreen_ = QRect();
-                    update();
                     emit selectionFinishedDoc(common::Rect{0, 0, 0, 0});  // ou n’émet pas du tout
                 }
                 else
                 {
-                    update();
                     emit selectionFinishedDoc(r);
                 }
+                update();
             }
-
             e->accept();
             return;
         }

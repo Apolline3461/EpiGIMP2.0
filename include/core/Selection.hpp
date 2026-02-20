@@ -48,6 +48,8 @@ class Selection
         return mask_;
     }
 
+    [[nodiscard]] std::optional<Rect> boundingRect() const;
+
    private:
     std::shared_ptr<ImageBuffer> mask_;
 };

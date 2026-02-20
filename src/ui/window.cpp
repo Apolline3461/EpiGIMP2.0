@@ -128,6 +128,15 @@ void MainWindow::refreshUIAfterDocChange()
     populateLayersList();
     updateLayerHeaderButtonsEnabled();
 
+    const auto& sel = app().document().selection();
+    if (!sel.hasMask())
+    {
+        canvas_->setSelectionRectOverlay(std::nullopt);
+    }
+    else
+    {
+        canvas_->setSelectionRectOverlay(sel.boundingRect());
+    }
     if (m_pendingSelectLayerId_)
     {
         selectLayerInListById(*m_pendingSelectLayerId_);
@@ -349,6 +358,20 @@ void MainWindow::createActions()
                     m_bucketAct->setIcon(QIcon(":/icons/bucket.svg"));
             });
     m_bucketAct->setObjectName("act.bucket");
+
+    auto* escClearAct = new QAction(this);
+    escClearAct->setShortcut(QKeySequence(Qt::Key_Escape));
+    escClearAct->setShortcutContext(Qt::ApplicationShortcut);
+    connect(escClearAct, &QAction::triggered, this,
+            [this]()
+            {
+                if (!app().hasDocument())
+                    return;
+                app().clearSelectionRect();
+                if (canvas_)
+                    canvas_->clearSelectionRect();
+            });
+    addAction(escClearAct);
 }
 
 void MainWindow::createMenus()
@@ -1221,10 +1244,6 @@ void MainWindow::clearSelection()
     if (!app().hasDocument())
         return;
     app().clearSelectionRect();
-    if (canvas_)
-        canvas_->clearSelectionRect();
-
-    // TODO: render selection overlay from doc selection, not from CanvasWidget local state.
 }
 
 void MainWindow::toggleSelectionMode(bool enabled)
