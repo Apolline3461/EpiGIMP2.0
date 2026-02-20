@@ -67,13 +67,7 @@ void AppService::newDocument(Size size, float dpi, std::uint32_t bgColor)
     auto img = std::make_shared<ImageBuffer>(size.w, size.h);
     img->fill(bgColor);
 
-    auto layer = std::make_shared<Layer>(
-        /*id*/ 0,
-        /*name*/ "Background",
-        /*image*/ img,
-        /*visible*/ true,
-        /*locked*/ false,
-        /*opacity*/ 1.f);
+    auto layer = std::make_shared<Layer>(0, "Background", img, true, false, 1.f);
     doc_->addLayer(std::move(layer));
 
     documentChanged.notify();
@@ -240,11 +234,17 @@ void AppService::addLayer(const LayerSpec& spec)
     if (!doc_)
         throw std::runtime_error("AddLayer Error : document is null");
 
-    auto img = std::make_shared<ImageBuffer>(doc_->width(), doc_->height());
+    const int w = spec.width.value_or(doc_->width());
+    const int h = spec.height.value_or(doc_->height());
+    if (w <= 0 || h <= 0)
+        throw std::invalid_argument("addLayer: invalid layer size");
+
+    auto img = std::make_shared<ImageBuffer>(w, h);
     img->fill(spec.color);
 
     auto layer = std::make_shared<Layer>(nextLayerId_++, spec.name, img, spec.visible, spec.locked,
                                          spec.opacity);
+    layer->setOffset(spec.offsetX, spec.offsetY);
 
     apply(commands::makeAddLayerCommand(doc_.get(), std::move(layer), &activeLayer_));
 }
@@ -254,24 +254,15 @@ void AppService::addImageLayer(const ImageBuffer& img, std::string name, bool vi
 {
     if (!doc_)
         throw std::runtime_error("addImageLayer: document is null");
-    auto out = std::make_shared<ImageBuffer>(doc_->width(), doc_->height());
-    out->fill(0u);
-
-    const int copyW = std::min(out->width(), img.width());
-    const int copyH = std::min(out->height(), img.height());
-
-    for (int y = 0; y < copyH; ++y)
-    {
-        for (int x = 0; x < copyW; ++x)
-        {
+    auto out = std::make_shared<ImageBuffer>(img.width(), img.height());
+    for (int y = 0; y < img.height(); ++y)
+        for (int x = 0; x < img.width(); ++x)
             out->setPixel(x, y, img.getPixel(x, y));
-        }
-    }
 
     auto layer = std::make_shared<Layer>(nextLayerId_++,
                                          name.empty() ? std::string("Layer") : std::move(name), out,
                                          visible, locked, opacity);
-
+    layer->setOffset(0, 0);
     apply(commands::makeAddLayerCommand(doc_.get(), std::move(layer), &activeLayer_));
 }
 
@@ -406,10 +397,12 @@ uint32_t AppService::pickColorAt(common::Point p) const
     auto img = layer->image();
     if (!img)
         return common::colors::Transparent;
-    if (p.x < 0 || p.y < 0 || p.x >= img->width() || p.y >= img->height())
-        return common::colors::Transparent;
 
-    return img->getPixel(p.x, p.y);
+    const int lx = p.x - layer->offsetX();
+    const int ly = p.y - layer->offsetY();
+    if (lx < 0 || ly < 0 || lx >= img->width() || ly >= img->height())
+        return common::colors::Transparent;
+    return img->getPixel(lx, ly);
 }
 
 const Selection& AppService::selection() const
@@ -463,7 +456,14 @@ void AppService::bucketFill(common::Point p, std::uint32_t rgba)
         throw std::runtime_error("bucketFill: layer locked");
 
     auto img = layer->image();
-    if (p.x < 0 || p.y < 0 || p.x >= img->width() || p.y >= img->height())
+    const int w = img->width();
+    const int h = img->height();
+
+    //layer local pos
+    const int lx = p.x - layer->offsetX();
+    const int ly = p.y - layer->offsetY();
+
+    if (lx < 0 || ly < 0 || lx >= w || ly >= h)
         return;
 
     /* Selection handling */
@@ -485,12 +485,38 @@ void AppService::bucketFill(common::Point p, std::uint32_t rgba)
     std::vector<std::tuple<int, int, std::uint32_t>> changedPixels;
     if (sel.hasMask() && sel.mask())
     {
+        ImageBuffer maskLocal(w, h);
+        maskLocal.fill(0u);
+
+        const int offX = layer->offsetX();
+        const int offY = layer->offsetY();
+
+        for (int y = 0; y < h; ++y)
+        {
+            for (int x = 0; x < w; ++x)
+            {
+                const int dx = x + offX;
+                const int dy = y + offY;
+
+                // outside doc -> not selected
+                if (dx < 0 || dy < 0 || dx >= doc_->width() || dy >= doc_->height())
+                {
+                    maskLocal.setPixel(x, y, 0u);
+                    continue;
+                }
+
+                // Here we assume selection mask stores something where "selected" => non-zero.
+                // If Selection::t_at(dx,dy) already encapsulates that, use it (recommended).
+                const std::uint8_t t = sel.t_at(dx, dy);
+                maskLocal.setPixel(x, y, t ? 0xFFFFFFFFu : 0u);
+            }
+        }
         changedPixels =
-            core::floodFillWithinMaskTracked(working, *sel.mask(), p.x, p.y, core::Color{rgba});
+            core::floodFillWithinMaskTracked(working, maskLocal, lx, ly, core::Color{rgba});
     }
     else
     {
-        changedPixels = core::floodFillTracked(working, p.x, p.y, core::Color{rgba});
+        changedPixels = core::floodFillTracked(working, lx, ly, core::Color{rgba});
     }
 
     if (changedPixels.empty())
@@ -504,7 +530,7 @@ void AppService::bucketFill(common::Point p, std::uint32_t rgba)
 
     const std::uint64_t layerId = layer->id();
 
-    // --- ApplyFn reused for redo/undo (same pattern as StrokeCommand)
+    // --- ApplyFn reused for redo/undo (same pattern as StrokeCommand) //TODO: enelver le apply fn d'ici peut etre
     ApplyFn applyFn =
         [doc = doc_.get()](std::uint64_t id, const std::vector<PixelChange>& ch, bool useBefore)
     {
@@ -543,6 +569,7 @@ void AppService::redo()
     history_.redo();
     documentChanged.notify();
 }
+
 bool AppService::canUndo() const noexcept
 {
     return history_.canUndo();
@@ -552,6 +579,7 @@ bool AppService::canRedo() const noexcept
 {
     return history_.canRedo();
 }
+
 void AppService::apply(app::History::CommandPtr cmd)
 {
     if (!cmd)

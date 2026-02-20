@@ -417,8 +417,7 @@ void MainWindow::addNewLayer()
     const int defW = app().document().width();
     const int defH = app().document().height();
 
-    QDialog dlg(
-        this);  // TODO: support layer size (w/h) in AppService::addLayer (resize layer buffer or add "LayerSpec size")
+    QDialog dlg(this);
     dlg.setWindowTitle(tr("Ajouter un calque"));
     QVBoxLayout* dlgLayout = new QVBoxLayout(&dlg);
 
@@ -487,6 +486,8 @@ void MainWindow::addNewLayer()
 
     if (w <= 0 || h <= 0)
         return;
+    spec.width = w;
+    spec.height = h;
 
     if (fillWithColor)
     {

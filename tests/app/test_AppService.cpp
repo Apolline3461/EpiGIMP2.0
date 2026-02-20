@@ -852,6 +852,31 @@ TEST(AppService_Picking, pickColorAt_DoesNotAffectUndoRedo)
     EXPECT_EQ(app->canRedo(), beforeRedo);
 }
 
+TEST(AppService_Picking, PickColorAt_RespectsLayerOffsetAndSize)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    // add 3x3 layer at offset (4,4), fill red
+    app::LayerSpec spec{};
+    spec.name = "tiny";
+    spec.width = 3;
+    spec.height = 3;
+    spec.color = 0xFF0000FFu;
+    spec.offsetX = 4;
+    spec.offsetY = 4;
+
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    // inside
+    EXPECT_EQ(app->pickColorAt({4,4}), 0xFF0000FFu);
+
+    // outside (but still within doc) => transparent
+    EXPECT_EQ(app->pickColorAt({0,0}), common::colors::Transparent);
+}
+
+
 TEST(AppService_Stroke, Stroke_DrawsPixels_AndIsUndoable)
 {
     const auto app = makeApp();
@@ -920,6 +945,64 @@ TEST(AppService_Stroke, BeginStroke_OnLockedLayer_Throws)
 
     app::ToolParams tp{};
     EXPECT_THROW(app->beginStroke(tp, common::Point{0, 0}), std::runtime_error);
+}
+
+TEST(AppService_Stroke, DoesNotPaintOutsideLayer_AndPaintsLocalPixelInside)
+{
+    const auto app = makeApp();
+    app->newDocument({10, 10}, 72.f, /*bg*/ 0x000000FFu);
+
+    // Remplace layer actif par un layer 3x3 offset (4,4), pour contrôler exactement la zone.
+    app::LayerSpec spec{};
+    spec.name = "L1";
+    spec.visible = true;
+    spec.locked = false;
+    spec.opacity = 1.f;
+    spec.color = 0x00000000u; // transparent
+    app->addLayer(spec);
+
+    ASSERT_EQ(app->document().layerCount(), 2u);
+
+    // Force image buffer 3x3 + offset (4,4)
+    auto layer = app->document().layerAt(1);
+    ASSERT_NE(layer, nullptr);
+    auto img = std::make_shared<ImageBuffer>(3, 3);
+    img->fill(0x00000000u);
+    layer->setImageBuffer(img);
+    layer->setOffset(4, 4);
+    app->setActiveLayer(1);
+
+    // --- OUTSIDE : doc point (3,4) -> local (-1,0) => doit rien peindre
+    {
+        app::ToolParams params{};
+        params.color = 0xFF00FFFFu;
+        app->beginStroke(params, common::Point{3, 4});
+        app->endStroke();
+
+        // vérifie qu'aucun pixel du layer 3x3 n'a changé
+        auto img = layer->image();
+        ASSERT_NE(img, nullptr);
+        for (int y = 0; y < img->height(); ++y)
+            for (int x = 0; x < img->width(); ++x)
+                EXPECT_EQ(img->getPixel(x, y), 0x00000000u);
+    }
+
+    // --- INSIDE : doc point (5,6) -> local (1,2) => doit peindre img(1,2)
+    {
+        app::ToolParams params{};
+        params.color = 0x00FF00FFu; // vert opaque
+        app->beginStroke(params, common::Point{5, 6});
+        app->endStroke();
+
+        auto img = layer->image();
+        ASSERT_NE(img, nullptr);
+
+        // pixel attendu peint
+        EXPECT_EQ(img->getPixel(1, 2), 0x00FF00FFu);
+
+        // un autre pixel reste transparent
+        EXPECT_EQ(img->getPixel(0, 0), 0x00000000u);
+    }
 }
 
 TEST(AppService_BucketFill, NoSelection_FillsAndUndoRedoWorks)
@@ -1198,3 +1281,44 @@ TEST(AppService_Layers, ReorderLayer_ActiveLayerFollowsMovedLayer)
 
     EXPECT_EQ(app->activeLayer(), 1u);
 }
+
+TEST(AppService_Layers, AddLayer_UsesSpecSize)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.name = "small";
+    spec.color = 0u;
+    spec.width = 10;
+    spec.height = 20;
+
+    app->addLayer(spec);
+
+    ASSERT_EQ(app->document().layerCount(), 2u);
+    auto l = app->document().layerAt(1);
+    ASSERT_NE(l, nullptr);
+    ASSERT_NE(l->image(), nullptr);
+    EXPECT_EQ(l->image()->width(), 10);
+    EXPECT_EQ(l->image()->height(), 20);
+}
+
+TEST(AppService_Layers, AddImageLayer_UsesImageSize)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+
+    ImageBuffer img(12, 7);
+    img.fill(0xFF00FFFFu);
+
+    app->addImageLayer(img, "img");
+
+    ASSERT_EQ(app->document().layerCount(), 2u);
+    auto l = app->document().layerAt(1);
+    ASSERT_NE(l, nullptr);
+    ASSERT_NE(l->image(), nullptr);
+    EXPECT_EQ(l->image()->width(), 12);
+    EXPECT_EQ(l->image()->height(), 7);
+}
+
