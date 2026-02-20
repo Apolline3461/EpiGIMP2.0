@@ -1290,6 +1290,58 @@ void MainWindow::newImage()
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
 
+    // --- Background controls ---
+    auto* bgLayout = new QHBoxLayout();
+
+    auto* transparentBgCheck = new QCheckBox(tr("Créer un calque transparent"), &dialog);
+    transparentBgCheck->setChecked(false);
+
+    auto* colorBtn = new QPushButton(tr("Choisir la couleur"), &dialog);
+    auto* colorPreview = new QLabel(&dialog);
+    colorPreview->setFixedSize(24, 24);
+    colorPreview->setFrameStyle(QFrame::Box | QFrame::Plain);
+    colorPreview->setAutoFillBackground(true);
+
+    // default: white background
+    QColor canvasColor = QColor(255, 255, 255, 255);
+
+    auto updatePreview = [&]()
+    {
+        QPalette pal = colorPreview->palette();
+        pal.setColor(QPalette::Window, canvasColor);
+        colorPreview->setPalette(pal);
+    };
+    updatePreview();
+
+    auto updateBgUiEnabled = [&]()
+    {
+        const bool isTransparent = transparentBgCheck->isChecked();
+        colorBtn->setEnabled(!isTransparent);
+        colorPreview->setEnabled(!isTransparent);
+    };
+    updateBgUiEnabled();
+
+    connect(transparentBgCheck, &QCheckBox::toggled, &dialog, [&](bool) { updateBgUiEnabled(); });
+
+    connect(colorBtn, &QPushButton::clicked, &dialog,
+            [&]()
+            {
+                QColor c =
+                    QColorDialog::getColor(canvasColor, &dialog, tr("Choisir la couleur du fond"));
+                if (c.isValid())
+                {
+                    canvasColor = c;
+                    updatePreview();
+                }
+            });
+
+    bgLayout->addWidget(transparentBgCheck);
+    bgLayout->addSpacing(8);
+    bgLayout->addWidget(colorBtn);
+    bgLayout->addWidget(colorPreview);
+    bgLayout->addStretch();
+
+    mainLayout->addLayout(bgLayout);
     mainLayout->addLayout(wLay);
     mainLayout->addLayout(hLay);
     mainLayout->addWidget(buttons);
@@ -1298,7 +1350,21 @@ void MainWindow::newImage()
         return;
 
     m_currentFileName.clear();
-    app().newDocument({wSpin->value(), hSpin->value()}, 72.f);
+    std::uint32_t bgColor = common::colors::White;
+
+    if (transparentBgCheck->isChecked())
+    {
+        bgColor = common::colors::Transparent;
+    }
+    else
+    {
+        bgColor = (static_cast<uint32_t>(canvasColor.red()) << 24) |
+                  (static_cast<uint32_t>(canvasColor.green()) << 16) |
+                  (static_cast<uint32_t>(canvasColor.blue()) << 8) |
+                  static_cast<uint32_t>(canvasColor.alpha());
+    }
+
+    app().newDocument({wSpin->value(), hSpin->value()}, 72.f, bgColor);
     setWindowTitle(tr("Sans titre - EpiGimp 2.0"));
     statusBar()->showMessage(
         tr("Nouvelle image créée: %1x%2").arg(wSpin->value()).arg(hSpin->value()), 2000);
