@@ -86,6 +86,7 @@ class MainWindow : public QMainWindow
     CanvasWidget* canvas_{nullptr};
 
     void refreshUIAfterDocChange();
+    void updateLayerOverlayFromSelection();
     void clearUiStateOnClose();
 
     void createActions();

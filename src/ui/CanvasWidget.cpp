@@ -93,6 +93,12 @@ void CanvasWidget::setSelectionRectOverlay(std::optional<common::Rect> r)
     update();
 }
 
+void CanvasWidget::setLayerRectOverlay(std::optional<common::Rect> r)
+{
+    layerOverlay_ = r;
+    update();
+}
+
 void CanvasWidget::setSelectionRect(const QRect& r)
 {
     hasSel_ = !r.isNull() && r.isValid();
@@ -164,11 +170,23 @@ void CanvasWidget::paintEvent(QPaintEvent*)
     p.scale(scale_, scale_);
     p.drawImage(0, 0, img_);
 
+    if (layerOverlay_)
+    {
+        QPen pen(QColor(255, 220, 0));
+        pen.setStyle(Qt::DashLine);
+        pen.setWidthF(1.0 / scale_);
+        p.setPen(pen);
+        p.setBrush(Qt::NoBrush);
+
+        const auto& r = *layerOverlay_;
+        p.drawRect(r.x, r.y, r.w, r.h);
+    }
+
     if (selectionOverlay_)
     {
         QPen pen(QColor(220, 0, 0));
         pen.setStyle(Qt::DashLine);
-        pen.setWidth(1 / scale_);
+        pen.setWidthF(1 / scale_);
         p.setPen(pen);
         p.setBrush(Qt::NoBrush);
         const auto& r = *selectionOverlay_;

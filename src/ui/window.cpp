@@ -125,35 +125,78 @@ void MainWindow::refreshUIAfterDocChange()
     }
     canvas_->setImage(Renderer::render(app().document()));
 
-    populateLayersList();
-    updateLayerHeaderButtonsEnabled();
+    {
+        QSignalBlocker blocker(m_layersList);
+        populateLayersList();
 
-    const auto& sel = app().document().selection();
-    if (!sel.hasMask())
-    {
-        canvas_->setSelectionRectOverlay(std::nullopt);
-    }
-    else
-    {
-        canvas_->setSelectionRectOverlay(sel.boundingRect());
-    }
-    if (m_pendingSelectLayerId_)
-    {
-        selectLayerInListById(*m_pendingSelectLayerId_);
-        m_pendingSelectLayerId_.reset();
-    }
-    else
-    {
-        const auto idx = app().activeLayer();
-        auto layer = app().document().layerAt(idx);
-        if (layer)
-            selectLayerInListById(layer->id());
-    }
+        const auto& sel = app().document().selection();
+        if (!sel.hasMask())
+        {
+            canvas_->setSelectionRectOverlay(std::nullopt);
+        }
+        else
+        {
+            canvas_->setSelectionRectOverlay(sel.boundingRect());
+        }
+        if (m_pendingSelectLayerId_)
+        {
+            selectLayerInListById(*m_pendingSelectLayerId_);
+            m_pendingSelectLayerId_.reset();
+        }
+        else
+        {
+            const auto idx = app().activeLayer();
+            auto layer = app().document().layerAt(idx);
+            if (layer)
+                selectLayerInListById(layer->id());
+        }
+    }  // unlock signals
+
+    updateLayerHeaderButtonsEnabled();
+    updateLayerOverlayFromSelection();
 
     if (m_undoAct)
         m_undoAct->setEnabled(app().canUndo());
     if (m_redoAct)
         m_redoAct->setEnabled(app().canRedo());
+}
+
+void MainWindow::updateLayerOverlayFromSelection()
+{
+    if (!canvas_ || !app().hasDocument())
+    {
+        if (canvas_)
+            canvas_->setLayerRectOverlay(std::nullopt);
+        return;
+    }
+
+    auto idxOpt = currentLayerIndexFromSelection();
+    if (!idxOpt.has_value())
+    {
+        canvas_->setLayerRectOverlay(std::nullopt);
+        return;
+    }
+
+    const std::size_t idx = *idxOpt;
+    if (idx == 0)  // background: pas d’overlay
+    {
+        canvas_->setLayerRectOverlay(std::nullopt);
+        return;
+    }
+
+    auto layer = app().document().layerAt(idx);
+    if (!layer || !layer->image())
+    {
+        canvas_->setLayerRectOverlay(std::nullopt);
+        return;
+    }
+
+    common::Rect r;
+    r.x = layer->offsetX();
+    r.y = layer->offsetY();
+    r.w = layer->image()->width();
+    r.h = layer->image()->height();
+    canvas_->setLayerRectOverlay(r);
 }
 
 void MainWindow::clearUiStateOnClose()
@@ -707,6 +750,7 @@ void MainWindow::createLayersPanel()
                     app().setActiveLayer(*idx);
 
                 updateLayerHeaderButtonsEnabled();
+                updateLayerOverlayFromSelection();
             });
 
     connect(m_layersList, &QListWidget::itemDoubleClicked, this, &MainWindow::onLayerDoubleClicked);
