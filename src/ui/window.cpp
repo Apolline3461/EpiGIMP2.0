@@ -234,6 +234,7 @@ void MainWindow::createActions()
     m_pickAct = new QAction(tr("Pipette"), this);
     m_pickAct->setCheckable(true);
     m_pickAct->setIcon(QIcon(":/icons/color_picker.svg"));
+    m_pickAct->setShortcut(QKeySequence("O"));
 
     connect(m_pickAct, &QAction::toggled, this,
             [this](bool on)
@@ -321,6 +322,7 @@ void MainWindow::createActions()
 
     m_bucketAct = new QAction(tr("Pot de peinture"), this);
     m_bucketAct->setCheckable(true);
+    m_bucketAct->setShortcut(QKeySequence("Shift+B"));
     connect(m_bucketAct, &QAction::toggled, this,
             [this](bool on)
             {
