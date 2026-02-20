@@ -4,51 +4,12 @@
 #include <gtest/gtest.h>
 #include <memory>
 
-#include "io/IStorage.hpp"
 #include "app/AppService.hpp"
 #include "common/Geometry.hpp"
 #include "common/Colors.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
-
-class SpyStorage final : public IStorage {
-public:
-    bool openCalled = false;
-    bool saveCalled = false;
-    bool exportCalled = false;
-
-    std::string lastOpenPath;
-    std::string lastSavePath;
-    std::string lastExportPath;
-    const Document* lastSavedDoc = nullptr;
-    const Document* lastExportedDoc = nullptr;
-
-    io::epg::OpenResult open(const std::string& path) override {
-        openCalled = true;
-        lastOpenPath = path;
-        io::epg::OpenResult result;
-        result.document = std::make_unique<Document>(1, 1, 72.f);
-        return result;
-    }
-
-    void save(const Document& doc, const std::string& path) override {
-        saveCalled = true;
-        lastSavePath = path;
-        lastSavedDoc = &doc;
-    }
-
-    void exportImage(const Document& doc, const std::string& path) override {
-        exportCalled = true;
-        lastExportPath = path;
-        lastExportedDoc = &doc;
-    }
-};
-
-static std::unique_ptr<app::AppService> makeApp(SpyStorage** outSpy = nullptr) {
-    auto spy = std::make_unique<SpyStorage>();
-    if (outSpy) *outSpy = spy.get();
-    return std::make_unique<app::AppService>(std::move(spy));
-}
+#include "AppServiceUtilsForTest.hpp"
 
 TEST(AppService_BucketFill, NoSelection_FillsAndUndoRedoWorks)
 {

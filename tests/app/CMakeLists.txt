@@ -2,6 +2,8 @@ set(EPIGIMP_APP_TEST_SOURCES
         test_AppService.cpp
         test_History.cpp
         test_BucketFill.cpp
+        test_Signals.cpp
+        test_epg.cpp
 )
 
 add_executable(test_app
