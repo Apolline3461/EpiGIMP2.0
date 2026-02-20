@@ -43,6 +43,13 @@ const Document& AppService::document() const
     return *doc_;
 }
 
+Document& AppService::document()
+{
+    if (!doc_)
+        throw std::runtime_error("AppService::document(): no document loaded");
+    return *doc_;
+}
+
 bool AppService::hasDocument() const
 {
     return static_cast<bool>(doc_);

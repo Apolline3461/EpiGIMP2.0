@@ -52,6 +52,7 @@ class AppService
     ~AppService() = default;
 
     const Document& document() const;
+    Document& document();
 
     [[nodiscard]] bool hasDocument() const;
     void newDocument(Size size, float dpi, std::uint32_t bgColor = common::colors::White);
