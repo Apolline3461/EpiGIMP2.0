@@ -435,24 +435,26 @@ void MainWindow::addNewLayer()
     spec.visible = true;
     spec.locked = false;
     spec.opacity = 1.f;
-    spec.color = common::colors::Transparent;
 
     const int defW = app().document().width();
     const int defH = app().document().height();
 
     QDialog dlg(this);
     dlg.setWindowTitle(tr("Ajouter un calque"));
-    QVBoxLayout* dlgLayout = new QVBoxLayout(&dlg);
+    auto* dlgLayout = new QVBoxLayout(&dlg);
 
-    QHBoxLayout* sizeLayout = new QHBoxLayout();
-    QLabel* wLabel = new QLabel(tr("Largeur:"), &dlg);
-    QSpinBox* wSpin = new QSpinBox(&dlg);
+    // --- Size row ---
+    auto* sizeLayout = new QHBoxLayout();
+    auto* wLabel = new QLabel(tr("Largeur:"), &dlg);
+    auto* wSpin = new QSpinBox(&dlg);
     wSpin->setRange(1, 10000);
     wSpin->setValue(defW);
-    QLabel* hLabel = new QLabel(tr("Hauteur:"), &dlg);
-    QSpinBox* hSpin = new QSpinBox(&dlg);
+
+    auto* hLabel = new QLabel(tr("Hauteur:"), &dlg);
+    auto* hSpin = new QSpinBox(&dlg);
     hSpin->setRange(1, 10000);
     hSpin->setValue(defH);
+
     sizeLayout->addWidget(wLabel);
     sizeLayout->addWidget(wSpin);
     sizeLayout->addSpacing(8);
@@ -460,65 +462,100 @@ void MainWindow::addNewLayer()
     sizeLayout->addWidget(hSpin);
     dlgLayout->addLayout(sizeLayout);
 
-    QHBoxLayout* colorLayout = new QHBoxLayout();
-    QCheckBox* fillCheck = new QCheckBox(tr("Remplir avec une couleur"), &dlg);
-    QPushButton* colorBtn = new QPushButton(tr("Choisir la couleur"), &dlg);
-    QLabel* colorPreview = new QLabel(&dlg);
+    // --- Color / transparent row ---
+    auto* colorLayout = new QHBoxLayout();
+
+    // New behavior: default color always defined, checkbox is "transparent layer"
+    auto* transparentCheck = new QCheckBox(tr("Créer un calque transparent"), &dlg);
+
+    auto* colorBtn = new QPushButton(tr("Choisir la couleur"), &dlg);
+    auto* colorPreview = new QLabel(&dlg);
     colorPreview->setFixedSize(24, 24);
     colorPreview->setFrameStyle(QFrame::Box | QFrame::Plain);
     colorPreview->setAutoFillBackground(true);
-    QColor chosenColor = QColor(255, 255, 255, 255);
+
+    QColor chosenColor(255, 255, 255, 255);  // default fill: white opaque
+
     auto updatePreview = [&]()
     {
-        QPalette pal = colorPreview->palette();
-        pal.setColor(QPalette::Window, chosenColor);
-        colorPreview->setPalette(pal);
+        if (transparentCheck->isChecked())
+        {
+            // show "transparent" preview (simple: transparent bg)
+            QPalette pal = colorPreview->palette();
+            pal.setColor(QPalette::Window, Qt::transparent);
+            colorPreview->setPalette(pal);
+        }
+        else
+        {
+            QPalette pal = colorPreview->palette();
+            pal.setColor(QPalette::Window, chosenColor);
+            colorPreview->setPalette(pal);
+        }
+        colorPreview->update();
     };
+
     updatePreview();
-    connect(colorBtn, &QPushButton::clicked, &dlg,
-            [&]()
-            {
-                QColor c = QColorDialog::getColor(chosenColor, &dlg, tr("Choisir la couleur"));
-                if (c.isValid())
-                {
-                    chosenColor = c;
-                    updatePreview();
-                }
-            });
-    colorLayout->addWidget(fillCheck);
+
+    QObject::connect(colorBtn, &QPushButton::clicked, &dlg,
+                     [&]()
+                     {
+                         QColor c =
+                             QColorDialog::getColor(chosenColor, &dlg, tr("Choisir la couleur"));
+                         if (c.isValid())
+                         {
+                             chosenColor = c;
+                             updatePreview();
+                         }
+                     });
+
+    QObject::connect(transparentCheck, &QCheckBox::toggled, &dlg,
+                     [&](bool on)
+                     {
+                         colorBtn->setEnabled(!on);
+                         updatePreview();
+                     });
+
+    colorLayout->addWidget(transparentCheck);
+    colorLayout->addStretch();
     colorLayout->addWidget(colorBtn);
     colorLayout->addWidget(colorPreview);
     dlgLayout->addLayout(colorLayout);
 
-    QHBoxLayout* buttons = new QHBoxLayout();
+    // --- Buttons row ---
+    auto* buttons = new QHBoxLayout();
     buttons->addStretch();
-    QPushButton* okBtn = new QPushButton(tr("OK"), &dlg);
-    QPushButton* cancelBtn = new QPushButton(tr("Annuler"), &dlg);
+    auto* okBtn = new QPushButton(tr("OK"), &dlg);
+    auto* cancelBtn = new QPushButton(tr("Annuler"), &dlg);
     buttons->addWidget(okBtn);
     buttons->addWidget(cancelBtn);
     dlgLayout->addLayout(buttons);
-    connect(okBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
-    connect(cancelBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
+
+    QObject::connect(okBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+    QObject::connect(cancelBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
 
     if (dlg.exec() != QDialog::Accepted)
         return;
 
-    int w = wSpin->value();
-    int h = hSpin->value();
-    const bool fillWithColor = fillCheck->isChecked();
-
+    const int w = wSpin->value();
+    const int h = hSpin->value();
     if (w <= 0 || h <= 0)
         return;
+
     spec.width = w;
     spec.height = h;
 
-    if (fillWithColor)
+    if (transparentCheck->isChecked())
+    {
+        spec.color = common::colors::Transparent;
+    }
+    else
     {
         spec.color = (static_cast<uint32_t>(chosenColor.red()) << 24) |
                      (static_cast<uint32_t>(chosenColor.green()) << 16) |
                      (static_cast<uint32_t>(chosenColor.blue()) << 8) |
                      static_cast<uint32_t>(chosenColor.alpha());
     }
+
     app().addLayer(spec);
 }
 
