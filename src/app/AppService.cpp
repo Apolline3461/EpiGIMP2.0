@@ -10,13 +10,13 @@
 #include "app/Command.hpp"
 #include "app/commands/CommandUtils.hpp"
 #include "app/commands/LayerCommands.hpp"
+#include "app/commands/PixelCommands.hpp"
 #include "app/ToolParams.hpp"
 #include "common/Colors.hpp"
+#include "core/BucketFill.hpp"
 #include "core/Document.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
-
-#include <core/BucketFill.hpp>
 
 namespace app
 {
@@ -529,27 +529,7 @@ void AppService::bucketFill(common::Point p, std::uint32_t rgba)
         changes.push_back(PixelChange{x, y, oldColor, rgba});
 
     const std::uint64_t layerId = layer->id();
-
-    // --- ApplyFn reused for redo/undo (same pattern as StrokeCommand) //TODO: enelver le apply fn d'ici peut etre
-    ApplyFn applyFn =
-        [doc = doc_.get()](std::uint64_t id, const std::vector<PixelChange>& ch, bool useBefore)
-    {
-        if (!doc)
-            return;
-        const auto idx = commands::findLayerIndexById(*doc, id);
-        if (!idx)
-            return;
-
-        auto layer2 = doc->layerAt(*idx);
-        if (!layer2 || !layer2->image())
-            return;
-
-        auto img2 = layer2->image();
-        for (const auto& c : ch)
-            img2->setPixel(c.x, c.y, useBefore ? c.before : c.after);
-    };
-
-    apply(std::make_unique<DataCommand>(layerId, std::move(changes), std::move(applyFn)));
+    apply(commands::makePixelChangesCommand(doc_.get(), layerId, std::move(changes)));
 }
 
 void AppService::undo()
