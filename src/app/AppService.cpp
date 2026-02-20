@@ -436,17 +436,6 @@ void AppService::clearSelectionRect()
     documentChanged.notify();
 }
 
-// TODO(perf): avoid cloning full image for bucketFill by implementing a tracked fill
-// that records changes without mutating a working buffer, or by adding an ImageBuffer copy ctor.
-static ImageBuffer cloneImageBuffer(const ImageBuffer& src)
-{
-    ImageBuffer out(src.width(), src.height());
-    for (int y = 0; y < src.height(); ++y)
-        for (int x = 0; x < src.width(); ++x)
-            out.setPixel(x, y, src.getPixel(x, y));
-    return out;
-}
-
 void AppService::bucketFill(common::Point p, std::uint32_t rgba)
 {
     if (!doc_)
@@ -477,17 +466,13 @@ void AppService::bucketFill(common::Point p, std::uint32_t rgba)
     const Selection& sel = doc_->selection();
     if (sel.hasMask())
     {
-        // Safety: mask() should exist if hasMask() is true, but keep it robust
         if (!sel.mask())
             return;
-
-        // If click is outside selection, do nothing
         if (sel.t_at(p.x, p.y) == 0)
             return;
     }
 
     // --- Work on a copy to compute tracked changes WITHOUT mutating the document yet
-    ImageBuffer working = cloneImageBuffer(*img);
 
     std::vector<std::tuple<int, int, std::uint32_t>> changedPixels;
     if (sel.hasMask() && sel.mask())
@@ -511,19 +496,16 @@ void AppService::bucketFill(common::Point p, std::uint32_t rgba)
                     maskLocal.setPixel(x, y, 0u);
                     continue;
                 }
-
-                // Here we assume selection mask stores something where "selected" => non-zero.
-                // If Selection::t_at(dx,dy) already encapsulates that, use it (recommended).
                 const std::uint8_t t = sel.t_at(dx, dy);
                 maskLocal.setPixel(x, y, t ? 0xFFFFFFFFu : 0u);
             }
         }
         changedPixels =
-            core::floodFillWithinMaskTracked(working, maskLocal, lx, ly, core::Color{rgba});
+            core::floodFillWithinMaskCollect(*img, maskLocal, lx, ly, core::Color{rgba});
     }
     else
     {
-        changedPixels = core::floodFillTracked(working, lx, ly, core::Color{rgba});
+        changedPixels = core::floodFillCollect(*img, lx, ly, core::Color{rgba});
     }
 
     if (changedPixels.empty())

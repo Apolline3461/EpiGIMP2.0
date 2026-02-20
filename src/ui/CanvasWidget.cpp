@@ -125,6 +125,7 @@ void CanvasWidget::resetView()
 void CanvasWidget::setPan(QPointF p)
 {
     pan_ = p;
+    clampPan();
     update();
 }
 
