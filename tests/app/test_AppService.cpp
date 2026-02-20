@@ -819,3 +819,28 @@ TEST(AppService_SetLayerName, NoOpIfSameNameDoesNotPushHistory)
     EXPECT_EQ(svc.document().layerCount(), 1u);
 }
 
+TEST(AppService_Validation, NewDocument_ZeroWidth_ThrowsInvalidArgument)
+{
+    const auto app = makeApp();
+    EXPECT_THROW(app->newDocument(app::Size{0, 10}, 72.f), std::invalid_argument);
+}
+
+TEST(AppService_Validation, NewDocument_ZeroHeight_ThrowsInvalidArgument)
+{
+    const auto app = makeApp();
+    EXPECT_THROW(app->newDocument(app::Size{10, 0}, 72.f), std::invalid_argument);
+}
+
+TEST(AppService_Validation, NewDocument_ZeroByZero_ThrowsInvalidArgument)
+{
+    const auto app = makeApp();
+    EXPECT_THROW(app->newDocument(app::Size{0, 0}, 72.f), std::invalid_argument);
+}
+
+TEST(AppService_Validation, NewDocument_NegativeDimensions_ThrowsInvalidArgument)
+{
+    const auto app = makeApp();
+    EXPECT_THROW(app->newDocument(app::Size{-1, 10}, 72.f), std::invalid_argument);
+    EXPECT_THROW(app->newDocument(app::Size{10, -1}, 72.f), std::invalid_argument);
+    EXPECT_THROW(app->newDocument(app::Size{-1, -1}, 72.f), std::invalid_argument);
+}

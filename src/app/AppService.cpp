@@ -66,6 +66,8 @@ void AppService::closeDocument()
 
 void AppService::newDocument(Size size, float dpi, std::uint32_t bgColor)
 {
+    if (size.w <= 0 || size.h <= 0)
+        throw std::invalid_argument("newDocument: invalid document size");
     doc_ = std::make_unique<Document>(size.w, size.h, dpi);
     history_.clear();
     activeLayer_ = 0;
