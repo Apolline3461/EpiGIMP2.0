@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <tuple>
-#include <utility>
 #include <vector>
 
 class ImageBuffer;
@@ -19,10 +18,18 @@ void floodFill(ImageBuffer& buf, int startX, int startY, Color newColor);
 void floodFillWithinMask(ImageBuffer& buf, const ImageBuffer& mask, int startX, int startY,
                          Color newColor);
 
-// Optimized versions that return changed pixels (x, y, oldColor)
+// Tracked mutate buf
 std::vector<std::tuple<int, int, uint32_t>> floodFillTracked(ImageBuffer& buf, int startX,
                                                              int startY, Color newColor);
 std::vector<std::tuple<int, int, uint32_t>> floodFillWithinMaskTracked(ImageBuffer& buf,
+                                                                       const ImageBuffer& mask,
+                                                                       int startX, int startY,
+                                                                       Color newColor);
+// Collect-only: returns (x,y,oldColor) without mutating buf
+std::vector<std::tuple<int, int, uint32_t>> floodFillCollect(const ImageBuffer& buf, int startX,
+                                                             int startY, Color newColor);
+
+std::vector<std::tuple<int, int, uint32_t>> floodFillWithinMaskCollect(const ImageBuffer& buf,
                                                                        const ImageBuffer& mask,
                                                                        int startX, int startY,
                                                                        Color newColor);
