@@ -18,13 +18,6 @@ void floodFill(ImageBuffer& buf, int startX, int startY, Color newColor);
 void floodFillWithinMask(ImageBuffer& buf, const ImageBuffer& mask, int startX, int startY,
                          Color newColor);
 
-// Tracked mutate buf
-std::vector<std::tuple<int, int, uint32_t>> floodFillTracked(ImageBuffer& buf, int startX,
-                                                             int startY, Color newColor);
-std::vector<std::tuple<int, int, uint32_t>> floodFillWithinMaskTracked(ImageBuffer& buf,
-                                                                       const ImageBuffer& mask,
-                                                                       int startX, int startY,
-                                                                       Color newColor);
 // Collect-only: returns (x,y,oldColor) without mutating buf
 std::vector<std::tuple<int, int, uint32_t>> floodFillCollect(const ImageBuffer& buf, int startX,
                                                              int startY, Color newColor);
