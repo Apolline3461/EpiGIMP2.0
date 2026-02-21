@@ -378,7 +378,7 @@ void AppService::resizeLayer(std::size_t idx, int newW, int newH, bool smooth)
     if (!doc_)
         throw std::runtime_error("resizeLayer: document is null");
     if (idx == 0)
-        return;  // ou throw si tu veux interdire BG
+        throw std::runtime_error("resizeLayer: cannot resize background");
     if (newW <= 0 || newH <= 0)
         throw std::invalid_argument("resizeLayer: invalid size");
 
@@ -390,7 +390,7 @@ void AppService::resizeLayer(std::size_t idx, int newW, int newH, bool smooth)
 
     const auto before = layer->image();
     if (before->width() == newW && before->height() == newH)
-        return;  // no-op => pas de push dans l'historique
+        return;
 
     auto after = smooth ? /* scaleBilinear(*before, newW, newH) */ scaleNearest(*before, newW, newH)
                         : scaleNearest(*before, newW, newH);

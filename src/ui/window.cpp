@@ -1239,7 +1239,7 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
         v->addLayout(row);
 
         // Row: keep ratio
-        auto* keepRatio = new QCheckBox(tr("Garder proportions (🔗)"), &dlg);
+        auto* keepRatio = new QCheckBox(tr("Garder proportions 🔗"), &dlg);
         keepRatio->setChecked(true);
         v->addWidget(keepRatio);
 
@@ -1251,7 +1251,7 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
 
         // Ratio logic
         const double ratio = static_cast<double>(curW) / static_cast<double>(curH);
-        bool guard = false;  // évite la boucle W->H->W...
+        bool guard = false;
 
         auto syncHFromW = [&]()
         {
@@ -1277,8 +1277,6 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
 
         connect(wSpin, qOverload<int>(&QSpinBox::valueChanged), &dlg, [&](int) { syncHFromW(); });
         connect(hSpin, qOverload<int>(&QSpinBox::valueChanged), &dlg, [&](int) { syncWFromH(); });
-
-        // Si tu coches "garder proportions" après avoir modifié, on recale tout de suite
         connect(keepRatio, &QCheckBox::toggled, &dlg,
                 [&](bool on)
                 {
@@ -1292,7 +1290,6 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
         const int newW = wSpin->value();
         const int newH = hSpin->value();
 
-        // (optionnel) smooth / nearest : à toi de choisir
         const bool smooth = true;
         app().resizeLayer(idx, newW, newH, smooth);
     }
