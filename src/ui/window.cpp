@@ -58,10 +58,12 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
     resize(1080, 720);
     // Interface creation
     createActions();
-    m_bucketColor = QColor(0, 0, 0, 255);
+    m_toolColor = QColor(0, 0, 0, 255);
     updateColorPickerIcon();
     createMenus();
     createToolBar();
+    if (canvas_)
+        canvas_->setPencilColor(m_toolColor);
     createLayersPanel();
 
     connect(canvas_, &CanvasWidget::selectionFinishedDoc, this,
@@ -80,20 +82,53 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
                     const uint8_t b = static_cast<uint8_t>((rgba >> 8) & 0xFFu);
                     const uint8_t a = static_cast<uint8_t>(rgba & 0xFFu);
 
-                    m_bucketColor = QColor(r, g, b, a);
+                    m_toolColor = QColor(r, g, b, a);
                     updateColorPickerIcon();
+                    if (canvas_)
+                        canvas_->setPencilColor(m_toolColor);
                     if (m_pickAct)
                         m_pickAct->setChecked(false);
                     return;
                 }
                 if (!m_bucketMode)
                     return;
-                const uint32_t newColor = (static_cast<uint32_t>(m_bucketColor.red()) << 24) |
-                                          (static_cast<uint32_t>(m_bucketColor.green()) << 16) |
-                                          (static_cast<uint32_t>(m_bucketColor.blue()) << 8) |
-                                          static_cast<uint32_t>(m_bucketColor.alpha());
+                const uint32_t newColor = (static_cast<uint32_t>(m_toolColor.red()) << 24) |
+                                          (static_cast<uint32_t>(m_toolColor.green()) << 16) |
+                                          (static_cast<uint32_t>(m_toolColor.blue()) << 8) |
+                                          static_cast<uint32_t>(m_toolColor.alpha());
 
                 app().bucketFill(p, newColor);
+            });
+    connect(canvas_, &CanvasWidget::beginStroke, this,
+            [this](common::Point p)
+            {
+                if (!m_pencilAct || !m_pencilAct->isChecked())
+                    return;
+                app::ToolParams params;
+                params.tool = app::ToolKind::Pencil;
+                params.size = (m_pencilSizeSpin) ? m_pencilSizeSpin->value() : 8;
+                (void)0;  // hardness removed
+                params.color = (static_cast<uint32_t>(m_toolColor.red()) << 24) |
+                               (static_cast<uint32_t>(m_toolColor.green()) << 16) |
+                               (static_cast<uint32_t>(m_toolColor.blue()) << 8) |
+                               static_cast<uint32_t>(m_toolColor.alpha());
+                app().beginStroke(params, p);
+            });
+
+    connect(canvas_, &CanvasWidget::moveStroke, this,
+            [this](common::Point p)
+            {
+                if (!m_pencilAct || !m_pencilAct->isChecked())
+                    return;
+                app().moveStroke(p);
+            });
+
+    connect(canvas_, &CanvasWidget::endStroke, this,
+            [this]()
+            {
+                if (!m_pencilAct || !m_pencilAct->isChecked())
+                    return;
+                app().endStroke();
             });
 
     app().documentChanged.connect([this]() { refreshUIAfterDocChange(); });
@@ -261,12 +296,30 @@ void MainWindow::createActions()
     connect(m_colorPickerAct, &QAction::triggered, this,
             [this]()
             {
-                QColor chosen =
-                    QColorDialog::getColor(m_bucketColor, this, tr("Choisir la couleur"));
+                QColor chosen = QColorDialog::getColor(m_toolColor, this, tr("Choisir la couleur"));
                 if (chosen.isValid())
                 {
-                    m_bucketColor = chosen;
+                    m_toolColor = chosen;
                     updateColorPickerIcon();
+                    if (canvas_)
+                        canvas_->setPencilColor(m_toolColor);
+                }
+            });
+
+    m_pencilAct = new QAction(tr("Pinceau"), this);
+    m_pencilAct->setCheckable(true);
+    m_pencilAct->setIcon(QIcon(":/icons/pencil.svg"));
+    connect(m_pencilAct, &QAction::toggled, this,
+            [this](bool on)
+            {
+                if (on)
+                {
+                    if (m_bucketAct)
+                        m_bucketAct->setChecked(false);
+                    if (m_selectToggleAct)
+                        m_selectToggleAct->setChecked(false);
+                    if (canvas_)
+                        canvas_->setSelectionEnable(false);
                 }
             });
 
@@ -602,6 +655,68 @@ void MainWindow::createToolBar()
         m_toolsGroup->addAction(m_pickAct);
         m_toolsTb->addAction(m_pickAct);
     }
+    if (m_pencilAct)
+    {
+        m_pencilAct->setToolTip(tr("Pinceau"));
+        m_toolsGroup->addAction(m_pencilAct);
+        m_toolsTb->addAction(m_pencilAct);
+    }
+
+    // Create a small popup menu for pencil sizes when clicking the pencil icon
+    QMenu* pencilSizeMenu = new QMenu(this);
+    const std::vector<int> sizes = {1, 2, 4, 8, 16};
+    for (int s : sizes)
+    {
+        QAction* a = new QAction(QString::number(s), pencilSizeMenu);
+        a->setData(s);
+        pencilSizeMenu->addAction(a);
+        connect(a, &QAction::triggered, this,
+                [this, s]()
+                {
+                    if (m_pencilSizeSpin)
+                        m_pencilSizeSpin->setValue(s);
+                    if (m_pencilAct)
+                        m_pencilAct->setChecked(true);
+                });
+    }
+    pencilSizeMenu->addSeparator();
+    QAction* otherAct = new QAction(tr("Autre…"), pencilSizeMenu);
+    pencilSizeMenu->addAction(otherAct);
+    connect(otherAct, &QAction::triggered, this,
+            [this]()
+            {
+                bool ok = false;
+                const int cur = (m_pencilSizeSpin) ? m_pencilSizeSpin->value() : 8;
+                const int v = QInputDialog::getInt(this, tr("Taille personnalisée"),
+                                                   tr("Taille (px):"), cur, 1, 2000, 1, &ok);
+                if (ok)
+                {
+                    if (m_pencilSizeSpin)
+                        m_pencilSizeSpin->setValue(v);
+                    if (m_pencilAct)
+                        m_pencilAct->setChecked(true);
+                }
+            });
+    // Show menu when pencil action is triggered
+    connect(m_pencilAct, &QAction::triggered, this,
+            [this, pencilSizeMenu]()
+            {
+                if (!m_toolsTb || !m_pencilAct)
+                {
+                    pencilSizeMenu->popup(QCursor::pos());
+                    return;
+                }
+                QWidget* w = m_toolsTb->widgetForAction(m_pencilAct);
+                if (w)
+                {
+                    const QPoint pos = w->mapToGlobal(QPoint(0, w->height()));
+                    pencilSizeMenu->popup(pos);
+                }
+                else
+                {
+                    pencilSizeMenu->popup(QCursor::pos());
+                }
+            });
 
     m_toolsTb->addSeparator();
 
@@ -609,6 +724,36 @@ void MainWindow::createToolBar()
         m_toolsTb->addAction(m_undoAct);
     if (m_redoAct)
         m_toolsTb->addAction(m_redoAct);
+    // Pencil properties dock
+    m_pencilDock = new QDockWidget(tr("Pinceau"), this);
+    QWidget* pencilWidget = new QWidget(m_pencilDock);
+    QHBoxLayout* bv = new QHBoxLayout(pencilWidget);
+    bv->setContentsMargins(6, 6, 6, 6);
+
+    QLabel* sizeLbl = new QLabel(tr("Taille"), pencilWidget);
+    m_pencilSizeSpin = new QSpinBox(pencilWidget);
+    m_pencilSizeSpin->setRange(1, 200);
+    m_pencilSizeSpin->setValue(8);
+    bv->addWidget(sizeLbl);
+    bv->addWidget(m_pencilSizeSpin);
+
+    // connect pencil size to canvas preview
+    if (m_pencilSizeSpin && canvas_)
+    {
+        connect(m_pencilSizeSpin, qOverload<int>(&QSpinBox::valueChanged), this,
+                [this](int v)
+                {
+                    if (canvas_)
+                        canvas_->setPencilSize(v);
+                });
+        // initialize canvas size
+        canvas_->setPencilSize(m_pencilSizeSpin->value());
+    }
+
+    pencilWidget->setLayout(bv);
+    m_pencilDock->setWidget(pencilWidget);
+    addDockWidget(Qt::TopDockWidgetArea, m_pencilDock);
+    m_pencilDock->setVisible(false);
 }
 
 void MainWindow::populateLayersList()
@@ -1257,7 +1402,7 @@ void MainWindow::updateColorPickerIcon()
     pix.fill(Qt::transparent);
     QPainter p(&pix);
     p.setRenderHint(QPainter::Antialiasing, true);
-    p.setBrush(QBrush(m_bucketColor));
+    p.setBrush(QBrush(m_toolColor));
     p.setPen(Qt::black);
     p.drawRect(0, 0, sz - 1, sz - 1);
     p.end();
