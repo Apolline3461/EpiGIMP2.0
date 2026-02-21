@@ -31,11 +31,18 @@ struct Size
 
 struct LayerSpec  // TODO: put it in other file
 {
-    std::uint32_t color = 0xFFFFFFFFU;
     std::string name = "Layer ";
     bool visible = true;
-    bool locked = false;  // TODO: change tests with this new default value
+    bool locked = false;
     float opacity = 1.F;
+    std::uint32_t color = 0U;
+
+    std::optional<size_t> width;
+    std::optional<size_t> height;
+
+    //positon on the doc
+    int offsetX = 0;
+    int offsetY = 0;
 };
 
 class AppService
@@ -45,6 +52,7 @@ class AppService
     ~AppService() = default;
 
     const Document& document() const;
+    Document& document();
 
     [[nodiscard]] bool hasDocument() const;
     void newDocument(Size size, float dpi, std::uint32_t bgColor = common::colors::White);
@@ -67,6 +75,10 @@ class AppService
     void removeLayer(std::size_t idx);
     void reorderLayer(std::size_t from, std::size_t to);
     void mergeLayerDown(std::size_t from);
+    void moveLayer(std::size_t idx, int newOffsetX, int newOffsetY);
+
+    void resizeLayer(std::size_t idx, int newW, int newH,
+                     bool smooth = true);  // smooth true = bilinear, nearest
 
     void beginStroke(const ToolParams&, common::Point pStart);
     void moveStroke(common::Point p);

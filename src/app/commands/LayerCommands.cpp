@@ -5,10 +5,13 @@
 #include "app/commands/LayerCommands.hpp"
 
 #include <stdexcept>
+#include <utility>
 
 #include "app/commands/CommandUtils.hpp"
+#include "common/Geometry.hpp"
 #include "core/Document.hpp"
 #include "core/Layer.hpp"
+// #include "core/ImageBuffer.hpp"
 
 namespace app::commands
 {
@@ -187,6 +190,89 @@ class SetLayerOpacityCommand final : public Command
     float after_{1.f};
 };
 
+class SetLayerNameCommand final : public Command
+{
+   public:
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    SetLayerNameCommand(Document* doc, std::uint64_t layerId, std::string before, std::string after)
+        : doc_(doc), layerId_(layerId), before_(std::move(before)), after_(std::move(after))
+    {
+    }
+
+    void redo() override
+    {
+        set(after_);
+    }
+    void undo() override
+    {
+        set(before_);
+    }
+
+   private:
+    void set(std::string v) const
+    {
+        if (!doc_)
+            return;
+
+        auto idx = findLayerIndexById(*doc_, layerId_);
+        if (!idx)
+            return;
+
+        auto layer = doc_->layerAt(*idx);
+        if (!layer)
+            return;
+
+        layer->setName(std::move(v));
+    }
+
+    Document* doc_{nullptr};
+    std::uint64_t layerId_{0};
+    std::string before_;
+    std::string after_;
+};
+
+class SetMoveLayerCommand final : public Command
+{
+   public:
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    SetMoveLayerCommand(Document* doc, std::uint64_t layerId, common::Point before,
+                        common::Point after)
+        : doc_(doc), layerId_(layerId), before_(before), after_(after)
+    {
+    }
+
+    void redo() override
+    {
+        set(after_);
+    }
+    void undo() override
+    {
+        set(before_);
+    }
+
+   private:
+    void set(common::Point v) const
+    {
+        if (!doc_)
+            return;
+
+        auto idx = findLayerIndexById(*doc_, layerId_);
+        if (!idx)
+            return;
+
+        auto layer = doc_->layerAt(*idx);
+        if (!layer)
+            return;
+
+        layer->setOffset(v.x, v.y);
+    }
+
+    Document* doc_{nullptr};
+    std::uint64_t layerId_{0};
+    common::Point before_;
+    common::Point after_;
+};
+
 class RemoveLayerCommand final : public Command
 {
    public:
@@ -336,6 +422,43 @@ class MergeDownCommand final : public Command
     std::size_t* activeLayer_{nullptr};
 };
 
+class ResizeLayerCommand final : public Command
+{
+   public:
+    ResizeLayerCommand(Document* doc, std::uint64_t layerId, std::shared_ptr<ImageBuffer> before,
+                       std::shared_ptr<ImageBuffer> after)
+        : doc_(doc), layerId_(layerId), before_(std::move(before)), after_(std::move(after))
+    {
+    }
+
+    void redo() override
+    {
+        set(after_);
+    }
+    void undo() override
+    {
+        set(before_);
+    }
+
+   private:
+    void set(const std::shared_ptr<ImageBuffer>& img) const
+    {
+        if (!doc_)
+            return;
+        auto idx = findLayerIndexById(*doc_, layerId_);
+        if (!idx)
+            return;
+        auto layer = doc_->layerAt(*idx);
+        if (!layer)
+            return;
+        layer->setImageBuffer(img);
+    }
+    Document* doc_{nullptr};
+    std::uint64_t layerId_{0};
+    std::shared_ptr<ImageBuffer> before_;
+    std::shared_ptr<ImageBuffer> after_;
+};
+
 }  // namespace
 
 std::unique_ptr<Command> makeAddLayerCommand(Document* doc, std::shared_ptr<Layer> layer,
@@ -379,6 +502,25 @@ std::unique_ptr<Command> makeSetLayerOpacityCommand(Document* doc, std::uint64_t
                                                     float before, float after)
 {
     return std::make_unique<SetLayerOpacityCommand>(doc, layerId, before, after);
+}
+
+std::unique_ptr<Command> makeSetLayerNameCommand(Document* doc, std::uint64_t layerId,
+                                                 std::string before, std::string after)
+{
+    return std::make_unique<SetLayerNameCommand>(doc, layerId, before, after);
+}
+
+std::unique_ptr<Command> makeMoveLayerCommand(Document* doc, std::uint64_t layerId,
+                                              common::Point before, common::Point after)
+{
+    return std::make_unique<SetMoveLayerCommand>(doc, layerId, before, after);
+}
+
+std::unique_ptr<Command> makeResizeLayerCommand(Document* doc, std::uint64_t layerId,
+                                                std::shared_ptr<ImageBuffer> before,
+                                                std::shared_ptr<ImageBuffer> after)
+{
+    return std::make_unique<ResizeLayerCommand>(doc, layerId, before, after);
 }
 
 }  // namespace app::commands

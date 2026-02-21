@@ -169,3 +169,31 @@ TEST(Compositor, RoiHorizontalStrip) {
     EXPECT_EQ(out.getPixel(1, 0), c2);
 }
 
+TEST(Compositor, OffsetLayer_IsCompositedAtCorrectDocPosition)
+{
+    Document doc(5, 5, 72.f);
+
+    auto bgImg = std::make_shared<ImageBuffer>(5, 5);
+    bgImg->fill(0x000000FFu); // noir opaque
+    auto bg = std::make_shared<Layer>(0, "bg", bgImg, true, false, 1.f);
+    doc.addLayer(bg);
+
+    auto layerImg = std::make_shared<ImageBuffer>(1, 1);
+    layerImg->fill(0xFF0000FFu); // rouge opaque
+    auto L1 = std::make_shared<Layer>(1, "L1", layerImg, true, false, 1.f);
+    L1->setOffset(2, 3); // <-- important
+    doc.addLayer(L1);
+
+    ImageBuffer out(5, 5);
+    out.fill(0u);
+
+    Compositor c;
+    c.compose(doc, out);
+
+    // le pixel (2,3) doit être rouge
+    EXPECT_EQ(out.getPixel(2, 3), 0xFF0000FFu);
+
+    // un pixel voisin doit rester noir (bg)
+    EXPECT_EQ(out.getPixel(0, 0), 0x000000FFu);
+}
+

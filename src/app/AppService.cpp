@@ -10,13 +10,13 @@
 #include "app/Command.hpp"
 #include "app/commands/CommandUtils.hpp"
 #include "app/commands/LayerCommands.hpp"
+#include "app/commands/PixelCommands.hpp"
 #include "app/ToolParams.hpp"
 #include "common/Colors.hpp"
+#include "core/BucketFill.hpp"
 #include "core/Document.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
-
-#include <core/BucketFill.hpp>
 
 namespace app
 {
@@ -43,6 +43,13 @@ const Document& AppService::document() const
     return *doc_;
 }
 
+Document& AppService::document()
+{
+    if (!doc_)
+        throw std::runtime_error("AppService::document(): no document loaded");
+    return *doc_;
+}
+
 bool AppService::hasDocument() const
 {
     return static_cast<bool>(doc_);
@@ -59,6 +66,8 @@ void AppService::closeDocument()
 
 void AppService::newDocument(Size size, float dpi, std::uint32_t bgColor)
 {
+    if (size.w <= 0 || size.h <= 0)
+        throw std::invalid_argument("newDocument: invalid document size");
     doc_ = std::make_unique<Document>(size.w, size.h, dpi);
     history_.clear();
     activeLayer_ = 0;
@@ -67,13 +76,7 @@ void AppService::newDocument(Size size, float dpi, std::uint32_t bgColor)
     auto img = std::make_shared<ImageBuffer>(size.w, size.h);
     img->fill(bgColor);
 
-    auto layer = std::make_shared<Layer>(
-        /*id*/ 0,
-        /*name*/ "Background",
-        /*image*/ img,
-        /*visible*/ true,
-        /*locked*/ false,
-        /*opacity*/ 1.f);
+    auto layer = std::make_shared<Layer>(0, "Background", img, true, false, 1.f);
     doc_->addLayer(std::move(layer));
 
     documentChanged.notify();
@@ -220,7 +223,7 @@ void AppService::setLayerLocked(std::size_t idx, bool locked)
     apply(commands::makeSetLayerLockedCommand(doc_.get(), layer->id(), layer->locked(), locked));
 }
 
-void AppService::setLayerName(std::size_t idx, std::string name)  // TODO: use apply command
+void AppService::setLayerName(std::size_t idx, std::string name)
 {
     if (!doc_)
         throw std::runtime_error("setLayerName: document is null");
@@ -232,8 +235,7 @@ void AppService::setLayerName(std::size_t idx, std::string name)  // TODO: use a
     if (layer->name() == name)
         return;
 
-    layer->setName(std::move(name));
-    documentChanged.notify();
+    apply(commands::makeSetLayerNameCommand(doc_.get(), layer->id(), layer->name(), name));
 }
 
 void AppService::addLayer(const LayerSpec& spec)
@@ -241,11 +243,17 @@ void AppService::addLayer(const LayerSpec& spec)
     if (!doc_)
         throw std::runtime_error("AddLayer Error : document is null");
 
-    auto img = std::make_shared<ImageBuffer>(doc_->width(), doc_->height());
+    const int w = spec.width.value_or(doc_->width());
+    const int h = spec.height.value_or(doc_->height());
+    if (w <= 0 || h <= 0)
+        throw std::invalid_argument("addLayer: invalid layer size");
+
+    auto img = std::make_shared<ImageBuffer>(w, h);
     img->fill(spec.color);
 
     auto layer = std::make_shared<Layer>(nextLayerId_++, spec.name, img, spec.visible, spec.locked,
                                          spec.opacity);
+    layer->setOffset(spec.offsetX, spec.offsetY);
 
     apply(commands::makeAddLayerCommand(doc_.get(), std::move(layer), &activeLayer_));
 }
@@ -255,24 +263,15 @@ void AppService::addImageLayer(const ImageBuffer& img, std::string name, bool vi
 {
     if (!doc_)
         throw std::runtime_error("addImageLayer: document is null");
-    auto out = std::make_shared<ImageBuffer>(doc_->width(), doc_->height());
-    out->fill(0u);
-
-    const int copyW = std::min(out->width(), img.width());
-    const int copyH = std::min(out->height(), img.height());
-
-    for (int y = 0; y < copyH; ++y)
-    {
-        for (int x = 0; x < copyW; ++x)
-        {
+    auto out = std::make_shared<ImageBuffer>(img.width(), img.height());
+    for (int y = 0; y < img.height(); ++y)
+        for (int x = 0; x < img.width(); ++x)
             out->setPixel(x, y, img.getPixel(x, y));
-        }
-    }
 
     auto layer = std::make_shared<Layer>(nextLayerId_++,
                                          name.empty() ? std::string("Layer") : std::move(name), out,
                                          visible, locked, opacity);
-
+    layer->setOffset(0, 0);
     apply(commands::makeAddLayerCommand(doc_.get(), std::move(layer), &activeLayer_));
 }
 
@@ -329,6 +328,74 @@ void AppService::mergeLayerDown(std::size_t from)
         throw std::out_of_range("mergeLayerDown: invalid index");
 
     apply(commands::makeMergeDownCommand(doc_.get(), layer, static_cast<int>(from), &activeLayer_));
+}
+
+void AppService::moveLayer(std::size_t idx, int newOffsetX, int newOffsetY)
+{
+    if (!doc_)
+        throw std::runtime_error("moveLayer: document is null");
+
+    const auto n = doc_->layerCount();
+    if (idx >= n)
+        throw std::out_of_range("moveLayer: index out of range");
+
+    if (idx == 0)
+        return;  // ou throw si tu préfères interdire le move du background
+
+    auto layer = doc_->layerAt(idx);
+    if (!layer)
+        throw std::runtime_error("moveLayer: layer is null");
+
+    if (layer->locked())
+        throw std::runtime_error("moveLayer: layer locked");
+
+    const common::Point before{layer->offsetX(), layer->offsetY()};
+    const common::Point after{newOffsetX, newOffsetY};
+
+    if (before.x == after.x && before.y == after.y)
+        return;
+
+    apply(commands::makeMoveLayerCommand(doc_.get(), layer->id(), before, after));
+}
+
+static std::shared_ptr<ImageBuffer> scaleNearest(const ImageBuffer& src, int newW, int newH)
+{
+    auto dst = std::make_shared<ImageBuffer>(newW, newH);
+    for (int y = 0; y < newH; ++y)
+    {
+        const int sy = (y * src.height()) / newH;
+        for (int x = 0; x < newW; ++x)
+        {
+            const int sx = (x * src.width()) / newW;
+            dst->setPixel(x, y, src.getPixel(sx, sy));
+        }
+    }
+    return dst;
+}
+
+void AppService::resizeLayer(std::size_t idx, int newW, int newH, bool smooth)
+{
+    if (!doc_)
+        throw std::runtime_error("resizeLayer: document is null");
+    if (idx == 0)
+        throw std::runtime_error("resizeLayer: cannot resize background");
+    if (newW <= 0 || newH <= 0)
+        throw std::invalid_argument("resizeLayer: invalid size");
+
+    auto layer = doc_->layerAt(idx);
+    if (!layer || !layer->image())
+        throw std::runtime_error("resizeLayer: invalid layer");
+    if (layer->locked())
+        throw std::runtime_error("resizeLayer: layer locked");
+
+    const auto before = layer->image();
+    if (before->width() == newW && before->height() == newH)
+        return;
+
+    auto after = smooth ? /* scaleBilinear(*before, newW, newH) */ scaleNearest(*before, newW, newH)
+                        : scaleNearest(*before, newW, newH);
+
+    apply(commands::makeResizeLayerCommand(doc_.get(), layer->id(), before, after));
 }
 
 void AppService::beginStroke(const ToolParams& params, common::Point pStart)
@@ -407,10 +474,12 @@ uint32_t AppService::pickColorAt(common::Point p) const
     auto img = layer->image();
     if (!img)
         return common::colors::Transparent;
-    if (p.x < 0 || p.y < 0 || p.x >= img->width() || p.y >= img->height())
-        return common::colors::Transparent;
 
-    return img->getPixel(p.x, p.y);
+    const int lx = p.x - layer->offsetX();
+    const int ly = p.y - layer->offsetY();
+    if (lx < 0 || ly < 0 || lx >= img->width() || ly >= img->height())
+        return common::colors::Transparent;
+    return img->getPixel(lx, ly);
 }
 
 const Selection& AppService::selection() const
@@ -437,17 +506,6 @@ void AppService::clearSelectionRect()
     documentChanged.notify();
 }
 
-// TODO(perf): avoid cloning full image for bucketFill by implementing a tracked fill
-// that records changes without mutating a working buffer, or by adding an ImageBuffer copy ctor.
-static ImageBuffer cloneImageBuffer(const ImageBuffer& src)
-{
-    ImageBuffer out(src.width(), src.height());
-    for (int y = 0; y < src.height(); ++y)
-        for (int x = 0; x < src.width(); ++x)
-            out.setPixel(x, y, src.getPixel(x, y));
-    return out;
-}
-
 void AppService::bucketFill(common::Point p, std::uint32_t rgba)
 {
     if (!doc_)
@@ -464,34 +522,60 @@ void AppService::bucketFill(common::Point p, std::uint32_t rgba)
         throw std::runtime_error("bucketFill: layer locked");
 
     auto img = layer->image();
-    if (p.x < 0 || p.y < 0 || p.x >= img->width() || p.y >= img->height())
+    const int w = img->width();
+    const int h = img->height();
+
+    //layer local pos
+    const int lx = p.x - layer->offsetX();
+    const int ly = p.y - layer->offsetY();
+
+    if (lx < 0 || ly < 0 || lx >= w || ly >= h)
         return;
 
     /* Selection handling */
     const Selection& sel = doc_->selection();
     if (sel.hasMask())
     {
-        // Safety: mask() should exist if hasMask() is true, but keep it robust
         if (!sel.mask())
             return;
-
-        // If click is outside selection, do nothing
         if (sel.t_at(p.x, p.y) == 0)
             return;
     }
 
     // --- Work on a copy to compute tracked changes WITHOUT mutating the document yet
-    ImageBuffer working = cloneImageBuffer(*img);
 
     std::vector<std::tuple<int, int, std::uint32_t>> changedPixels;
     if (sel.hasMask() && sel.mask())
     {
+        ImageBuffer maskLocal(w, h);
+        maskLocal.fill(0u);
+
+        const int offX = layer->offsetX();
+        const int offY = layer->offsetY();
+
+        for (int y = 0; y < h; ++y)
+        {
+            for (int x = 0; x < w; ++x)
+            {
+                const int dx = x + offX;
+                const int dy = y + offY;
+
+                // outside doc -> not selected
+                if (dx < 0 || dy < 0 || dx >= doc_->width() || dy >= doc_->height())
+                {
+                    maskLocal.setPixel(x, y, 0u);
+                    continue;
+                }
+                const std::uint8_t t = sel.t_at(dx, dy);
+                maskLocal.setPixel(x, y, t ? 0xFFFFFFFFu : 0u);
+            }
+        }
         changedPixels =
-            core::floodFillWithinMaskTracked(working, *sel.mask(), p.x, p.y, core::Color{rgba});
+            core::floodFillWithinMaskCollect(*img, maskLocal, lx, ly, core::Color{rgba});
     }
     else
     {
-        changedPixels = core::floodFillTracked(working, p.x, p.y, core::Color{rgba});
+        changedPixels = core::floodFillCollect(*img, lx, ly, core::Color{rgba});
     }
 
     if (changedPixels.empty())
@@ -504,27 +588,7 @@ void AppService::bucketFill(common::Point p, std::uint32_t rgba)
         changes.push_back(PixelChange{x, y, oldColor, rgba});
 
     const std::uint64_t layerId = layer->id();
-
-    // --- ApplyFn reused for redo/undo (same pattern as StrokeCommand)
-    ApplyFn applyFn =
-        [doc = doc_.get()](std::uint64_t id, const std::vector<PixelChange>& ch, bool useBefore)
-    {
-        if (!doc)
-            return;
-        const auto idx = commands::findLayerIndexById(*doc, id);
-        if (!idx)
-            return;
-
-        auto layer2 = doc->layerAt(*idx);
-        if (!layer2 || !layer2->image())
-            return;
-
-        auto img2 = layer2->image();
-        for (const auto& c : ch)
-            img2->setPixel(c.x, c.y, useBefore ? c.before : c.after);
-    };
-
-    apply(std::make_unique<DataCommand>(layerId, std::move(changes), std::move(applyFn)));
+    apply(commands::makePixelChangesCommand(doc_.get(), layerId, std::move(changes)));
 }
 
 void AppService::undo()
@@ -544,6 +608,7 @@ void AppService::redo()
     history_.redo();
     documentChanged.notify();
 }
+
 bool AppService::canUndo() const noexcept
 {
     return history_.canUndo();
@@ -553,6 +618,7 @@ bool AppService::canRedo() const noexcept
 {
     return history_.canRedo();
 }
+
 void AppService::apply(app::History::CommandPtr cmd)
 {
     if (!cmd)

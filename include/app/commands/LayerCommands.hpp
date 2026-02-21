@@ -9,6 +9,8 @@
 #include <memory>
 
 #include "app/Command.hpp"
+#include "common/Geometry.hpp"
+#include "core/ImageBuffer.hpp"
 
 class Document;
 class Layer;
@@ -36,4 +38,15 @@ std::unique_ptr<Command> makeSetLayerVisibleCommand(Document* doc, std::uint64_t
 
 std::unique_ptr<Command> makeSetLayerOpacityCommand(Document* doc, std::uint64_t layerId,
                                                     float before, float after);
+
+std::unique_ptr<Command> makeSetLayerNameCommand(Document* doc, std::uint64_t layerId,
+                                                 std::string before, std::string after);
+
+std::unique_ptr<Command> makeMoveLayerCommand(Document* doc, std::uint64_t layerId,
+                                              common::Point before, common::Point after);
+
+std::unique_ptr<Command> makeResizeLayerCommand(Document* doc, std::uint64_t layerId,
+                                                std::shared_ptr<ImageBuffer> before,
+                                                std::shared_ptr<ImageBuffer> after);
+
 }  // namespace app::commands

@@ -5,8 +5,6 @@
 #include <QColor>
 #include <QColorDialog>
 #include <QContextMenuEvent>
-#include <QCursor>
-#include <QDateTime>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
@@ -18,25 +16,19 @@
 #include <QIcon>
 #include <QImageReader>
 #include <QInputDialog>
-#include <QKeyEvent>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
-#include <QMouseEvent>
 #include <QPainter>
 #include <QPalette>
 #include <QPixmap>
 #include <QPushButton>
-#include <QScrollArea>
-#include <QScrollBar>
-#include <QSlider>
 #include <QSpinBox>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QTextEdit>
-#include <QTextOption>
 #include <QToolBar>
 #include <QVBoxLayout>
 
@@ -44,8 +36,6 @@
 #include "common/Geometry.hpp"
 #include "core/Document.hpp"
 #include "core/Layer.hpp"
-#include "io/EpgFormat.hpp"
-#include "io/EpgJson.hpp"
 #include "ui/CanvasWidget.hpp"
 #include "ui/ImageConversion.hpp"
 #include "ui/Render.hpp"
@@ -131,6 +121,92 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
                 app().endStroke();
             });
 
+    connect(
+        canvas_, &CanvasWidget::beginDragDoc, this,
+        [this](common::Point p)
+        {
+            if (!m_moveLayerMode || !app().hasDocument() || !canvas_)
+                return;
+
+            auto idxOpt = currentLayerIndexFromSelection();
+            if (!idxOpt || *idxOpt == 0)
+                return;
+
+            const std::size_t idx = *idxOpt;
+            auto layer = app().document().layerAt(idx);
+            if (!layer || !layer->image() || layer->locked())
+                return;
+
+            // hit test local layer
+            const int lx = p.x - layer->offsetX();
+            const int ly = p.y - layer->offsetY();
+            if (lx < 0 || ly < 0 || lx >= layer->image()->width() || ly >= layer->image()->height())
+                return;
+
+            // drag state
+            m_dragLayerActive = true;
+            m_dragLayerIdx = idx;
+            m_dragStartDoc = p;
+            m_dragStartOffset = {layer->offsetX(), layer->offsetY()};
+
+            // layer image for preview (once)
+            m_dragLayerImage = ImageConversion::imageBufferToQImage(
+                *layer->image(), QImage::Format_ARGB32_Premultiplied);
+
+            // base render without this layer (once)
+            const bool oldVis = layer->visible();
+            layer->setVisible(false);
+            m_dragBaseImage = Renderer::render(app().document());
+            layer->setVisible(oldVis);
+
+            canvas_->setImage(m_dragBaseImage);
+            canvas_->setDragLayerPreview(m_dragLayerImage, m_dragStartOffset.x,
+                                         m_dragStartOffset.y);
+
+            // update yellow overlay to match preview
+            canvas_->setLayerRectOverlay(common::Rect{m_dragStartOffset.x, m_dragStartOffset.y,
+                                                      m_dragLayerImage.width(),
+                                                      m_dragLayerImage.height()});
+        });
+
+    connect(canvas_, &CanvasWidget::dragDoc, this,
+            [this](common::Point p)
+            {
+                if (!m_dragLayerActive || !canvas_)
+                    return;
+
+                const common::Point delta{p.x - m_dragStartDoc.x, p.y - m_dragStartDoc.y};
+                const int newX = m_dragStartOffset.x + delta.x;
+                const int newY = m_dragStartOffset.y + delta.y;
+
+                // no render here
+                canvas_->setDragLayerPos(newX, newY);
+                canvas_->setLayerRectOverlay(
+                    common::Rect{newX, newY, m_dragLayerImage.width(), m_dragLayerImage.height()});
+            });
+
+    connect(canvas_, &CanvasWidget::endDragDoc, this,
+            [this](common::Point p)
+            {
+                if (!m_dragLayerActive || !canvas_ || !app().hasDocument())
+                    return;
+
+                const common::Point delta{p.x - m_dragStartDoc.x, p.y - m_dragStartDoc.y};
+                const int newX = m_dragStartOffset.x + delta.x;
+                const int newY = m_dragStartOffset.y + delta.y;
+
+                // stop preview BEFORE pushing (documentChanged will re-render normal doc)
+                m_dragLayerActive = false;
+                canvas_->clearDragLayerPreview();
+
+                // clear caches
+                m_dragBaseImage = QImage();
+                m_dragLayerImage = QImage();
+
+                // undoable commit
+                app().moveLayer(m_dragLayerIdx, newX, newY);
+            });
+
     app().documentChanged.connect([this]() { refreshUIAfterDocChange(); });
 
     refreshUIAfterDocChange();
@@ -138,7 +214,11 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
 
 void MainWindow::refreshUIAfterDocChange()
 {
+    if (m_dragLayerActive)
+        return;
+
     const bool hasDoc = app().hasDocument();
+
     if (m_zoomInAct)
         m_zoomInAct->setEnabled(hasDoc);
     if (m_zoomOutAct)
@@ -152,27 +232,59 @@ void MainWindow::refreshUIAfterDocChange()
     if (m_zoom2Act)
         m_zoom2Act->setEnabled(hasDoc);
 
+    if (m_bucketAct)
+        m_bucketAct->setEnabled(hasDoc);
+    if (m_pickAct)
+        m_pickAct->setEnabled(hasDoc);
+    if (m_selectToggleAct)
+        m_selectToggleAct->setEnabled(hasDoc);
+    if (m_clearSelectionAct)
+        m_clearSelectionAct->setEnabled(hasDoc);
+    if (m_colorPickerAct)
+        m_colorPickerAct->setEnabled(hasDoc);
+    if (m_moveLayerAct)
+        m_moveLayerAct->setEnabled(hasDoc);
+
     if (!hasDoc)
     {
+        if (canvas_)
+        {
+            canvas_->setMoveLayerEnable(false);
+            canvas_->clearDragLayerPreview();
+        }
         clearUiStateOnClose();
         return;
     }
-    canvas_->setImage(Renderer::render(app().document()));
 
-    populateLayersList();
+    if (canvas_)
+        canvas_->setImage(Renderer::render(app().document()));
 
-    if (m_pendingSelectLayerId_)
     {
-        selectLayerInListById(*m_pendingSelectLayerId_);
-        m_pendingSelectLayerId_.reset();
+        QSignalBlocker blocker(m_layersList);
+        populateLayersList();
+
+        const auto& sel = app().document().selection();
+        canvas_->setSelectionRectOverlay(sel.hasMask() ? std::optional(sel.boundingRect())
+                                                       : std::nullopt);
+
+        if (m_pendingSelectLayerId_)
+        {
+            selectLayerInListById(*m_pendingSelectLayerId_);
+            m_pendingSelectLayerId_.reset();
+        }
+        else
+        {
+            const auto idx = app().activeLayer();
+            auto layer = app().document().layerAt(idx);
+            if (layer)
+                selectLayerInListById(layer->id());
+        }
     }
-    else
-    {
-        const auto idx = app().activeLayer();
-        auto layer = app().document().layerAt(idx);
-        if (layer)
-            selectLayerInListById(layer->id());
-    }
+    if (canvas_ && m_moveLayerAct)
+        canvas_->setMoveLayerEnable(m_moveLayerAct->isChecked());
+
+    updateLayerHeaderButtonsEnabled();
+    updateLayerOverlayFromSelection();
 
     if (m_undoAct)
         m_undoAct->setEnabled(app().canUndo());
@@ -180,15 +292,66 @@ void MainWindow::refreshUIAfterDocChange()
         m_redoAct->setEnabled(app().canRedo());
 }
 
+void MainWindow::updateLayerOverlayFromSelection()
+{
+    if (!canvas_ || !app().hasDocument())
+    {
+        if (canvas_)
+            canvas_->setLayerRectOverlay(std::nullopt);
+        return;
+    }
+
+    auto idxOpt = currentLayerIndexFromSelection();
+    if (!idxOpt.has_value())
+    {
+        canvas_->setLayerRectOverlay(std::nullopt);
+        return;
+    }
+
+    const std::size_t idx = *idxOpt;
+    if (idx == 0)  // background: pas d’overlay
+    {
+        canvas_->setLayerRectOverlay(std::nullopt);
+        return;
+    }
+
+    auto layer = app().document().layerAt(idx);
+    if (!layer || !layer->image())
+    {
+        canvas_->setLayerRectOverlay(std::nullopt);
+        return;
+    }
+
+    common::Rect r;
+    r.x = layer->offsetX();
+    r.y = layer->offsetY();
+    r.w = layer->image()->width();
+    r.h = layer->image()->height();
+    canvas_->setLayerRectOverlay(r);
+}
+
 void MainWindow::clearUiStateOnClose()
 {
     m_currentFileName.clear();
     if (canvas_)
+    {
         canvas_->clear();
+        canvas_->setSelectionEnable(false);
+        canvas_->setMoveLayerEnable(false);
+    }
     if (m_layersList)
         m_layersList->clear();
-
-    // TODO: reset bucket/selection tool state in UI (actions checked etc.)
+    if (m_bucketAct)
+        m_bucketAct->setChecked(false);
+    if (m_pickAct)
+        m_pickAct->setChecked(false);
+    if (m_selectToggleAct)
+        m_selectToggleAct->setChecked(false);
+    if (m_moveLayerAct)
+        m_moveLayerAct->setChecked(false);
+    m_bucketMode = false;
+    m_pickMode = false;
+    m_moveLayerMode = false;
 }
 
 void MainWindow::createActions()
@@ -213,6 +376,7 @@ void MainWindow::createActions()
     m_closeAct->setShortcut(QKeySequence::Close);
     m_closeAct->setStatusTip(tr("Fermer l'image actuelle"));
     connect(m_closeAct, &QAction::triggered, this, &MainWindow::closeImage);
+    m_closeAct->setObjectName("act.close");
 
     m_exitAct = new QAction(tr("&Quitter"), this);
     m_exitAct->setShortcut(QKeySequence::Quit);
@@ -263,8 +427,38 @@ void MainWindow::createActions()
     m_layerDownAct->setShortcut(QKeySequence("Ctrl+["));
     connect(m_layerDownAct, &QAction::triggered, this, &MainWindow::moveLayerDown);
 
-    // TODO: m_layerMergeDown
+    m_moveLayerAct = new QAction(tr("Déplacer le calque"), this);
+    m_moveLayerAct->setCheckable(true);
+    m_moveLayerAct->setChecked(false);
+    m_moveLayerAct->setIcon(QIcon(":/icons/mouse.svg"));
+    m_moveLayerAct->setShortcut(QKeySequence("Ctrl+M"));
+    m_moveLayerAct->setStatusTip("Permet de déplacer le calque sélectionné");
+    m_moveLayerAct->setObjectName("act.moveLayer");
+    connect(
+        m_moveLayerAct, &QAction::toggled, this,
+        [this](bool on)
+        {
+            m_moveLayerMode = on;
 
+            m_moveLayerAct->setIcon(QIcon(on ? ":/icons/mouse_select.svg" : ":/icons/mouse.svg"));
+            if (canvas_)
+                canvas_->setMoveLayerEnable(on);
+            if (on)
+            {
+                if (m_bucketAct)
+                    m_bucketAct->setChecked(false);
+                if (m_pickAct)
+                    m_pickAct->setChecked(false);
+                if (m_selectToggleAct)
+                    m_selectToggleAct->setChecked(false);
+
+                m_bucketMode = false;
+                m_pickMode = false;
+
+                if (canvas_)
+                    canvas_->setSelectionEnable(false);
+            }
+        });
     /* Color Picker */
     m_pickAct = new QAction(tr("Pipette"), this);
     m_pickAct->setCheckable(true);
@@ -283,6 +477,8 @@ void MainWindow::createActions()
                     m_bucketMode = false;
                     if (canvas_)
                         canvas_->setSelectionEnable(false);
+                    if (m_moveLayerAct)
+                        m_moveLayerAct->setChecked(false);
                     m_pickAct->setIcon(QIcon(":/icons/color_picker_selec.svg"));
                 }
                 else
@@ -290,6 +486,8 @@ void MainWindow::createActions()
                     m_pickAct->setIcon(QIcon(":/icons/color_picker.svg"));
                 }
             });
+    m_pickAct->setObjectName("act.picker");
+
     m_colorPickerAct = new QAction(tr("Couleur de remplissage"), this);
     m_colorPickerAct->setStatusTip(tr("Choisir la couleur utilisée par le pot de peinture"));
     m_colorPickerAct->setIcon(QIcon(":/icons/color_picker.svg"));
@@ -322,6 +520,7 @@ void MainWindow::createActions()
                         canvas_->setSelectionEnable(false);
                 }
             });
+    m_colorPickerAct->setObjectName("act.colorPick");
 
     /* Zoom actions */
     m_zoomInAct = new QAction(tr("Zoom &Avant"), this);
@@ -368,9 +567,11 @@ void MainWindow::createActions()
     m_selectToggleAct = new QAction(tr("Mode sélection"), this);
     m_selectToggleAct->setCheckable(true);
     connect(m_selectToggleAct, &QAction::toggled, this, &MainWindow::toggleSelectionMode);
+    m_selectToggleAct->setObjectName("act.select");
 
     m_clearSelectionAct = new QAction(tr("Effacer sélection"), this);
     connect(m_clearSelectionAct, &QAction::triggered, this, &MainWindow::clearSelection);
+    m_clearSelectionAct->setObjectName("act.clearSelection");
 
     m_bucketAct = new QAction(tr("Pot de peinture"), this);
     m_bucketAct->setCheckable(true);
@@ -382,10 +583,27 @@ void MainWindow::createActions()
                 {
                     m_selectToggleAct->setChecked(false);
                     m_bucketAct->setIcon(QIcon(":/icons/bucket_selec.svg"));
+                    if (m_moveLayerAct)
+                        m_moveLayerAct->setChecked(false);
                 }
                 else
                     m_bucketAct->setIcon(QIcon(":/icons/bucket.svg"));
             });
+    m_bucketAct->setObjectName("act.bucket");
+
+    auto* escClearAct = new QAction(this);
+    escClearAct->setShortcut(QKeySequence(Qt::Key_Escape));
+    escClearAct->setShortcutContext(Qt::ApplicationShortcut);
+    connect(escClearAct, &QAction::triggered, this,
+            [this]()
+            {
+                if (!app().hasDocument())
+                    return;
+                app().clearSelectionRect();
+                if (canvas_)
+                    canvas_->clearSelectionRect();
+            });
+    addAction(escClearAct);
 }
 
 void MainWindow::createMenus()
@@ -419,6 +637,7 @@ void MainWindow::createMenus()
 
     /* Tool menu */
     m_cmdMenu = menuBar()->addMenu(tr("&Outils"));
+    m_cmdMenu->addAction(m_moveLayerAct);
     m_cmdMenu->addAction(m_selectToggleAct);
     m_cmdMenu->addAction(m_clearSelectionAct);
     m_cmdMenu->addSeparator();
@@ -449,25 +668,26 @@ void MainWindow::addNewLayer()
     spec.visible = true;
     spec.locked = false;
     spec.opacity = 1.f;
-    spec.color = common::colors::Transparent;
 
     const int defW = app().document().width();
     const int defH = app().document().height();
 
-    QDialog dlg(
-        this);  // TODO: support layer size (w/h) in AppService::addLayer (resize layer buffer or add "LayerSpec size")
+    QDialog dlg(this);
     dlg.setWindowTitle(tr("Ajouter un calque"));
-    QVBoxLayout* dlgLayout = new QVBoxLayout(&dlg);
+    auto* dlgLayout = new QVBoxLayout(&dlg);
 
-    QHBoxLayout* sizeLayout = new QHBoxLayout();
-    QLabel* wLabel = new QLabel(tr("Largeur:"), &dlg);
-    QSpinBox* wSpin = new QSpinBox(&dlg);
+    // --- Size row ---
+    auto* sizeLayout = new QHBoxLayout();
+    auto* wLabel = new QLabel(tr("Largeur:"), &dlg);
+    auto* wSpin = new QSpinBox(&dlg);
     wSpin->setRange(1, 10000);
     wSpin->setValue(defW);
-    QLabel* hLabel = new QLabel(tr("Hauteur:"), &dlg);
-    QSpinBox* hSpin = new QSpinBox(&dlg);
+
+    auto* hLabel = new QLabel(tr("Hauteur:"), &dlg);
+    auto* hSpin = new QSpinBox(&dlg);
     hSpin->setRange(1, 10000);
     hSpin->setValue(defH);
+
     sizeLayout->addWidget(wLabel);
     sizeLayout->addWidget(wSpin);
     sizeLayout->addSpacing(8);
@@ -475,63 +695,100 @@ void MainWindow::addNewLayer()
     sizeLayout->addWidget(hSpin);
     dlgLayout->addLayout(sizeLayout);
 
-    QHBoxLayout* colorLayout = new QHBoxLayout();
-    QCheckBox* fillCheck = new QCheckBox(tr("Remplir avec une couleur"), &dlg);
-    QPushButton* colorBtn = new QPushButton(tr("Choisir la couleur"), &dlg);
-    QLabel* colorPreview = new QLabel(&dlg);
+    // --- Color / transparent row ---
+    auto* colorLayout = new QHBoxLayout();
+
+    // New behavior: default color always defined, checkbox is "transparent layer"
+    auto* transparentCheck = new QCheckBox(tr("Créer un calque transparent"), &dlg);
+
+    auto* colorBtn = new QPushButton(tr("Choisir la couleur"), &dlg);
+    auto* colorPreview = new QLabel(&dlg);
     colorPreview->setFixedSize(24, 24);
     colorPreview->setFrameStyle(QFrame::Box | QFrame::Plain);
     colorPreview->setAutoFillBackground(true);
-    QColor chosenColor = QColor(255, 255, 255, 255);
+
+    QColor chosenColor(255, 255, 255, 255);  // default fill: white opaque
+
     auto updatePreview = [&]()
     {
-        QPalette pal = colorPreview->palette();
-        pal.setColor(QPalette::Window, chosenColor);
-        colorPreview->setPalette(pal);
+        if (transparentCheck->isChecked())
+        {
+            // show "transparent" preview (simple: transparent bg)
+            QPalette pal = colorPreview->palette();
+            pal.setColor(QPalette::Window, Qt::transparent);
+            colorPreview->setPalette(pal);
+        }
+        else
+        {
+            QPalette pal = colorPreview->palette();
+            pal.setColor(QPalette::Window, chosenColor);
+            colorPreview->setPalette(pal);
+        }
+        colorPreview->update();
     };
+
     updatePreview();
-    connect(colorBtn, &QPushButton::clicked, &dlg,
-            [&]()
-            {
-                QColor c = QColorDialog::getColor(chosenColor, &dlg, tr("Choisir la couleur"));
-                if (c.isValid())
-                {
-                    chosenColor = c;
-                    updatePreview();
-                }
-            });
-    colorLayout->addWidget(fillCheck);
+
+    QObject::connect(colorBtn, &QPushButton::clicked, &dlg,
+                     [&]()
+                     {
+                         QColor c =
+                             QColorDialog::getColor(chosenColor, &dlg, tr("Choisir la couleur"));
+                         if (c.isValid())
+                         {
+                             chosenColor = c;
+                             updatePreview();
+                         }
+                     });
+
+    QObject::connect(transparentCheck, &QCheckBox::toggled, &dlg,
+                     [&](bool on)
+                     {
+                         colorBtn->setEnabled(!on);
+                         updatePreview();
+                     });
+
+    colorLayout->addWidget(transparentCheck);
+    colorLayout->addStretch();
     colorLayout->addWidget(colorBtn);
     colorLayout->addWidget(colorPreview);
     dlgLayout->addLayout(colorLayout);
 
-    QHBoxLayout* buttons = new QHBoxLayout();
+    // --- Buttons row ---
+    auto* buttons = new QHBoxLayout();
     buttons->addStretch();
-    QPushButton* okBtn = new QPushButton(tr("OK"), &dlg);
-    QPushButton* cancelBtn = new QPushButton(tr("Annuler"), &dlg);
+    auto* okBtn = new QPushButton(tr("OK"), &dlg);
+    auto* cancelBtn = new QPushButton(tr("Annuler"), &dlg);
     buttons->addWidget(okBtn);
     buttons->addWidget(cancelBtn);
     dlgLayout->addLayout(buttons);
-    connect(okBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
-    connect(cancelBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
+
+    QObject::connect(okBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+    QObject::connect(cancelBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
 
     if (dlg.exec() != QDialog::Accepted)
         return;
 
-    int w = wSpin->value();
-    int h = hSpin->value();
-    const bool fillWithColor = fillCheck->isChecked();
-
+    const int w = wSpin->value();
+    const int h = hSpin->value();
     if (w <= 0 || h <= 0)
         return;
 
-    if (fillWithColor)
+    spec.width = w;
+    spec.height = h;
+
+    if (transparentCheck->isChecked())
+    {
+        spec.color = common::colors::Transparent;
+    }
+    else
     {
         spec.color = (static_cast<uint32_t>(chosenColor.red()) << 24) |
                      (static_cast<uint32_t>(chosenColor.green()) << 16) |
                      (static_cast<uint32_t>(chosenColor.blue()) << 8) |
                      static_cast<uint32_t>(chosenColor.alpha());
     }
+
     app().addLayer(spec);
 }
 
@@ -578,12 +835,97 @@ void MainWindow::addImageAsLayer()
 void MainWindow::createLayersPanel()
 {
     m_layersDock = new QDockWidget(tr("Calques"), this);
-    m_layersList = new QListWidget(m_layersDock);
+
+    auto* root = new QWidget(m_layersDock);
+    auto* v = new QVBoxLayout(root);
+    v->setContentsMargins(6, 6, 6, 6);
+    v->setSpacing(6);
+
+    // --- header bar ---
+    auto* header = new QWidget(root);
+    auto* h = new QHBoxLayout(header);
+    h->setContentsMargins(0, 0, 0, 0);
+    h->setSpacing(4);
+
+    m_layerAddBtn = new QToolButton(header);
+    m_layerAddBtn->setIcon(QIcon(":/icons/add_layer.svg"));
+    m_layerAddBtn->setToolTip(tr("Ajouter un calque"));
+    m_layerAddBtn->setObjectName("btn.layer.add");
+
+    m_layerDeleteBtn = new QToolButton(header);
+    m_layerDeleteBtn->setIcon(QIcon(":/icons/remove_layer.svg"));
+    m_layerDeleteBtn->setToolTip(tr("Supprimer le calque"));
+    m_layerDeleteBtn->setObjectName("btn.layer.del");
+
+    m_layerUpBtn = new QToolButton(header);
+    m_layerUpBtn->setIcon(QIcon(":/icons/layer_up.svg"));
+    m_layerUpBtn->setToolTip(tr("Monter"));
+    m_layerUpBtn->setObjectName("btn.layer.up");
+
+    m_layerDownBtn = new QToolButton(header);
+    m_layerDownBtn->setIcon(QIcon(":/icons/layer_down.svg"));
+    m_layerDownBtn->setToolTip(tr("Descendre"));
+    m_layerDownBtn->setObjectName("btn.layer.down");
+
+    m_layerMergeDownBtn = new QToolButton(header);
+    m_layerMergeDownBtn->setIcon(QIcon(":/icons/merge_layer_down.svg"));
+    m_layerMergeDownBtn->setToolTip(tr("Fusionner vers le bas"));
+    m_layerMergeDownBtn->setObjectName("btn.layer.mergeDown");
+
+    h->addWidget(m_layerAddBtn);
+    h->addWidget(m_layerDeleteBtn);
+    h->addSpacing(8);
+    h->addWidget(m_layerUpBtn);
+    h->addWidget(m_layerDownBtn);
+    h->addWidget(m_layerMergeDownBtn);
+    h->addStretch();
+
+    // --- list ---
+    m_layersList = new QListWidget(root);
     m_layersList->setSelectionMode(QAbstractItemView::SingleSelection);
-
-    m_layersList->setDragDropMode(QAbstractItemView::NoDragDrop);  //disable for the moment
-
+    m_layersList->setDragDropMode(QAbstractItemView::NoDragDrop);
     m_layersList->setContextMenuPolicy(Qt::CustomContextMenu);
+
+    v->addWidget(header);
+    v->addWidget(m_layersList);
+
+    m_layersDock->setWidget(root);
+    addDockWidget(Qt::RightDockWidgetArea, m_layersDock);
+
+    // --- connections ---
+    connect(m_layerAddBtn, &QToolButton::clicked, this, &MainWindow::addNewLayer);
+
+    connect(m_layerUpBtn, &QToolButton::clicked, this, &MainWindow::moveLayerUp);
+    connect(m_layerDownBtn, &QToolButton::clicked, this, &MainWindow::moveLayerDown);
+
+    connect(m_layerMergeDownBtn, &QToolButton::clicked, this, &MainWindow::onMergeDown);
+
+    connect(m_layerDeleteBtn, &QToolButton::clicked, this,
+            [this]()
+            {
+                if (!app().hasDocument())
+                    return;
+
+                auto idxOpt = currentLayerIndexFromSelection();
+                if (!idxOpt.has_value())
+                    return;
+
+                const std::size_t idx = *idxOpt;
+                if (idx == 0)  // background
+                    return;
+
+                auto layer = app().document().layerAt(idx);
+                if (!layer || layer->locked())
+                    return;
+
+                const QString layerName = QString::fromStdString(layer->name());
+                if (QMessageBox::question(this, tr("Supprimer le calque"),
+                                          tr("Supprimer le calque %1 ?").arg(layerName),
+                                          QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
+                {
+                    app().removeLayer(idx);
+                }
+            });
 
     connect(m_layersList, &QListWidget::currentItemChanged, this,
             [this](QListWidgetItem* current, QListWidgetItem*)
@@ -593,18 +935,19 @@ void MainWindow::createLayersPanel()
 
                 const auto layerId =
                     static_cast<std::uint64_t>(current->data(Qt::UserRole).toULongLong());
-                std::optional<std::size_t> idx =
-                    app::commands::findLayerIndexById(app().document(), layerId);
+                auto idx = app::commands::findLayerIndexById(app().document(), layerId);
                 if (idx.has_value())
                     app().setActiveLayer(*idx);
+
+                updateLayerHeaderButtonsEnabled();
+                updateLayerOverlayFromSelection();
             });
 
     connect(m_layersList, &QListWidget::itemDoubleClicked, this, &MainWindow::onLayerDoubleClicked);
     connect(m_layersList, &QListWidget::customContextMenuRequested, this,
             &MainWindow::onShowLayerContextMenu);
 
-    m_layersDock->setWidget(m_layersList);
-    addDockWidget(Qt::RightDockWidgetArea, m_layersDock);
+    updateLayerHeaderButtonsEnabled();
 }
 
 void MainWindow::createToolBar()
@@ -617,14 +960,26 @@ void MainWindow::createToolBar()
     m_toolsGroup = new QActionGroup(this);
     m_toolsGroup->setExclusive(true);
 
+    // --- Move Layer (checkable tool, part of exclusive group)
+    if (m_moveLayerAct)
+    {
+        m_moveLayerAct->setCheckable(true);  // au cas où
+        m_toolsGroup->addAction(m_moveLayerAct);
+        m_toolsTb->addAction(m_moveLayerAct);
+    }
+
+    // --- Select tool (checkable tool, part of exclusive group)
     if (m_selectToggleAct)
     {
         m_selectToggleAct->setIcon(QIcon(":/icons/selection.svg"));
         m_selectToggleAct->setToolTip(tr("Sélection rectangulaire"));
         m_selectToggleAct->setCheckable(true);
+
         m_toolsGroup->addAction(m_selectToggleAct);
         m_toolsTb->addAction(m_selectToggleAct);
     }
+
+    // --- Clear selection (not a tool)
     if (m_clearSelectionAct)
     {
         m_clearSelectionAct->setIcon(QIcon(":/icons/clear_selection.svg"));
@@ -634,24 +989,28 @@ void MainWindow::createToolBar()
 
     m_toolsTb->addSeparator();
 
+    // --- Bucket tool (checkable tool, part of exclusive group)
     if (m_bucketAct)
     {
         m_bucketAct->setIcon(QIcon(":/icons/bucket.svg"));
         m_bucketAct->setToolTip(tr("Pot de peinture"));
         m_bucketAct->setCheckable(true);
+
         m_toolsGroup->addAction(m_bucketAct);
         m_toolsTb->addAction(m_bucketAct);
     }
 
+    // --- Fill color picker (not a tool)
     if (m_colorPickerAct)
     {
-        m_colorPickerAct->setToolTip(tr(
-            "Couleur de remplissage"));  // image de la pipette et ca modifie juste la couleur courante
+        m_colorPickerAct->setToolTip(tr("Couleur de remplissage"));
         m_toolsTb->addAction(m_colorPickerAct);
     }
 
+    // --- Pipette tool (checkable tool, part of exclusive group)
     if (m_pickAct)
     {
+        m_pickAct->setCheckable(true);
         m_toolsGroup->addAction(m_pickAct);
         m_toolsTb->addAction(m_pickAct);
     }
@@ -968,13 +1327,14 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
     QAction* mergeDownAct = menu.addAction(tr("Merge Down"));
     menu.addSeparator();
     QAction* renameAct = menu.addAction(tr("Renommer"));
-    // QAction* resizeAct = menu.addAction(tr("Redimensionner..."));
+    QAction* resizeAct = menu.addAction(tr("Redimensionner calque"));
     QAction* deleteAct = menu.addAction(tr("Supprimer"));
 
     const bool isBottomLayer = (idx == 0);
     const bool isLockedLayer = layer ? layer->locked() : false;
     renameAct->setEnabled(!isBottomLayer && !isLockedLayer);
     deleteAct->setEnabled(!isBottomLayer && !isLockedLayer);
+    resizeAct->setEnabled(!isBottomLayer && !isLockedLayer);
 
     const QAction* act = menu.exec(m_layersList->mapToGlobal(pos));
     if (!act)
@@ -989,65 +1349,95 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
         if (ok)
             app().setLayerName(idx, text.toStdString());
     }
-    /*else if (act == resizeAct) // revoir ca plus tard
+    else if (act == resizeAct)
     {
-        const int curW = app().document().width();
-        const int curH = app().document().height();
+        if (!layer || !layer->image())
+            return;
+
+        const int curW = layer->image()->width();
+        const int curH = layer->image()->height();
+        if (curW <= 0 || curH <= 0)
+            return;
 
         QDialog dlg(this);
         dlg.setWindowTitle(tr("Redimensionner le calque"));
-        QVBoxLayout* dlgLayout = new QVBoxLayout(&dlg);
 
-        QHBoxLayout* sizeLayout = new QHBoxLayout();
-        QLabel* wLabel = new QLabel(tr("Largeur:"), &dlg);
-        QSpinBox* wSpin = new QSpinBox(&dlg);
-        wSpin->setRange(1, 10000);
+        auto* v = new QVBoxLayout(&dlg);
+
+        // Row: W / H
+        auto* row = new QHBoxLayout();
+        auto* wLabel = new QLabel(tr("Largeur:"), &dlg);
+        auto* wSpin = new QSpinBox(&dlg);
+        wSpin->setRange(1, 20000);
         wSpin->setValue(curW);
-        QLabel* hLabel = new QLabel(tr("Hauteur:"), &dlg);
-        QSpinBox* hSpin = new QSpinBox(&dlg);
-        hSpin->setRange(1, 10000);
-        hSpin->setValue(curH);
-        sizeLayout->addWidget(wLabel);
-        sizeLayout->addWidget(wSpin);
-        sizeLayout->addSpacing(8);
-        sizeLayout->addWidget(hLabel);
-        sizeLayout->addWidget(hSpin);
-        dlgLayout->addLayout(sizeLayout);
 
-        QHBoxLayout* buttons = new QHBoxLayout();
-        buttons->addStretch();
-        QPushButton* okBtn = new QPushButton(tr("OK"), &dlg);
-        QPushButton* cancelBtn = new QPushButton(tr("Annuler"), &dlg);
-        buttons->addWidget(okBtn);
-        buttons->addWidget(cancelBtn);
-        dlgLayout->addLayout(buttons);
-        connect(okBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
-        connect(cancelBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
+        auto* hLabel = new QLabel(tr("Hauteur:"), &dlg);
+        auto* hSpin = new QSpinBox(&dlg);
+        hSpin->setRange(1, 20000);
+        hSpin->setValue(curH);
+
+        row->addWidget(wLabel);
+        row->addWidget(wSpin);
+        row->addSpacing(10);
+        row->addWidget(hLabel);
+        row->addWidget(hSpin);
+        v->addLayout(row);
+
+        // Row: keep ratio
+        auto* keepRatio = new QCheckBox(tr("Garder proportions 🔗"), &dlg);
+        keepRatio->setChecked(true);
+        v->addWidget(keepRatio);
+
+        // Buttons
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+        v->addWidget(buttons);
+        connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+        connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+        // Ratio logic
+        const double ratio = static_cast<double>(curW) / static_cast<double>(curH);
+        bool guard = false;
+
+        auto syncHFromW = [&]()
+        {
+            if (!keepRatio->isChecked() || guard)
+                return;
+            guard = true;
+            const int w = wSpin->value();
+            const int h = std::max(1, static_cast<int>(std::lround(w / ratio)));
+            hSpin->setValue(h);
+            guard = false;
+        };
+
+        auto syncWFromH = [&]()
+        {
+            if (!keepRatio->isChecked() || guard)
+                return;
+            guard = true;
+            const int h = hSpin->value();
+            const int w = std::max(1, static_cast<int>(std::lround(h * ratio)));
+            wSpin->setValue(w);
+            guard = false;
+        };
+
+        connect(wSpin, qOverload<int>(&QSpinBox::valueChanged), &dlg, [&](int) { syncHFromW(); });
+        connect(hSpin, qOverload<int>(&QSpinBox::valueChanged), &dlg, [&](int) { syncWFromH(); });
+        connect(keepRatio, &QCheckBox::toggled, &dlg,
+                [&](bool on)
+                {
+                    if (on)
+                        syncHFromW();
+                });
 
         if (dlg.exec() != QDialog::Accepted)
             return;
 
-        const int w = wSpin->value();
-        const int h = hSpin->value();
+        const int newW = wSpin->value();
+        const int newH = hSpin->value();
 
-        auto lyr = app().document().layerAt(*idx);
-        if (lyr && lyr->image())
-        {
-            ImageBuffer newBuf(w, h);
-            newBuf.fill(0u);
-            const ImageBuffer& old = *lyr->image();
-            const int copyW = std::min(w, old.width());
-            const int copyH = std::min(h, old.height());
-            for (int yy = 0; yy < copyH; ++yy)
-            {
-                for (int xx = 0; xx < copyW; ++xx)
-                {
-                    newBuf.setPixel(xx, yy, old.getPixel(xx, yy));
-                }
-            }
-            lyr->setImageBuffer(std::make_shared<ImageBuffer>(newBuf));
-        }
-    } */
+        const bool smooth = true;
+        app().resizeLayer(idx, newW, newH, smooth);
+    }
     else if (act == deleteAct)
     {
         const QString layerName = QString::fromStdString(layer ? layer->name() : "");
@@ -1108,6 +1498,72 @@ QPixmap MainWindow::createLayerThumbnail(const std::shared_ptr<Layer>& layer,
     }
 
     return canvas;
+}
+
+std::optional<std::size_t> MainWindow::currentLayerIndexFromSelection() const
+{
+    if (!m_layersList || !app().hasDocument())
+        return std::nullopt;
+
+    auto* cur = m_layersList->currentItem();
+    if (!cur)
+        return std::nullopt;
+
+    const auto layerId = static_cast<std::uint64_t>(cur->data(Qt::UserRole).toULongLong());
+    return app::commands::findLayerIndexById(app().document(), layerId);
+}
+
+void MainWindow::updateLayerHeaderButtonsEnabled()
+{
+    const bool hasDoc = app().hasDocument();
+    if (!hasDoc)
+    {
+        if (m_layerDeleteBtn)
+            m_layerDeleteBtn->setEnabled(false);
+        if (m_layerUpBtn)
+            m_layerUpBtn->setEnabled(false);
+        if (m_layerDownBtn)
+            m_layerDownBtn->setEnabled(false);
+        if (m_layerMergeDownBtn)
+            m_layerMergeDownBtn->setEnabled(false);
+        if (m_layerAddBtn)
+            m_layerAddBtn->setEnabled(false);
+        return;
+    }
+
+    if (m_layerAddBtn)
+        m_layerAddBtn->setEnabled(true);
+
+    auto idxOpt = currentLayerIndexFromSelection();
+    if (!idxOpt.has_value())
+    {
+        if (m_layerDeleteBtn)
+            m_layerDeleteBtn->setEnabled(false);
+        if (m_layerUpBtn)
+            m_layerUpBtn->setEnabled(false);
+        if (m_layerDownBtn)
+            m_layerDownBtn->setEnabled(false);
+        if (m_layerMergeDownBtn)
+            m_layerMergeDownBtn->setEnabled(false);
+        return;
+    }
+
+    const std::size_t idx = *idxOpt;
+    const auto n = app().document().layerCount();
+    auto layer = app().document().layerAt(idx);
+
+    const bool isBottom = (idx == 0);
+    const bool isLocked = (layer && layer->locked());
+
+    if (m_layerDeleteBtn)
+        m_layerDeleteBtn->setEnabled(!isBottom && !isLocked);
+    if (m_layerMergeDownBtn)
+        m_layerMergeDownBtn->setEnabled(!isBottom && !isLocked);
+
+    if (m_layerUpBtn)
+        m_layerUpBtn->setEnabled(idx + 1 < n);
+    if (m_layerDownBtn)
+        m_layerDownBtn->setEnabled(idx > 0);
 }
 
 void MainWindow::onMergeDown()
@@ -1198,25 +1654,22 @@ void MainWindow::clearSelection()
     if (!app().hasDocument())
         return;
     app().clearSelectionRect();
-    if (canvas_)
-        canvas_->clearSelectionRect();
-
-    // TODO: render selection overlay from doc selection, not from CanvasWidget local state.
 }
 
 void MainWindow::toggleSelectionMode(bool enabled)
 {
+    if (enabled)
+    {
+        if (m_moveLayerAct)
+            m_moveLayerAct->setChecked(false);
+        if (m_bucketAct)
+            m_bucketAct->setChecked(false);
+        m_bucketMode = false;
+    }
     if (canvas_)
         canvas_->setSelectionEnable(enabled);
     if (m_selectToggleAct)
         m_selectToggleAct->setChecked(enabled);
-
-    // si on active la sélection, désactiver le pot de peinture
-    if (enabled && m_bucketAct)
-    {
-        m_bucketAct->setChecked(false);
-        m_bucketMode = false;
-    }
 }
 
 void MainWindow::newImage()
@@ -1248,6 +1701,58 @@ void MainWindow::newImage()
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
 
+    // --- Background controls ---
+    auto* bgLayout = new QHBoxLayout();
+
+    auto* transparentBgCheck = new QCheckBox(tr("Créer un calque transparent"), &dialog);
+    transparentBgCheck->setChecked(false);
+
+    auto* colorBtn = new QPushButton(tr("Choisir la couleur"), &dialog);
+    auto* colorPreview = new QLabel(&dialog);
+    colorPreview->setFixedSize(24, 24);
+    colorPreview->setFrameStyle(QFrame::Box | QFrame::Plain);
+    colorPreview->setAutoFillBackground(true);
+
+    // default: white background
+    QColor canvasColor = QColor(255, 255, 255, 255);
+
+    auto updatePreview = [&]()
+    {
+        QPalette pal = colorPreview->palette();
+        pal.setColor(QPalette::Window, canvasColor);
+        colorPreview->setPalette(pal);
+    };
+    updatePreview();
+
+    auto updateBgUiEnabled = [&]()
+    {
+        const bool isTransparent = transparentBgCheck->isChecked();
+        colorBtn->setEnabled(!isTransparent);
+        colorPreview->setEnabled(!isTransparent);
+    };
+    updateBgUiEnabled();
+
+    connect(transparentBgCheck, &QCheckBox::toggled, &dialog, [&](bool) { updateBgUiEnabled(); });
+
+    connect(colorBtn, &QPushButton::clicked, &dialog,
+            [&]()
+            {
+                QColor c =
+                    QColorDialog::getColor(canvasColor, &dialog, tr("Choisir la couleur du fond"));
+                if (c.isValid())
+                {
+                    canvasColor = c;
+                    updatePreview();
+                }
+            });
+
+    bgLayout->addWidget(transparentBgCheck);
+    bgLayout->addSpacing(8);
+    bgLayout->addWidget(colorBtn);
+    bgLayout->addWidget(colorPreview);
+    bgLayout->addStretch();
+
+    mainLayout->addLayout(bgLayout);
     mainLayout->addLayout(wLay);
     mainLayout->addLayout(hLay);
     mainLayout->addWidget(buttons);
@@ -1256,7 +1761,21 @@ void MainWindow::newImage()
         return;
 
     m_currentFileName.clear();
-    app().newDocument({wSpin->value(), hSpin->value()}, 72.f);
+    std::uint32_t bgColor = common::colors::White;
+
+    if (transparentBgCheck->isChecked())
+    {
+        bgColor = common::colors::Transparent;
+    }
+    else
+    {
+        bgColor = (static_cast<uint32_t>(canvasColor.red()) << 24) |
+                  (static_cast<uint32_t>(canvasColor.green()) << 16) |
+                  (static_cast<uint32_t>(canvasColor.blue()) << 8) |
+                  static_cast<uint32_t>(canvasColor.alpha());
+    }
+
+    app().newDocument({wSpin->value(), hSpin->value()}, 72.f, bgColor);
     setWindowTitle(tr("Sans titre - EpiGimp 2.0"));
     statusBar()->showMessage(
         tr("Nouvelle image créée: %1x%2").arg(wSpin->value()).arg(hSpin->value()), 2000);

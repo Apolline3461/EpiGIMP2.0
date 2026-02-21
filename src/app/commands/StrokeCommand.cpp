@@ -91,11 +91,18 @@ void StrokeCommand::buildChanges()
     const int w = img->width();
     const int h = img->height();
 
+    const int offX = layer->offsetX();
+    const int offY = layer->offsetY();
+
     std::unordered_map<std::uint64_t, PixelChange> map;
     map.reserve(256);
 
+
     auto recordPixel = [&](int x, int y, std::uint32_t afterColor)
     {
+        const int x = docX - offX;
+        const int y = docY - offY;
+
         if (x < 0 || y < 0 || x >= w || y >= h)
             return;
 
