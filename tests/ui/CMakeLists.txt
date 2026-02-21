@@ -3,7 +3,7 @@
 set(EPIGIMP_UI_TEST_SOURCES
         test_MainWindow.cpp
         test_ImageConversion.cpp
-        test_pan_clamp.cpp
+        test_PanClamp.cpp
 )
 
 add_executable(test_ui

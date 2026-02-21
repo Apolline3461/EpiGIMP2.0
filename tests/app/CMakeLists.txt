@@ -3,7 +3,8 @@ set(EPIGIMP_APP_TEST_SOURCES
         test_History.cpp
         test_BucketFill.cpp
         test_Signals.cpp
-        test_epg.cpp
+        test_Epg.cpp
+        test_MoveLayer.cpp
 )
 
 add_executable(test_app

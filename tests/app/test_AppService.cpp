@@ -5,15 +5,16 @@
 #include <memory>
 #include <string>
 #include <unordered_set>
-#include <gtest/gtest.h>
 
 #include "app/AppService.hpp"
+#include "AppServiceUtilsForTest.hpp"
+#include "common/Colors.hpp"
+#include "common/Geometry.hpp"
 #include "core/Document.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
-#include "common/Geometry.hpp"
-#include "common/Colors.hpp"
-#include "AppServiceUtilsForTest.hpp"
+
+#include <gtest/gtest.h>
 
 static void addOneEditableLayer(app::AppService& svc, std::string name = "Layer 1")
 {

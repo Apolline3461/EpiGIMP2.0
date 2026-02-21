@@ -330,6 +330,34 @@ void AppService::mergeLayerDown(std::size_t from)
     apply(commands::makeMergeDownCommand(doc_.get(), layer, static_cast<int>(from), &activeLayer_));
 }
 
+void AppService::moveLayer(std::size_t idx, int newOffsetX, int newOffsetY)
+{
+    if (!doc_)
+        throw std::runtime_error("moveLayer: document is null");
+
+    const auto n = doc_->layerCount();
+    if (idx >= n)
+        throw std::out_of_range("moveLayer: index out of range");
+
+    if (idx == 0)
+        return;  // ou throw si tu préfères interdire le move du background
+
+    auto layer = doc_->layerAt(idx);
+    if (!layer)
+        throw std::runtime_error("moveLayer: layer is null");
+
+    if (layer->locked())
+        throw std::runtime_error("moveLayer: layer locked");
+
+    const common::Point before{layer->offsetX(), layer->offsetY()};
+    const common::Point after{newOffsetX, newOffsetY};
+
+    if (before.x == after.x && before.y == after.y)
+        return;
+
+    apply(commands::makeMoveLayerCommand(doc_.get(), layer->id(), before, after));
+}
+
 void AppService::beginStroke(const ToolParams& params, common::Point pStart)
 {
     if (!doc_)

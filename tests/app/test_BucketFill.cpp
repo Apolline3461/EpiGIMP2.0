@@ -1,15 +1,16 @@
 //
 // Created by apolline on 20/02/2026.
 //
-#include <gtest/gtest.h>
 #include <memory>
 
 #include "app/AppService.hpp"
-#include "common/Geometry.hpp"
+#include "AppServiceUtilsForTest.hpp"
 #include "common/Colors.hpp"
+#include "common/Geometry.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
-#include "AppServiceUtilsForTest.hpp"
+
+#include <gtest/gtest.h>
 
 TEST(AppService_BucketFill, NoSelection_FillsAndUndoRedoWorks)
 {

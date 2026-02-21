@@ -139,12 +139,22 @@ class MainWindow : public QMainWindow
 
     QAction* m_clearSelectionAct{nullptr};
     QAction* m_selectToggleAct{nullptr};
-    QAction* m_bucketAct{nullptr};
-    QAction* m_colorPickerAct{nullptr};
-    QAction* m_pickAct{nullptr};
+
     bool m_bucketMode{false};
     bool m_pickMode{false};
     QColor m_bucketColor{Qt::black};
+    QAction* m_bucketAct{nullptr};
+    QAction* m_colorPickerAct{nullptr};
+    QAction* m_pickAct{nullptr};
+
+    QAction* m_moveLayerAct{nullptr};
+    bool m_moveLayerMode{false};
+    bool m_dragLayerActive{false};
+    std::size_t m_dragLayerIdx{0};
+    common::Point m_dragStartDoc{0, 0};
+    common::Point m_dragStartOffset{0, 0};
+    QImage m_dragBaseImage;   // rendu "base" pendant le drag (doc sans le layer déplacé)
+    QImage m_dragLayerImage;  // image du layer déplacé (seul)
 
     bool m_handMode{false};
     bool m_panningActive{false};

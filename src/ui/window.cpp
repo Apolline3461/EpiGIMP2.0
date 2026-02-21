@@ -86,6 +86,92 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
                 app().bucketFill(p, newColor);
             });
 
+    connect(
+        canvas_, &CanvasWidget::beginDragDoc, this,
+        [this](common::Point p)
+        {
+            if (!m_moveLayerMode || !app().hasDocument() || !canvas_)
+                return;
+
+            auto idxOpt = currentLayerIndexFromSelection();
+            if (!idxOpt || *idxOpt == 0)
+                return;
+
+            const std::size_t idx = *idxOpt;
+            auto layer = app().document().layerAt(idx);
+            if (!layer || !layer->image() || layer->locked())
+                return;
+
+            // hit test local layer
+            const int lx = p.x - layer->offsetX();
+            const int ly = p.y - layer->offsetY();
+            if (lx < 0 || ly < 0 || lx >= layer->image()->width() || ly >= layer->image()->height())
+                return;
+
+            // drag state
+            m_dragLayerActive = true;
+            m_dragLayerIdx = idx;
+            m_dragStartDoc = p;
+            m_dragStartOffset = {layer->offsetX(), layer->offsetY()};
+
+            // layer image for preview (once)
+            m_dragLayerImage = ImageConversion::imageBufferToQImage(
+                *layer->image(), QImage::Format_ARGB32_Premultiplied);
+
+            // base render without this layer (once)
+            const bool oldVis = layer->visible();
+            layer->setVisible(false);
+            m_dragBaseImage = Renderer::render(app().document());
+            layer->setVisible(oldVis);
+
+            canvas_->setImage(m_dragBaseImage);
+            canvas_->setDragLayerPreview(m_dragLayerImage, m_dragStartOffset.x,
+                                         m_dragStartOffset.y);
+
+            // update yellow overlay to match preview
+            canvas_->setLayerRectOverlay(common::Rect{m_dragStartOffset.x, m_dragStartOffset.y,
+                                                      m_dragLayerImage.width(),
+                                                      m_dragLayerImage.height()});
+        });
+
+    connect(canvas_, &CanvasWidget::dragDoc, this,
+            [this](common::Point p)
+            {
+                if (!m_dragLayerActive || !canvas_)
+                    return;
+
+                const common::Point delta{p.x - m_dragStartDoc.x, p.y - m_dragStartDoc.y};
+                const int newX = m_dragStartOffset.x + delta.x;
+                const int newY = m_dragStartOffset.y + delta.y;
+
+                // no render here
+                canvas_->setDragLayerPos(newX, newY);
+                canvas_->setLayerRectOverlay(
+                    common::Rect{newX, newY, m_dragLayerImage.width(), m_dragLayerImage.height()});
+            });
+
+    connect(canvas_, &CanvasWidget::endDragDoc, this,
+            [this](common::Point p)
+            {
+                if (!m_dragLayerActive || !canvas_ || !app().hasDocument())
+                    return;
+
+                const common::Point delta{p.x - m_dragStartDoc.x, p.y - m_dragStartDoc.y};
+                const int newX = m_dragStartOffset.x + delta.x;
+                const int newY = m_dragStartOffset.y + delta.y;
+
+                // stop preview BEFORE pushing (documentChanged will re-render normal doc)
+                m_dragLayerActive = false;
+                canvas_->clearDragLayerPreview();
+
+                // clear caches
+                m_dragBaseImage = QImage();
+                m_dragLayerImage = QImage();
+
+                // undoable commit
+                app().moveLayer(m_dragLayerIdx, newX, newY);
+            });
+
     app().documentChanged.connect([this]() { refreshUIAfterDocChange(); });
 
     refreshUIAfterDocChange();
@@ -93,7 +179,11 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
 
 void MainWindow::refreshUIAfterDocChange()
 {
+    if (m_dragLayerActive)
+        return;
+
     const bool hasDoc = app().hasDocument();
+
     if (m_zoomInAct)
         m_zoomInAct->setEnabled(hasDoc);
     if (m_zoomOutAct)
@@ -117,27 +207,31 @@ void MainWindow::refreshUIAfterDocChange()
         m_clearSelectionAct->setEnabled(hasDoc);
     if (m_colorPickerAct)
         m_colorPickerAct->setEnabled(hasDoc);
+    if (m_moveLayerAct)
+        m_moveLayerAct->setEnabled(hasDoc);
 
     if (!hasDoc)
     {
+        if (canvas_)
+        {
+            canvas_->setMoveLayerEnable(false);
+            canvas_->clearDragLayerPreview();
+        }
         clearUiStateOnClose();
         return;
     }
-    canvas_->setImage(Renderer::render(app().document()));
+
+    if (canvas_)
+        canvas_->setImage(Renderer::render(app().document()));
 
     {
         QSignalBlocker blocker(m_layersList);
         populateLayersList();
 
         const auto& sel = app().document().selection();
-        if (!sel.hasMask())
-        {
-            canvas_->setSelectionRectOverlay(std::nullopt);
-        }
-        else
-        {
-            canvas_->setSelectionRectOverlay(sel.boundingRect());
-        }
+        canvas_->setSelectionRectOverlay(sel.hasMask() ? std::optional(sel.boundingRect())
+                                                       : std::nullopt);
+
         if (m_pendingSelectLayerId_)
         {
             selectLayerInListById(*m_pendingSelectLayerId_);
@@ -150,7 +244,9 @@ void MainWindow::refreshUIAfterDocChange()
             if (layer)
                 selectLayerInListById(layer->id());
         }
-    }  // unlock signals
+    }
+    if (canvas_ && m_moveLayerAct)
+        canvas_->setMoveLayerEnable(m_moveLayerAct->isChecked());
 
     updateLayerHeaderButtonsEnabled();
     updateLayerOverlayFromSelection();
@@ -206,6 +302,7 @@ void MainWindow::clearUiStateOnClose()
     {
         canvas_->clear();
         canvas_->setSelectionEnable(false);
+        canvas_->setMoveLayerEnable(false);
     }
     if (m_layersList)
         m_layersList->clear();
@@ -215,8 +312,11 @@ void MainWindow::clearUiStateOnClose()
         m_pickAct->setChecked(false);
     if (m_selectToggleAct)
         m_selectToggleAct->setChecked(false);
+    if (m_moveLayerAct)
+        m_moveLayerAct->setChecked(false);
     m_bucketMode = false;
     m_pickMode = false;
+    m_moveLayerMode = false;
 }
 
 void MainWindow::createActions()
@@ -292,6 +392,38 @@ void MainWindow::createActions()
     m_layerDownAct->setShortcut(QKeySequence("Ctrl+["));
     connect(m_layerDownAct, &QAction::triggered, this, &MainWindow::moveLayerDown);
 
+    m_moveLayerAct = new QAction(tr("Déplacer le calque"), this);
+    m_moveLayerAct->setCheckable(true);
+    m_moveLayerAct->setChecked(false);
+    m_moveLayerAct->setIcon(QIcon(":/icons/mouse.svg"));
+    m_moveLayerAct->setShortcut(QKeySequence("Ctrl+M"));
+    m_moveLayerAct->setStatusTip("Permet de déplacer le calque sélectionné");
+    m_moveLayerAct->setObjectName("act.moveLayer");
+    connect(
+        m_moveLayerAct, &QAction::toggled, this,
+        [this](bool on)
+        {
+            m_moveLayerMode = on;
+
+            m_moveLayerAct->setIcon(QIcon(on ? ":/icons/mouse_select.svg" : ":/icons/mouse.svg"));
+            if (canvas_)
+                canvas_->setMoveLayerEnable(on);
+            if (on)
+            {
+                if (m_bucketAct)
+                    m_bucketAct->setChecked(false);
+                if (m_pickAct)
+                    m_pickAct->setChecked(false);
+                if (m_selectToggleAct)
+                    m_selectToggleAct->setChecked(false);
+
+                m_bucketMode = false;
+                m_pickMode = false;
+
+                if (canvas_)
+                    canvas_->setSelectionEnable(false);
+            }
+        });
     /* Color Picker */
     m_pickAct = new QAction(tr("Pipette"), this);
     m_pickAct->setCheckable(true);
@@ -310,6 +442,8 @@ void MainWindow::createActions()
                     m_bucketMode = false;
                     if (canvas_)
                         canvas_->setSelectionEnable(false);
+                    if (m_moveLayerAct)
+                        m_moveLayerAct->setChecked(false);
                     m_pickAct->setIcon(QIcon(":/icons/color_picker_selec.svg"));
                 }
                 else
@@ -396,6 +530,8 @@ void MainWindow::createActions()
                 {
                     m_selectToggleAct->setChecked(false);
                     m_bucketAct->setIcon(QIcon(":/icons/bucket_selec.svg"));
+                    if (m_moveLayerAct)
+                        m_moveLayerAct->setChecked(false);
                 }
                 else
                     m_bucketAct->setIcon(QIcon(":/icons/bucket.svg"));
@@ -448,6 +584,7 @@ void MainWindow::createMenus()
 
     /* Tool menu */
     m_cmdMenu = menuBar()->addMenu(tr("&Outils"));
+    m_cmdMenu->addAction(m_moveLayerAct);
     m_cmdMenu->addAction(m_selectToggleAct);
     m_cmdMenu->addAction(m_clearSelectionAct);
     m_cmdMenu->addSeparator();
@@ -770,14 +907,26 @@ void MainWindow::createToolBar()
     m_toolsGroup = new QActionGroup(this);
     m_toolsGroup->setExclusive(true);
 
+    // --- Move Layer (checkable tool, part of exclusive group)
+    if (m_moveLayerAct)
+    {
+        m_moveLayerAct->setCheckable(true);  // au cas où
+        m_toolsGroup->addAction(m_moveLayerAct);
+        m_toolsTb->addAction(m_moveLayerAct);
+    }
+
+    // --- Select tool (checkable tool, part of exclusive group)
     if (m_selectToggleAct)
     {
         m_selectToggleAct->setIcon(QIcon(":/icons/selection.svg"));
         m_selectToggleAct->setToolTip(tr("Sélection rectangulaire"));
         m_selectToggleAct->setCheckable(true);
+
         m_toolsGroup->addAction(m_selectToggleAct);
         m_toolsTb->addAction(m_selectToggleAct);
     }
+
+    // --- Clear selection (not a tool)
     if (m_clearSelectionAct)
     {
         m_clearSelectionAct->setIcon(QIcon(":/icons/clear_selection.svg"));
@@ -787,24 +936,28 @@ void MainWindow::createToolBar()
 
     m_toolsTb->addSeparator();
 
+    // --- Bucket tool (checkable tool, part of exclusive group)
     if (m_bucketAct)
     {
         m_bucketAct->setIcon(QIcon(":/icons/bucket.svg"));
         m_bucketAct->setToolTip(tr("Pot de peinture"));
         m_bucketAct->setCheckable(true);
+
         m_toolsGroup->addAction(m_bucketAct);
         m_toolsTb->addAction(m_bucketAct);
     }
 
+    // --- Fill color picker (not a tool)
     if (m_colorPickerAct)
     {
-        m_colorPickerAct->setToolTip(tr(
-            "Couleur de remplissage"));  // image de la pipette et ca modifie juste la couleur courante
+        m_colorPickerAct->setToolTip(tr("Couleur de remplissage"));
         m_toolsTb->addAction(m_colorPickerAct);
     }
 
+    // --- Pipette tool (checkable tool, part of exclusive group)
     if (m_pickAct)
     {
+        m_pickAct->setCheckable(true);
         m_toolsGroup->addAction(m_pickAct);
         m_toolsTb->addAction(m_pickAct);
     }
@@ -1329,17 +1482,18 @@ void MainWindow::clearSelection()
 
 void MainWindow::toggleSelectionMode(bool enabled)
 {
+    if (enabled)
+    {
+        if (m_moveLayerAct)
+            m_moveLayerAct->setChecked(false);
+        if (m_bucketAct)
+            m_bucketAct->setChecked(false);
+        m_bucketMode = false;
+    }
     if (canvas_)
         canvas_->setSelectionEnable(enabled);
     if (m_selectToggleAct)
         m_selectToggleAct->setChecked(enabled);
-
-    // si on active la sélection, désactiver le pot de peinture
-    if (enabled && m_bucketAct)
-    {
-        m_bucketAct->setChecked(false);
-        m_bucketMode = false;
-    }
 }
 
 void MainWindow::newImage()

@@ -1,7 +1,6 @@
 //
 // Created by apolline on 14/02/2026.
 //
-
 #pragma once
 #include <QImage>
 #include <QPointF>
@@ -25,6 +24,7 @@ class CanvasWidget : public QWidget
     {
         return img_.size();
     }
+
     void setImage(const QImage& img);
     void clear();
 
@@ -33,6 +33,12 @@ class CanvasWidget : public QWidget
     void setLayerRectOverlay(std::optional<common::Rect> r);
     void setSelectionRect(const QRect& r);
     void clearSelectionRect();
+
+    void setMoveLayerEnable(bool enable);
+
+    void setDragLayerPreview(const QImage& layerImg, int x, int y);
+    void setDragLayerPos(int x, int y);
+    void clearDragLayerPreview();
 
     double scale() const
     {
@@ -43,16 +49,16 @@ class CanvasWidget : public QWidget
     void setPan(QPointF p);
     QPointF pan() const;
 
-    // conversions
     common::Point screenToDoc(const QPoint& sp) const;
     QPoint docToScreen(common::Point p) const;
 
    signals:
     void selectionFinishedDoc(common::Rect r);
     void clickedDoc(common::Point p);
-    // void beginDragDoc(common::Point p);
-    // void dragDoc(common::Point p);
-    // void endDragDoc(common::Point p);
+
+    void beginDragDoc(common::Point p);
+    void dragDoc(common::Point p);
+    void endDragDoc(common::Point p);
 
    protected:
     void paintEvent(QPaintEvent*) override;
@@ -68,12 +74,24 @@ class CanvasWidget : public QWidget
     bool panning_ = false;
     QPoint lastMouse_;
 
-    // selection overlay simple
+    // selection
     bool hasSel_ = false;
     QRect selScreen_;
     bool selectionEnabled_ = false;
+
+    // move layer
+    bool moveLayerEnabled_ = false;
+    bool draggingLayer_ = false;
+    common::Point dragStartDoc_{0, 0};
+
+    // overlays
     std::optional<common::Rect> selectionOverlay_;
     std::optional<common::Rect> layerOverlay_;
+
+    // drag preview
+    bool dragLayerPreviewOn_ = false;
+    QImage dragLayerImg_;
+    QPoint dragLayerPos_{0, 0};
 
     void drawChecker(QPainter& p);
     void clampPan();

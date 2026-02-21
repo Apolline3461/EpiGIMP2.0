@@ -2,11 +2,11 @@
 // Created by apolline on 20/02/2026.
 //
 
-#include <gtest/gtest.h>
-
 #include "app/AppService.hpp"
-#include "core/ImageBuffer.hpp"
 #include "AppServiceUtilsForTest.hpp"
+#include "core/ImageBuffer.hpp"
+
+#include <gtest/gtest.h>
 
 TEST(AppService_Signals, documentChanged_EmittedOnNewDocument) {
     const auto app = makeApp();

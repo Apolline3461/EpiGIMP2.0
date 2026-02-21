@@ -75,6 +75,7 @@ class AppService
     void removeLayer(std::size_t idx);
     void reorderLayer(std::size_t from, std::size_t to);
     void mergeLayerDown(std::size_t from);
+    void moveLayer(std::size_t idx, int newOffsetX, int newOffsetY);
 
     void beginStroke(const ToolParams&, common::Point pStart);
     void moveStroke(common::Point p);
