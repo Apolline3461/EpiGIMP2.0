@@ -37,6 +37,7 @@ class ImageLabel;
 class CanvasWidget;
 class QToolBar;
 class QActionGroup;
+class QSpinBox;
 
 class MainWindow : public QMainWindow
 {
@@ -155,6 +156,12 @@ class MainWindow : public QMainWindow
     common::Point m_dragStartOffset{0, 0};
     QImage m_dragBaseImage;   // rendu "base" pendant le drag (doc sans le layer déplacé)
     QImage m_dragLayerImage;  // image du layer déplacé (seul)
+    QColor m_toolColor{Qt::black};
+
+    QAction* m_pencilAct{nullptr};
+    QDockWidget* m_pencilDock{nullptr};
+    QSpinBox* m_pencilSizeSpin{nullptr};
+
 
     bool m_handMode{false};
     bool m_panningActive{false};

@@ -4,6 +4,7 @@
 #include "app/commands/StrokeCommand.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <iterator>
 #include <unordered_map>
@@ -96,7 +97,8 @@ void StrokeCommand::buildChanges()
     std::unordered_map<std::uint64_t, PixelChange> map;
     map.reserve(256);
 
-    auto record = [&](int docX, int docY)
+
+    auto recordPixel = [&](int x, int y, std::uint32_t afterColor)
     {
         const int x = docX - offX;
         const int y = docY - offY;
@@ -115,12 +117,40 @@ void StrokeCommand::buildChanges()
             ch.x = x;
             ch.y = y;
             ch.before = img->getPixel(x, y);
-            ch.after = params_.color;
+            ch.after = afterColor;
             map.emplace(key, ch);
         }
         else
         {
-            it->second.after = params_.color;
+            it->second.after = afterColor;
+        }
+    };
+
+    // Stamp a filled circle centered at (cx,cy) using params_.size as diameter
+    auto stampCircle = [&](int cx, int cy)
+    {
+        const int diameter = std::max(1, params_.size);
+        const double radius = static_cast<double>(diameter) * 0.5;
+        const int rInt = static_cast<int>(std::ceil(radius));
+
+        // Use after color directly (no hardness adjustment)
+        const std::uint32_t afterColor = params_.color;
+
+        const int x0 = cx - rInt;
+        const int x1 = cx + rInt;
+        const int y0 = cy - rInt;
+        const int y1 = cy + rInt;
+
+        const double r2 = radius * radius;
+        for (int yy = y0; yy <= y1; ++yy)
+        {
+            for (int xx = x0; xx <= x1; ++xx)
+            {
+                const double dx = static_cast<double>(xx) - static_cast<double>(cx);
+                const double dy = static_cast<double>(yy) - static_cast<double>(cy);
+                if (dx * dx + dy * dy <= r2)
+                    recordPixel(xx, yy, afterColor);
+            }
         }
     };
 
@@ -129,12 +159,12 @@ void StrokeCommand::buildChanges()
 
     if (points_.size() == 1)
     {
-        record(points_[0].x, points_[0].y);
+        stampCircle(points_[0].x, points_[0].y);
     }
     else
     {
         for (std::size_t i = 1; i < points_.size(); ++i)
-            rasterizeLine(points_[i - 1], points_[i], record);
+            rasterizeLine(points_[i - 1], points_[i], [&](int x, int y) { stampCircle(x, y); });
     }
 
     changes_.clear();

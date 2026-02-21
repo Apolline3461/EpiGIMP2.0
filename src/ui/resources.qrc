@@ -3,6 +3,7 @@
   <qresource prefix="/">
     <file>icons/mouse.svg</file>
     <file>icons/mouse_select.svg</file>
+    <file>icons/pencil.svg</file>
     <file>icons/selection.svg</file>
     <file>icons/clear_selection.svg</file>
     <file>icons/eye.svg</file>
