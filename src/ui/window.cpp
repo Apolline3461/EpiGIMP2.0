@@ -1182,13 +1182,14 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
     QAction* mergeDownAct = menu.addAction(tr("Merge Down"));
     menu.addSeparator();
     QAction* renameAct = menu.addAction(tr("Renommer"));
-    // QAction* resizeAct = menu.addAction(tr("Redimensionner..."));
+    QAction* resizeAct = menu.addAction(tr("Redimensionner calque"));
     QAction* deleteAct = menu.addAction(tr("Supprimer"));
 
     const bool isBottomLayer = (idx == 0);
     const bool isLockedLayer = layer ? layer->locked() : false;
     renameAct->setEnabled(!isBottomLayer && !isLockedLayer);
     deleteAct->setEnabled(!isBottomLayer && !isLockedLayer);
+    resizeAct->setEnabled(!isBottomLayer && !isLockedLayer);
 
     const QAction* act = menu.exec(m_layersList->mapToGlobal(pos));
     if (!act)
@@ -1203,65 +1204,98 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
         if (ok)
             app().setLayerName(idx, text.toStdString());
     }
-    /*else if (act == resizeAct) // revoir ca plus tard
+    else if (act == resizeAct)
     {
-        const int curW = app().document().width();
-        const int curH = app().document().height();
+        if (!layer || !layer->image())
+            return;
+
+        const int curW = layer->image()->width();
+        const int curH = layer->image()->height();
+        if (curW <= 0 || curH <= 0)
+            return;
 
         QDialog dlg(this);
         dlg.setWindowTitle(tr("Redimensionner le calque"));
-        QVBoxLayout* dlgLayout = new QVBoxLayout(&dlg);
 
-        QHBoxLayout* sizeLayout = new QHBoxLayout();
-        QLabel* wLabel = new QLabel(tr("Largeur:"), &dlg);
-        QSpinBox* wSpin = new QSpinBox(&dlg);
-        wSpin->setRange(1, 10000);
+        auto* v = new QVBoxLayout(&dlg);
+
+        // Row: W / H
+        auto* row = new QHBoxLayout();
+        auto* wLabel = new QLabel(tr("Largeur:"), &dlg);
+        auto* wSpin = new QSpinBox(&dlg);
+        wSpin->setRange(1, 20000);
         wSpin->setValue(curW);
-        QLabel* hLabel = new QLabel(tr("Hauteur:"), &dlg);
-        QSpinBox* hSpin = new QSpinBox(&dlg);
-        hSpin->setRange(1, 10000);
-        hSpin->setValue(curH);
-        sizeLayout->addWidget(wLabel);
-        sizeLayout->addWidget(wSpin);
-        sizeLayout->addSpacing(8);
-        sizeLayout->addWidget(hLabel);
-        sizeLayout->addWidget(hSpin);
-        dlgLayout->addLayout(sizeLayout);
 
-        QHBoxLayout* buttons = new QHBoxLayout();
-        buttons->addStretch();
-        QPushButton* okBtn = new QPushButton(tr("OK"), &dlg);
-        QPushButton* cancelBtn = new QPushButton(tr("Annuler"), &dlg);
-        buttons->addWidget(okBtn);
-        buttons->addWidget(cancelBtn);
-        dlgLayout->addLayout(buttons);
-        connect(okBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
-        connect(cancelBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
+        auto* hLabel = new QLabel(tr("Hauteur:"), &dlg);
+        auto* hSpin = new QSpinBox(&dlg);
+        hSpin->setRange(1, 20000);
+        hSpin->setValue(curH);
+
+        row->addWidget(wLabel);
+        row->addWidget(wSpin);
+        row->addSpacing(10);
+        row->addWidget(hLabel);
+        row->addWidget(hSpin);
+        v->addLayout(row);
+
+        // Row: keep ratio
+        auto* keepRatio = new QCheckBox(tr("Garder proportions (🔗)"), &dlg);
+        keepRatio->setChecked(true);
+        v->addWidget(keepRatio);
+
+        // Buttons
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+        v->addWidget(buttons);
+        connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+        connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+        // Ratio logic
+        const double ratio = static_cast<double>(curW) / static_cast<double>(curH);
+        bool guard = false;  // évite la boucle W->H->W...
+
+        auto syncHFromW = [&]()
+        {
+            if (!keepRatio->isChecked() || guard)
+                return;
+            guard = true;
+            const int w = wSpin->value();
+            const int h = std::max(1, static_cast<int>(std::lround(w / ratio)));
+            hSpin->setValue(h);
+            guard = false;
+        };
+
+        auto syncWFromH = [&]()
+        {
+            if (!keepRatio->isChecked() || guard)
+                return;
+            guard = true;
+            const int h = hSpin->value();
+            const int w = std::max(1, static_cast<int>(std::lround(h * ratio)));
+            wSpin->setValue(w);
+            guard = false;
+        };
+
+        connect(wSpin, qOverload<int>(&QSpinBox::valueChanged), &dlg, [&](int) { syncHFromW(); });
+        connect(hSpin, qOverload<int>(&QSpinBox::valueChanged), &dlg, [&](int) { syncWFromH(); });
+
+        // Si tu coches "garder proportions" après avoir modifié, on recale tout de suite
+        connect(keepRatio, &QCheckBox::toggled, &dlg,
+                [&](bool on)
+                {
+                    if (on)
+                        syncHFromW();
+                });
 
         if (dlg.exec() != QDialog::Accepted)
             return;
 
-        const int w = wSpin->value();
-        const int h = hSpin->value();
+        const int newW = wSpin->value();
+        const int newH = hSpin->value();
 
-        auto lyr = app().document().layerAt(*idx);
-        if (lyr && lyr->image())
-        {
-            ImageBuffer newBuf(w, h);
-            newBuf.fill(0u);
-            const ImageBuffer& old = *lyr->image();
-            const int copyW = std::min(w, old.width());
-            const int copyH = std::min(h, old.height());
-            for (int yy = 0; yy < copyH; ++yy)
-            {
-                for (int xx = 0; xx < copyW; ++xx)
-                {
-                    newBuf.setPixel(xx, yy, old.getPixel(xx, yy));
-                }
-            }
-            lyr->setImageBuffer(std::make_shared<ImageBuffer>(newBuf));
-        }
-    } */
+        // (optionnel) smooth / nearest : à toi de choisir
+        const bool smooth = true;
+        app().resizeLayer(idx, newW, newH, smooth);
+    }
     else if (act == deleteAct)
     {
         const QString layerName = QString::fromStdString(layer ? layer->name() : "");

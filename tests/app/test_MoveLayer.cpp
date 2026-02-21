@@ -8,7 +8,6 @@
 #include "AppServiceUtilsForTest.hpp"
 #include "common/Colors.hpp"
 #include "core/Layer.hpp"
-#include "io/EpgFormat.hpp"
 #include "app/commands/CommandUtils.hpp"
 
 TEST(AppService_MoveLayer, MoveUndoRedo)

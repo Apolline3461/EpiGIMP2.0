@@ -11,6 +11,7 @@
 #include "common/Geometry.hpp"
 #include "core/Document.hpp"
 #include "core/Layer.hpp"
+// #include "core/ImageBuffer.hpp"
 
 namespace app::commands
 {
@@ -421,6 +422,43 @@ class MergeDownCommand final : public Command
     std::size_t* activeLayer_{nullptr};
 };
 
+class ResizeLayerCommand final : public Command
+{
+   public:
+    ResizeLayerCommand(Document* doc, std::uint64_t layerId, std::shared_ptr<ImageBuffer> before,
+                       std::shared_ptr<ImageBuffer> after)
+        : doc_(doc), layerId_(layerId), before_(std::move(before)), after_(std::move(after))
+    {
+    }
+
+    void redo() override
+    {
+        set(after_);
+    }
+    void undo() override
+    {
+        set(before_);
+    }
+
+   private:
+    void set(const std::shared_ptr<ImageBuffer>& img) const
+    {
+        if (!doc_)
+            return;
+        auto idx = findLayerIndexById(*doc_, layerId_);
+        if (!idx)
+            return;
+        auto layer = doc_->layerAt(*idx);
+        if (!layer)
+            return;
+        layer->setImageBuffer(img);
+    }
+    Document* doc_{nullptr};
+    std::uint64_t layerId_{0};
+    std::shared_ptr<ImageBuffer> before_;
+    std::shared_ptr<ImageBuffer> after_;
+};
+
 }  // namespace
 
 std::unique_ptr<Command> makeAddLayerCommand(Document* doc, std::shared_ptr<Layer> layer,
@@ -471,10 +509,18 @@ std::unique_ptr<Command> makeSetLayerNameCommand(Document* doc, std::uint64_t la
 {
     return std::make_unique<SetLayerNameCommand>(doc, layerId, before, after);
 }
+
 std::unique_ptr<Command> makeMoveLayerCommand(Document* doc, std::uint64_t layerId,
                                               common::Point before, common::Point after)
 {
     return std::make_unique<SetMoveLayerCommand>(doc, layerId, before, after);
+}
+
+std::unique_ptr<Command> makeResizeLayerCommand(Document* doc, std::uint64_t layerId,
+                                                std::shared_ptr<ImageBuffer> before,
+                                                std::shared_ptr<ImageBuffer> after)
+{
+    return std::make_unique<ResizeLayerCommand>(doc, layerId, before, after);
 }
 
 }  // namespace app::commands

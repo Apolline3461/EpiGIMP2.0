@@ -77,6 +77,9 @@ class AppService
     void mergeLayerDown(std::size_t from);
     void moveLayer(std::size_t idx, int newOffsetX, int newOffsetY);
 
+    void resizeLayer(std::size_t idx, int newW, int newH,
+                     bool smooth = true);  // smooth true = bilinear, nearest
+
     void beginStroke(const ToolParams&, common::Point pStart);
     void moveStroke(common::Point p);
     void endStroke();

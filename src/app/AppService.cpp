@@ -358,6 +358,46 @@ void AppService::moveLayer(std::size_t idx, int newOffsetX, int newOffsetY)
     apply(commands::makeMoveLayerCommand(doc_.get(), layer->id(), before, after));
 }
 
+static std::shared_ptr<ImageBuffer> scaleNearest(const ImageBuffer& src, int newW, int newH)
+{
+    auto dst = std::make_shared<ImageBuffer>(newW, newH);
+    for (int y = 0; y < newH; ++y)
+    {
+        const int sy = (y * src.height()) / newH;
+        for (int x = 0; x < newW; ++x)
+        {
+            const int sx = (x * src.width()) / newW;
+            dst->setPixel(x, y, src.getPixel(sx, sy));
+        }
+    }
+    return dst;
+}
+
+void AppService::resizeLayer(std::size_t idx, int newW, int newH, bool smooth)
+{
+    if (!doc_)
+        throw std::runtime_error("resizeLayer: document is null");
+    if (idx == 0)
+        return;  // ou throw si tu veux interdire BG
+    if (newW <= 0 || newH <= 0)
+        throw std::invalid_argument("resizeLayer: invalid size");
+
+    auto layer = doc_->layerAt(idx);
+    if (!layer || !layer->image())
+        throw std::runtime_error("resizeLayer: invalid layer");
+    if (layer->locked())
+        throw std::runtime_error("resizeLayer: layer locked");
+
+    const auto before = layer->image();
+    if (before->width() == newW && before->height() == newH)
+        return;  // no-op => pas de push dans l'historique
+
+    auto after = smooth ? /* scaleBilinear(*before, newW, newH) */ scaleNearest(*before, newW, newH)
+                        : scaleNearest(*before, newW, newH);
+
+    apply(commands::makeResizeLayerCommand(doc_.get(), layer->id(), before, after));
+}
+
 void AppService::beginStroke(const ToolParams& params, common::Point pStart)
 {
     if (!doc_)
