@@ -277,7 +277,7 @@ void CanvasWidget::mousePressEvent(QMouseEvent* e)
 {
     lastMouse_ = e->pos();
 
-    if (e->button() == Qt::MiddleButton || e->button() == Qt::RightButton)
+    if (e->button() == Qt::MiddleButton)
     {
         panning_ = true;
         setCursor(Qt::ClosedHandCursor);
@@ -367,7 +367,7 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* e)
 
 void CanvasWidget::mouseReleaseEvent(QMouseEvent* e)
 {
-    if (e->button() == Qt::MiddleButton || e->button() == Qt::RightButton)
+    if (e->button() == Qt::MiddleButton)
     {
         if (panning_)
         {
