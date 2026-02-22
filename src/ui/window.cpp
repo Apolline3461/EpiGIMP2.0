@@ -309,6 +309,7 @@ void MainWindow::createActions()
 
     m_pencilAct = new QAction(tr("Pinceau"), this);
     m_pencilAct->setCheckable(true);
+    m_pencilAct->setShortcut(QKeySequence("P"));
     m_pencilAct->setIcon(QIcon(":/icons/pencil.svg"));
     connect(m_pencilAct, &QAction::toggled, this,
             [this](bool on)
