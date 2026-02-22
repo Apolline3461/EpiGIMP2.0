@@ -244,14 +244,30 @@ void MainWindow::refreshUIAfterDocChange()
         m_colorPickerAct->setEnabled(hasDoc);
     if (m_moveLayerAct)
         m_moveLayerAct->setEnabled(hasDoc);
+    if (m_pencilAct)
+        m_pencilAct->setEnabled(hasDoc);
 
     if (!hasDoc)
     {
         if (canvas_)
         {
             canvas_->setMoveLayerEnable(false);
+            canvas_->setPencilEnable(false);
             canvas_->clearDragLayerPreview();
         }
+        if (m_pencilAct)
+            m_pencilAct->setChecked(false);
+        if (m_pencilDock)
+            m_pencilDock->setVisible(false);
+        if (m_moveLayerAct)
+            m_moveLayerAct->setChecked(false);
+        if (m_bucketAct)
+            m_bucketAct->setChecked(false);
+        if (m_pickAct)
+            m_pickAct->setChecked(false);
+        if (m_selectToggleAct)
+            m_selectToggleAct->setChecked(false);
+
         clearUiStateOnClose();
         return;
     }
@@ -338,6 +354,7 @@ void MainWindow::clearUiStateOnClose()
         canvas_->clear();
         canvas_->setSelectionEnable(false);
         canvas_->setMoveLayerEnable(false);
+        canvas_->setPencilEnable(false);
     }
     if (m_layersList)
         m_layersList->clear();
@@ -349,6 +366,9 @@ void MainWindow::clearUiStateOnClose()
         m_selectToggleAct->setChecked(false);
     if (m_moveLayerAct)
         m_moveLayerAct->setChecked(false);
+    if (m_pencilAct)
+        m_pencilAct->setChecked(false);
+
     m_bucketMode = false;
     m_pickMode = false;
     m_moveLayerMode = false;
