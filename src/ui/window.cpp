@@ -1051,62 +1051,6 @@ void MainWindow::createToolBar()
         m_toolsTb->addAction(m_pencilAct);
     }
 
-    // Create a small popup menu for pencil sizes when clicking the pencil icon
-    QMenu* pencilSizeMenu = new QMenu(this);
-    const std::vector<int> sizes = {1, 2, 4, 8, 16};
-    for (int s : sizes)
-    {
-        QAction* a = new QAction(QString::number(s), pencilSizeMenu);
-        a->setData(s);
-        pencilSizeMenu->addAction(a);
-        connect(a, &QAction::triggered, this,
-                [this, s]()
-                {
-                    if (m_pencilSizeSpin)
-                        m_pencilSizeSpin->setValue(s);
-                    if (m_pencilAct)
-                        m_pencilAct->setChecked(true);
-                });
-    }
-    pencilSizeMenu->addSeparator();
-    QAction* otherAct = new QAction(tr("Autre…"), pencilSizeMenu);
-    pencilSizeMenu->addAction(otherAct);
-    connect(otherAct, &QAction::triggered, this,
-            [this]()
-            {
-                bool ok = false;
-                const int cur = (m_pencilSizeSpin) ? m_pencilSizeSpin->value() : 8;
-                const int v = QInputDialog::getInt(this, tr("Taille personnalisée"),
-                                                   tr("Taille (px):"), cur, 1, 2000, 1, &ok);
-                if (ok)
-                {
-                    if (m_pencilSizeSpin)
-                        m_pencilSizeSpin->setValue(v);
-                    if (m_pencilAct)
-                        m_pencilAct->setChecked(true);
-                }
-            });
-    // Show menu when pencil action is triggered
-    connect(m_pencilAct, &QAction::triggered, this,
-            [this, pencilSizeMenu]()
-            {
-                if (!m_toolsTb || !m_pencilAct)
-                {
-                    pencilSizeMenu->popup(QCursor::pos());
-                    return;
-                }
-                QWidget* w = m_toolsTb->widgetForAction(m_pencilAct);
-                if (w)
-                {
-                    const QPoint pos = w->mapToGlobal(QPoint(0, w->height()));
-                    pencilSizeMenu->popup(pos);
-                }
-                else
-                {
-                    pencilSizeMenu->popup(QCursor::pos());
-                }
-            });
-
     m_toolsTb->addSeparator();
 
     if (m_undoAct)
