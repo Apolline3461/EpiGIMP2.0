@@ -2,11 +2,13 @@
 // Created by apolline on 14/02/2026.
 //
 #pragma once
+#include <QColor>
 #include <QImage>
 #include <QPointF>
 #include <QWidget>
 
 #include <optional>
+#include <vector>
 
 #include "common/Geometry.hpp"
 
@@ -24,7 +26,6 @@ class CanvasWidget : public QWidget
     {
         return img_.size();
     }
-
     void setImage(const QImage& img);
     void clear();
 
@@ -39,6 +40,10 @@ class CanvasWidget : public QWidget
     void setDragLayerPreview(const QImage& layerImg, int x, int y);
     void setDragLayerPos(int x, int y);
     void clearDragLayerPreview();
+
+    void setPencilEnable(bool enable);
+    void setPencilSize(int s);
+    void setPencilColor(const QColor& c);
 
     double scale() const
     {
@@ -60,6 +65,10 @@ class CanvasWidget : public QWidget
     void dragDoc(common::Point p);
     void endDragDoc(common::Point p);
 
+    void beginStroke(common::Point p);
+    void moveStroke(common::Point p);
+    void endStroke();
+
    protected:
     void paintEvent(QPaintEvent*) override;
     void wheelEvent(QWheelEvent*) override;
@@ -78,6 +87,13 @@ class CanvasWidget : public QWidget
     bool hasSel_ = false;
     QRect selScreen_;
     bool selectionEnabled_ = false;
+
+    //draw
+    bool pencilEnabled_ = false;
+    bool drawing_ = false;
+    std::vector<common::Point> previewPoints_;
+    QColor pencilColor_ = QColor(0, 0, 0, 255);
+    int pencilSize_ = 1;
 
     // move layer
     bool moveLayerEnabled_ = false;

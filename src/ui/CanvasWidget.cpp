@@ -1,4 +1,5 @@
 // Created by apolline on 14/02/2026.
+
 #include "ui/CanvasWidget.hpp"
 
 #include <QMouseEvent>
@@ -142,6 +143,21 @@ void CanvasWidget::clearDragLayerPreview()
     update();
 }
 
+void CanvasWidget::setPencilEnable(bool enable)
+{
+    pencilEnabled_ = enable;
+}
+
+void CanvasWidget::setPencilSize(int s)
+{
+    pencilSize_ = s;
+}
+
+void CanvasWidget::setPencilColor(const QColor& c)
+{
+    pencilColor_ = c;
+}
+
 void CanvasWidget::setScale(double s)
 {
     scale_ = clampScale(s);
@@ -239,6 +255,43 @@ void CanvasWidget::paintEvent(QPaintEvent*)
         p.setBrush(Qt::NoBrush);
         p.drawRect(selScreen_);
     }
+    if (!previewPoints_.empty())
+    {
+        p.save();
+        p.setRenderHint(QPainter::Antialiasing, true);
+        QPen pen(Qt::NoPen);
+        p.setPen(pen);
+        QColor c = pencilColor_;
+        p.setBrush(QBrush(c));
+
+        const double s = scale_;
+        const double half = (static_cast<double>(pencilSize_) * 0.5) * s;
+
+        for (const auto& pt : previewPoints_)
+        {
+            QPoint sp = docToScreen(pt);
+            QRectF r(sp.x() - half, sp.y() - half, half * 2.0, half * 2.0);
+            p.drawEllipse(r);
+        }
+
+        // draw connecting lines for smoother preview
+        if (previewPoints_.size() >= 2)
+        {
+            QPen linePen(c);
+            linePen.setWidthF(std::max(1.0, s * static_cast<double>(pencilSize_)));
+            linePen.setCapStyle(Qt::RoundCap);
+            linePen.setJoinStyle(Qt::RoundJoin);
+            p.setPen(linePen);
+            for (size_t i = 1; i < previewPoints_.size(); ++i)
+            {
+                QPoint a = docToScreen(previewPoints_[i - 1]);
+                QPoint b = docToScreen(previewPoints_[i]);
+                p.drawLine(a, b);
+            }
+        }
+
+        p.restore();
+    }
 }
 
 void CanvasWidget::wheelEvent(QWheelEvent* e)
@@ -285,46 +338,53 @@ void CanvasWidget::mousePressEvent(QMouseEvent* e)
         return;
     }
 
-    if (e->button() == Qt::LeftButton)
+    if (e->button() != Qt::LeftButton)
     {
-        // Move-layer mode: only if click inside current layerOverlay_
-        if (!img_.isNull() && moveLayerEnabled_ && layerOverlay_)
-        {
-            const common::Point pDoc = screenToDoc(e->pos());
-            const auto& r = *layerOverlay_;
-            const bool inside =
-                (pDoc.x >= r.x && pDoc.y >= r.y && pDoc.x < r.x + r.w && pDoc.y < r.y + r.h);
-            if (!inside)
-            {
-                e->accept();
-                return;
-            }
+        QWidget::mousePressEvent(e);
+        return;
+    }
+    if (img_.isNull())
+    {
+        e->accept();
+        return;
+    }
+    const common::Point pDoc = screenToDoc(e->pos());
 
+    // Move-layer mode: only if click inside current layerOverlay_
+    if (moveLayerEnabled_ && layerOverlay_)
+    {
+        const auto& r = *layerOverlay_;
+        const bool inside =
+            (pDoc.x >= r.x && pDoc.y >= r.y && pDoc.x < r.x + r.w && pDoc.y < r.y + r.h);
+        if (inside)
+        {
             draggingLayer_ = true;
             dragStartDoc_ = pDoc;
             emit beginDragDoc(pDoc);
-            e->accept();
-            return;
-        }
-
-        if (!img_.isNull() && selectionEnabled_)
-        {
-            hasSel_ = true;
-            selScreen_ = QRect(e->pos(), e->pos());
-            e->accept();
-            update();
-            return;
-        }
-
-        if (!img_.isNull())
-        {
-            emit clickedDoc(screenToDoc(e->pos()));
         }
         e->accept();
         return;
     }
-
-    QWidget::mousePressEvent(e);
+    if (selectionEnabled_)
+    {
+        hasSel_ = true;
+        selScreen_ = QRect(e->pos(), e->pos());
+        update();
+        e->accept();
+        return;
+    }
+    if (pencilEnabled_)
+    {
+        drawing_ = true;
+        previewPoints_.clear();
+        previewPoints_.push_back(pDoc);
+        emit beginStroke(pDoc);
+        update();
+        e->accept();
+        return;
+    }
+    emit clickedDoc(pDoc);
+    e->accept();
 }
 
 void CanvasWidget::mouseMoveEvent(QMouseEvent* e)
@@ -357,6 +417,16 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* e)
     if (selectionEnabled_ && hasSel_ && (e->buttons() & Qt::LeftButton))
     {
         selScreen_.setBottomRight(cur);
+        update();
+        e->accept();
+        return;
+    }
+
+    if (drawing_ && (e->buttons() & Qt::LeftButton))
+    {
+        common::Point pDoc = screenToDoc(cur);
+        previewPoints_.push_back(pDoc);
+        emit moveStroke(pDoc);
         update();
         e->accept();
         return;
@@ -409,6 +479,15 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* e)
                 emit selectionFinishedDoc((r.w <= 0 || r.h <= 0) ? common::Rect{0, 0, 0, 0} : r);
                 update();
             }
+            e->accept();
+            return;
+        }
+        if (drawing_)
+        {
+            drawing_ = false;
+            emit endStroke();
+            previewPoints_.clear();
+            update();
             e->accept();
             return;
         }
