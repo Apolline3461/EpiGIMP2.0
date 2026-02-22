@@ -10,8 +10,6 @@
 
 #include <algorithm>
 
-#include "ui/PanClamp.hpp"
-
 namespace
 {
 static double clampScale(double s)
@@ -245,7 +243,6 @@ void CanvasWidget::paintEvent(QPaintEvent*)
 
     p.restore();
 
-    // screen selection overlay
     if (hasSel_)
     {
         QPen pen(QColor(220, 0, 0));
