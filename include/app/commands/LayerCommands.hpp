@@ -46,7 +46,7 @@ std::unique_ptr<Command> makeMoveLayerCommand(Document* doc, std::uint64_t layer
                                               common::Point before, common::Point after);
 
 std::unique_ptr<Command> makeResizeLayerCommand(Document* doc, std::uint64_t layerId,
-                                                std::shared_ptr<ImageBuffer> before,
-                                                std::shared_ptr<ImageBuffer> after);
+                                                const std::shared_ptr<ImageBuffer>& before,
+                                                const std::shared_ptr<ImageBuffer>& after);
 
 }  // namespace app::commands

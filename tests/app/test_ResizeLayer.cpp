@@ -29,7 +29,7 @@ TEST(AppService_ResizeLayer, ResizeUndoRedo)
     EXPECT_EQ(layer->image()->width(), 4);
     EXPECT_EQ(layer->image()->height(), 4);
 
-    svc->resizeLayer(idx, 8, 2, false);
+    svc->resizeLayer(idx, 8, 2);
 
     layer = svc->document().layerAt(idx);
     ASSERT_TRUE(layer && layer->image());
@@ -66,5 +66,5 @@ TEST(AppService_ResizeLayer, LockedLayerThrows)
     const std::size_t idx = svc->activeLayer();
     svc->setLayerLocked(idx, true);
 
-    EXPECT_THROW(svc->resizeLayer(idx, 8, 8, false), std::runtime_error);
+    EXPECT_THROW(svc->resizeLayer(idx, 8, 8), std::runtime_error);
 }

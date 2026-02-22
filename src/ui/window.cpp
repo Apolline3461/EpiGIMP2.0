@@ -1409,8 +1409,7 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
         const int newW = wSpin->value();
         const int newH = hSpin->value();
 
-        const bool smooth = true;
-        app().resizeLayer(idx, newW, newH, smooth);
+        app().resizeLayer(idx, newW, newH);
     }
     else if (act == deleteAct)
     {

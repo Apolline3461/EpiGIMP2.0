@@ -243,9 +243,9 @@ void AppService::addLayer(const LayerSpec& spec)
     if (!doc_)
         throw std::runtime_error("AddLayer Error : document is null");
 
-    const int w = spec.width.value_or(doc_->width());
-    const int h = spec.height.value_or(doc_->height());
-    if (w <= 0 || h <= 0)
+    const auto w = spec.width.value_or(doc_->width());
+    const auto h = spec.height.value_or(doc_->height());
+    if (w == 0 || h == 0)
         throw std::invalid_argument("addLayer: invalid layer size");
 
     auto img = std::make_shared<ImageBuffer>(w, h);
@@ -373,7 +373,7 @@ static std::shared_ptr<ImageBuffer> scaleNearest(const ImageBuffer& src, int new
     return dst;
 }
 
-void AppService::resizeLayer(std::size_t idx, int newW, int newH, bool smooth)
+void AppService::resizeLayer(std::size_t idx, int newW, int newH)
 {
     if (!doc_)
         throw std::runtime_error("resizeLayer: document is null");
@@ -392,8 +392,7 @@ void AppService::resizeLayer(std::size_t idx, int newW, int newH, bool smooth)
     if (before->width() == newW && before->height() == newH)
         return;
 
-    auto after = smooth ? /* scaleBilinear(*before, newW, newH) */ scaleNearest(*before, newW, newH)
-                        : scaleNearest(*before, newW, newH);
+    auto after = scaleNearest(*before, newW, newH);
 
     apply(commands::makeResizeLayerCommand(doc_.get(), layer->id(), before, after));
 }

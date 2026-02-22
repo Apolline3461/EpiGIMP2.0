@@ -71,12 +71,12 @@ std::optional<std::size_t> Document::addLayer(std::shared_ptr<Layer> layer, cons
     return idx;
 }
 
-void Document::removeLayer(size_t idx)
+void Document::removeLayer(const size_t idx)
 {
     const auto size = layers_.size();
     if (idx >= size)
         return;
-    layers_.erase(layers_.begin() + static_cast<std::ptrdiff_t>(idx));
+    layers_.erase(layers_.begin() + idx);
 }
 
 void Document::reorderLayer(size_t from, size_t to)
@@ -87,8 +87,8 @@ void Document::reorderLayer(size_t from, size_t to)
         return;
 
     auto tmpLayer = layers_[from];
-    layers_.erase(layers_.begin() + static_cast<std::ptrdiff_t>(from));
-    layers_.insert(layers_.begin() + static_cast<std::ptrdiff_t>(to), std::move(tmpLayer));
+    layers_.erase(layers_.begin() + from);
+    layers_.insert(layers_.begin() + to, std::move(tmpLayer));
 }
 
 void Document::mergeDown(const std::size_t from)
