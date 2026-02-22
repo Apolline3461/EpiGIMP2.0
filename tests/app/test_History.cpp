@@ -1,5 +1,3 @@
-#include <gtest/gtest.h>
-
 #include <memory>
 
 #include "app/Command.hpp"
@@ -7,17 +5,29 @@
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 
+#include <gtest/gtest.h>
+
 using namespace app;
 
-namespace {
-struct CounterCommand final : public Command {
+namespace
+{
+struct CounterCommand final : public Command
+{
     int* undoCount{};
     int* redoCount{};
     explicit CounterCommand(int* u, int* r) : undoCount(u), redoCount(r) {}
-    void undo() override { if (undoCount) (*undoCount)++; }
-    void redo() override { if (redoCount) (*redoCount)++; }
+    void undo() override
+    {
+        if (undoCount)
+            (*undoCount)++;
+    }
+    void redo() override
+    {
+        if (redoCount)
+            (*redoCount)++;
+    }
 };
-}
+}  // namespace
 
 static void applyToLayer(std::shared_ptr<ImageBuffer> img, const std::vector<app::PixelChange>& ch,
                          bool useBefore)
@@ -44,7 +54,7 @@ TEST(HistoryTest, UndoRedoPixels)
         applyToLayer(img, ch, useBefore);
     };
 
-    // push 25 small brush strokes
+    // push 25 small pencil strokes
     for (int s = 0; s < 25; ++s)
     {
         std::vector<app::PixelChange> changes;
@@ -116,7 +126,7 @@ TEST(HistoryTest, Push_ClearsRedoStack)
 {
     History h(10);
 
-    int uA=0, rA=0;
+    int uA = 0, rA = 0;
     auto a = std::make_unique<CounterCommand>(&uA, &rA);
     a->redo();
     h.push(std::move(a));
@@ -128,7 +138,7 @@ TEST(HistoryTest, Push_ClearsRedoStack)
     EXPECT_FALSE(h.canUndo());
     EXPECT_TRUE(h.canRedo());
 
-    int uB=0, rB=0;
+    int uB = 0, rB = 0;
     auto b = std::make_unique<CounterCommand>(&uB, &rB);
     b->redo();
     h.push(std::move(b));
@@ -142,7 +152,7 @@ TEST(HistoryTest, Clear_EmptiesUndoAndRedo)
 {
     History h(10);
 
-    int u=0, r=0;
+    int u = 0, r = 0;
     auto cmd = std::make_unique<CounterCommand>(&u, &r);
     cmd->redo();
     h.push(std::move(cmd));
@@ -166,10 +176,11 @@ TEST(HistoryTest, MaxDepth_DropsOldestCommands)
 {
     History h(3);
 
-    int u=0, r=0;
+    int u = 0, r = 0;
 
     // push 5 commands
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 5; ++i)
+    {
         auto cmd = std::make_unique<CounterCommand>(&u, &r);
         cmd->redo();
         h.push(std::move(cmd));
@@ -180,7 +191,7 @@ TEST(HistoryTest, MaxDepth_DropsOldestCommands)
     h.undo();
     h.undo();
     h.undo();
-    EXPECT_FALSE(h.canUndo());     // the oldest 2 were dropped
+    EXPECT_FALSE(h.canUndo());  // the oldest 2 were dropped
 
     // and redo should now be possible 3 times
     EXPECT_TRUE(h.canRedo());

@@ -36,6 +36,7 @@ class ImageLabel;
 class CanvasWidget;
 class QToolBar;
 class QActionGroup;
+class QSpinBox;
 
 class MainWindow : public QMainWindow
 {
@@ -134,7 +135,11 @@ class MainWindow : public QMainWindow
     QAction* m_pickAct{nullptr};
     bool m_bucketMode{false};
     bool m_pickMode{false};
-    QColor m_bucketColor{Qt::black};
+    QColor m_toolColor{Qt::black};
+
+    QAction* m_pencilAct{nullptr};
+    QDockWidget* m_pencilDock{nullptr};
+    QSpinBox* m_pencilSizeSpin{nullptr};
 
     bool m_handMode{false};
     bool m_panningActive{false};

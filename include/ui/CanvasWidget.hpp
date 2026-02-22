@@ -3,11 +3,13 @@
 //
 
 #pragma once
+#include <QColor>
 #include <QImage>
 #include <QPointF>
 #include <QWidget>
 
 #include <optional>
+#include <vector>
 
 #include "common/Geometry.hpp"
 
@@ -45,10 +47,20 @@ class CanvasWidget : public QWidget
     // conversions
     common::Point screenToDoc(const QPoint& sp) const;
     QPoint docToScreen(common::Point p) const;
-
+    void setPencilSize(int s)
+    {
+        pencilSize_ = s;
+    }
+    void setPencilColor(const QColor& c)
+    {
+        pencilColor_ = c;
+    }
    signals:
     void selectionFinishedDoc(common::Rect r);
     void clickedDoc(common::Point p);
+    void beginStroke(common::Point p);
+    void moveStroke(common::Point p);
+    void endStroke();
     // void beginDragDoc(common::Point p);
     // void dragDoc(common::Point p);
     // void endDragDoc(common::Point p);
@@ -71,6 +83,10 @@ class CanvasWidget : public QWidget
     bool hasSel_ = false;
     QRect selScreen_;
     bool selectionEnabled_ = false;
+    bool drawing_ = false;
+    std::vector<common::Point> previewPoints_;
+    QColor pencilColor_ = QColor(0, 0, 0, 255);
+    int pencilSize_ = 1;
 
     void drawChecker(QPainter& p);
 };
