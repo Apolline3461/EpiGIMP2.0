@@ -67,7 +67,7 @@ class AppService
     void setLayerVisible(std::size_t idx, bool visible);
     void setLayerOpacity(std::size_t idx, float alpha);
     void setLayerLocked(std::size_t idx, bool locked);
-    void setLayerName(std::size_t idx, std::string name);
+    void setLayerName(std::size_t idx, const std::string& name);
 
     void addLayer(const LayerSpec& spec);
     void addImageLayer(const ImageBuffer& img, std::string name, bool visible = true,

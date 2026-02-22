@@ -223,7 +223,7 @@ void AppService::setLayerLocked(std::size_t idx, bool locked)
     apply(commands::makeSetLayerLockedCommand(doc_.get(), layer->id(), layer->locked(), locked));
 }
 
-void AppService::setLayerName(std::size_t idx, std::string name)
+void AppService::setLayerName(std::size_t idx, const std::string& name)
 {
     if (!doc_)
         throw std::runtime_error("setLayerName: document is null");
