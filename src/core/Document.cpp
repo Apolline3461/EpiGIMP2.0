@@ -76,7 +76,8 @@ void Document::removeLayer(const size_t idx)
     const auto size = layers_.size();
     if (idx >= size)
         return;
-    layers_.erase(layers_.begin() + idx);
+    using Diff = decltype(layers_)::difference_type;
+    layers_.erase(layers_.begin() + static_cast<Diff>(idx));
 }
 
 void Document::reorderLayer(size_t from, size_t to)
@@ -87,8 +88,12 @@ void Document::reorderLayer(size_t from, size_t to)
         return;
 
     auto tmpLayer = layers_[from];
-    layers_.erase(layers_.begin() + from);
-    layers_.insert(layers_.begin() + to, std::move(tmpLayer));
+    using Diff = decltype(layers_)::difference_type;
+
+    layers_.erase(layers_.begin() + static_cast<Diff>(from));
+    layers_.insert(layers_.begin() + static_cast<Diff>(to), std::move(tmpLayer));
+
+    layers_.erase(layers_.begin() + static_cast<Diff>(from));
 }
 
 void Document::mergeDown(const std::size_t from)
@@ -190,5 +195,6 @@ void Document::mergeDown(const std::size_t from)
         }
     }
 
-    layers_.erase(layers_.begin() + from);
+    using Diff = decltype(layers_)::difference_type;
+    layers_.erase(layers_.begin() + static_cast<Diff>(from));
 }

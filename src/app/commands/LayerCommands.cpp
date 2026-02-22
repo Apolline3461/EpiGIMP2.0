@@ -5,6 +5,7 @@
 #include "app/commands/LayerCommands.hpp"
 
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 #include "app/commands/CommandUtils.hpp"
@@ -194,8 +195,9 @@ class SetLayerNameCommand final : public Command
 {
    public:
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-    SetLayerNameCommand(Document* doc, std::uint64_t layerId, std::string before, std::string after)
-        : doc_(doc), layerId_(layerId), before_(std::move(before)), after_(std::move(after))
+    SetLayerNameCommand(Document* doc, std::uint64_t layerId, const std::string& before,
+                        const std::string& after)
+        : doc_(doc), layerId_(layerId), before_(before), after_(after)
     {
     }
 
