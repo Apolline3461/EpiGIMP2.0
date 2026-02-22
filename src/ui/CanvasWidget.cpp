@@ -10,6 +10,8 @@
 
 #include <algorithm>
 
+#include "ui/PanClamp.hpp"
+
 namespace
 {
 static double clampScale(double s)
