@@ -1,47 +1,58 @@
 # Documentation utilisateur
 
-Ce document présente l'essentiel pour utiliser EpiGimp2.0 : démarrage, création et ouverture de projets, gestion des fichiers et des calques, outils principaux et conseils pratiques.
-
+Ce document présente l'essentiel pour utiliser EpiGIMP 2.0 : démarrage, création et ouverture de projets, gestion des fichiers et des calques, outils principaux et conseils pratiques.
 
 ---
 
 ## Sommaire
 
-- [Lancer le logiciel](#Lancer-le-logiciel)
-- [Interface principale](#Interface-principale)
-- [Créer un nouveau projet](#Créer-un-nouveau-projet)
-- [Ouvrir et Importer une image](#Ouvrir-et-Importer-une-image)
-- [Ouvrir et Enregistrer un projet](#Ouvrir-et-Enregistrer-un-projet)
-- [Exporter l'image finale](#Exporter-l'image-finale)
-- [Gestion des calques](#Gestion-des-calques)
-- [Historique](#Historique)
-- [Raccourcis principaux](#Raccourcis-principaux)
-- [Exemple entier](#Exemple-entier)
-- [Dépannage rapide](#Dépannage-rapide)
-- [Ressources](#Ressources)
+- [Lancer le logiciel](#lancer-le-logiciel)
+- [Interface principale](#interface-principale)
+  - [Barre de menus](#barre-de-menus)
+  - [Barre d'outils](#barre-doutils)
+  - [Panneau Calques](#panneau-calques)
+  - [Canvas](#canvas)
+  - [Palette de couleurs](#palette-de-couleurs)
+- [Créer un nouveau projet](#créer-un-nouveau-projet)
+- [Ouvrir et importer une image](#ouvrir-et-importer-une-image)
+- [Ouvrir et enregistrer un projet](#ouvrir-et-enregistrer-un-projet)
+- [Exporter l'image finale](#exporter-limage-finale)
+- [Gestion des calques](#gestion-des-calques)
+  - [Ajouter / Supprimer](#ajouter--supprimer)
+  - [Réorganiser](#réorganiser)
+  - [Propriétés](#propriétés)
+- [Historique](#historique)
+- [Outils principaux](#outils-principaux)
+  - [Pipette](#pipette)
+  - [Pinceau](#pinceau)
+  - [Pot de peinture](#pot-de-peinture)
+- [Raccourcis principaux](#raccourcis-principaux)
+- [Exemples](#exemples)
+- [Dépannage rapide](#dépannage-rapide)
+- [Ressources](#ressources)
 
 ---
 
 ## Lancer le logiciel
 
-- Sur Linux (depuis release AppImage) : rendre exécutable puis lancer :
+- Sur Linux (depuis la release AppImage) : rendre le fichier exécutable puis lancer :
 
 ```bash
 chmod +x epigimp-linux-x86_64.AppImage
 ./epigimp-linux-x86_64.AppImage
 ```
 
-- Si vous avez build depuis les sources, exécutez `./build/bin/epigimp` depuis la racine du projet.
+- Si vous avez compilé depuis les sources, exécutez `./build/bin/epigimp` depuis la racine du projet.
 
 ---
 
 ## Interface principale
 
-- Barre de menus : Fichier, Vue.
-- Barre d'outils : accès rapide aux outils (pot de peinture, sélection).
-- Panneau Calques : liste des calques, opacité, verrouillage, boutons supprimer.
-- Canvas : zone centrale pour dessiner.
-- Palette de couleurs et historique (annuler/rétablir).
+- Barre de menus : `Fichier`, `Vue`, etc.
+- Barre d'outils : accès rapide aux outils (pinceau, pot de peinture, sélection, etc.).
+- Panneau Calques : liste des calques, paramètres d'opacité, verrouillage et boutons d'action.
+- Canvas : zone centrale pour dessiner et visualiser le rendu.
+- Palette de couleurs et gestion de l'historique (annuler/rétablir).
 
 ![fichier](assets/fichier.png)
 ![vue](assets/vue.png)
@@ -53,31 +64,24 @@ chmod +x epigimp-linux-x86_64.AppImage
 
 - Menu : `Fichier` → `Nouveau projet` (raccourci : Ctrl+N).
 - Étapes :
-  1.  Saisir largeur, hauteur et résolution (optionnel).
-  2.  Choisir couleur de fond (transparent par défaut) et confirmer.
-  3.  Le système crée le canvas et un calque de base.
+  1. Saisir largeur et hauteur.
+  2. L'application crée le canvas et un calque de base prêt à l'emploi.
 
 ![Open](assets/open.png)
 ![New](assets/new.png)
 
-## Ouvrir et Importer une image
+## Ouvrir et importer une image
 
 - Menu : `Fichier` → `Ouvrir` (Ctrl+O).
-- Formats supportés : PNG, JPEG, et format projet `.epg` (voir section dédiée).
-- Comportement : les images PNG/JPEG sont importées comme calque unique ; les `.epg` sont ouverts comme projet complet.
+- Formats supportés : PNG, JPEG et format projet `.epg` (voir section dédiée).
+- Comportement : les images PNG/JPEG sont importées comme calque unique ; les fichiers `.epg` ouvrent le projet avec tous les calques et métadonnées.
 
 ![Open](assets/open2.png)
 
-## Ouvrir et Enregistrer un projet
+## Ouvrir et enregistrer un projet
 
 - Format `.epg` : archive ZIP contenant `project.json`, `preview.png` et `layers/NNNN.png`.
-- Enregistrer : `Fichier` → `Enregistrer` (Ctrl+S) ou `Enregistrer sous` pour choisir l'emplacement.
-- Sauvegarde atomique : l'application écrit dans un fichier temporaire puis renomme pour éviter la corruption.
-
-## Exporter l'image finale
-
-- Menu : `Fichier` → `Enregistrer sous` (Ctrl+Shift+S).
-- Options : choisir PNG (avec transparence) ou JPEG (qualité réglable).
+- Enregistrer : `Fichier` → `Enregistrer` (Ctrl+S) ou `Fichier` → `Enregistrer sous` pour choisir un nouvel emplacement.
 
 ![Save](assets/save.png)
 
@@ -85,11 +89,11 @@ chmod +x epigimp-linux-x86_64.AppImage
 
 ## Gestion des calques
 
-- Ajouter un calque : bouton `ajouter un calque` dans le menu fichier.
-- Supprimer : sélectionner calque → clique sur poubelle. Confirmation si calque non vide.
-- Réorganiser : glisser/déposer dans la liste des calques.
-- Propriétés : nom, opacité, verrouillage, visibilité.
-- Fusionner vers le bas : combine le calque avec celui inférieur.
+- Ajouter un calque : bouton `Ajouter un calque` dans la barre d'outils ou le menu `Calque`.
+- Supprimer : sélectionner le calque puis cliquer sur suprimer. Une confirmation s'affiche si le calque contient des données.
+- Réorganiser : glisser-déposer les calques dans la liste pour changer l'ordre d'empilement.
+- Propriétés : modifier le nom, l'opacité, le verrouillage et la visibilité depuis le panneau Calques.
+- Fusionner vers le bas : combine le calque sélectionné avec le calque immédiatement inférieur.
 
 ![Add layer](assets/addlayer.png)
 ![Calque](assets/calque1.png)
@@ -97,43 +101,67 @@ chmod +x epigimp-linux-x86_64.AppImage
 
 ## Historique
 
-- Annuler / Rétablir : Ctrl+Z / Ctrl+Y. Historique par défaut limité à 20 actions (configurable).
+- Annuler / Rétablir : `Ctrl+Z` / `Ctrl+Y`. L'historique contient par défaut 20 actions (paramétrable dans les préférences).
+
+## Outils principaux
+
+### Pipette
+
+- Permet de prélever une couleur directement sur le canvas.
+- Sélectionnez l'outil Pipette puis cliquez sur l'image pour définir la couleur active dans la palette.
+- Raccourci : `O`.
+
+### Pinceau
+
+- Outil principal de dessin pour tracer des traits avec pression et opacité variables selon les paramètres du pinceau.
+- Raccourci : `P`.
+
+### Pot de peinture
+
+- Remplit une zone contiguë avec la couleur active en fonction de la tolérance et du mode de fusion sélectionnés.
+- Utilisation : sélectionner le pot de peinture puis cliquer sur la zone à remplir. Ajustez la tolérance pour contrôler l'étendue du remplissage.
+- Raccourci : `Maj+B`.
 
 ---
 
 ## Raccourcis principaux
 
-| Action             | Raccourci           |
-| ------------------ | ------------------- |
-| Nouveau projet     | Ctrl + N            |
-| Ouvrir             | Ctrl + O            |
-| Enregistrer        | Ctrl + S            |
-| Exporter           | Ctrl + Maj + E      |
-| Annuler / Rétablir | Ctrl + Z / Ctrl + Y |
-| Pinceau            | P                   |
-| Gomme              | Maj + E             |
-| Pot de peinture    | Maj + B             |
-| Pipette            | O                   |
-| Texte              | T                   |
-| Zoom +/-           | Ctrl + + / Ctrl + - |
-| Fermer             | Ctrl + W            |
+| Action             | Raccourci       |
+| ------------------ | --------------- |
+| Nouveau projet     | Ctrl+N          |
+| Ouvrir             | Ctrl+O          |
+| Enregistrer        | Ctrl+S          |
+| Exporter           | Ctrl+Maj+E      |
+| Annuler / Rétablir | Ctrl+Z / Ctrl+Y |
+| Pinceau            | P               |
+| Gomme              | Maj+E           |
+| Pot de peinture    | Maj+B           |
+| Pipette            | O               |
+| Texte              | T               |
+| Zoom +/-           | Ctrl + / Ctrl - |
+| Fermer             | Ctrl+W          |
 
 ---
 
-## Exemple entier
+## Exemples
 
-Ci dessous un exemple d'un projet
-![Exemple](assets/exemple1.png)
+Voici deux captures illustrant des projets créés avec EpiGIMP :
+![Exemple 1](assets/exemple1.png)
+![Exemple 2](assets/exemple2.png)
 
 ## Dépannage rapide
 
-- Format non supporté : Vérifier l'extension et le fichier source.
-- Espace disque insuffisant : libérer de l'espace ou choisir un autre emplacement.
-- Calque verrouillé : déverrouiller dans le panneau Calques pour modifier.
+- Format non supporté : vérifier l'extension et l'intégrité du fichier source.
+- Espace disque insuffisant : libérer de l'espace ou choisir un emplacement différent.
+- Calque verrouillé : déverrouillez le calque dans le panneau Calques avant modification.
 
 ---
 
 ## Ressources
 
 - README du projet : [README.md](../README.md)
-- Format `.epg` : [../epgformat.md](epgformat.md)
+- Spécification du format `.epg` : [epgformat.md](epgformat.md)
+
+## Contact & contribution
+
+Si vous trouvez des erreurs ou souhaitez contribuer à la documentation, ouvrez une issue ou une pull request sur le dépôt. Pour des questions rapides, consultez le fichier `CONTRIBUTING.md`.
