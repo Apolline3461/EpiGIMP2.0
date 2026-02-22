@@ -80,20 +80,28 @@ void Document::removeLayer(const size_t idx)
     layers_.erase(layers_.begin() + static_cast<Diff>(idx));
 }
 
-void Document::reorderLayer(size_t from, size_t to)
+void Document::reorderLayer(std::size_t from, std::size_t to)
 {
     const auto size = layers_.size();
-
     if (from >= size || to >= size || from == to)
         return;
 
-    auto tmpLayer = layers_[from];
     using Diff = decltype(layers_)::difference_type;
+    auto b = layers_.begin();
 
-    layers_.erase(layers_.begin() + static_cast<Diff>(from));
-    layers_.insert(layers_.begin() + static_cast<Diff>(to), std::move(tmpLayer));
+    auto itFrom = b + static_cast<Diff>(from);
+    auto itTo = b + static_cast<Diff>(to);
 
-    layers_.erase(layers_.begin() + static_cast<Diff>(from));
+    if (from < to)
+    {
+        // move element [from] after shifting left the range (from+1..to)
+        std::rotate(itFrom, itFrom + 1, itTo + 1);
+    }
+    else
+    {
+        // move element [from] before shifting right the range (to..from-1)
+        std::rotate(itTo, itFrom, itFrom + 1);
+    }
 }
 
 void Document::mergeDown(const std::size_t from)
