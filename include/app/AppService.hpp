@@ -4,6 +4,7 @@
 
 #pragma once
 #include <memory>
+#include <string>
 
 #include "app/History.hpp"
 #include "app/Signal.h"
@@ -28,12 +29,12 @@ struct Size
     int h;
 };
 
-struct LayerSpec
-{  // maybe we can use it for other things in that's case we will put in a separated file
+struct LayerSpec  // TODO: put it in other file
+{
     std::uint32_t color = 0xFFFFFFFFU;
     std::string name = "Layer ";
     bool visible = true;
-    bool locked = true;
+    bool locked = false;  // TODO: change tests with this new default value
     float opacity = 1.F;
 };
 
@@ -45,18 +46,24 @@ class AppService
 
     const Document& document() const;
 
-    void newDocument(Size size, float dpi);
+    [[nodiscard]] bool hasDocument() const;
+    void newDocument(Size size, float dpi, std::uint32_t bgColor = common::colors::White);
     void open(const std::string& path);
+    void replaceBackgroundWithImage(const ImageBuffer& img, std::string name = "Background");
     void save(const std::string& path);
     void exportImage(const std::string& path);
+    void closeDocument();
 
     std::size_t activeLayer() const;
     void setActiveLayer(std::size_t idx);
     void setLayerVisible(std::size_t idx, bool visible);
     void setLayerOpacity(std::size_t idx, float alpha);
     void setLayerLocked(std::size_t idx, bool locked);
+    void setLayerName(std::size_t idx, std::string name);
 
     void addLayer(const LayerSpec& spec);
+    void addImageLayer(const ImageBuffer& img, std::string name, bool visible = true,
+                       bool locked = false, float opacity = 1.f);
     void removeLayer(std::size_t idx);
     void reorderLayer(std::size_t from, std::size_t to);
     void mergeLayerDown(std::size_t from);
@@ -70,6 +77,8 @@ class AppService
     void setSelectionRect(common::Rect r);
     void clearSelectionRect();
 
+    void bucketFill(common::Point p, std::uint32_t rgba);
+
     void undo();
     void redo();
     [[nodiscard]] bool canUndo() const noexcept;
@@ -79,7 +88,7 @@ class AppService
 
    private:
     std::unique_ptr<IStorage> storage_;
-    app::History history_ = app::History(20);
+    History history_ = History(20);
     std::unique_ptr<Document> doc_;
     std::size_t activeLayer_ = 0;
     std::uint64_t nextLayerId_ = 1;

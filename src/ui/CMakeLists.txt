@@ -1,17 +1,12 @@
 # src/ui/CMakeLists.txt
 
-set(UI_SOURCES
-        main.cpp
-        window.cpp
-        image.cpp
-        ImageConversion.cpp
-        resources.qrc
+file(GLOB UI_HEADERS
+        ${EPIGIMP_ROOT_INCLUDE_DIR}/ui/*.hpp
 )
 
-set(UI_HEADERS
-        ${EPIGIMP_ROOT_INCLUDE_DIR}/ui/window.hpp
-        ${EPIGIMP_ROOT_INCLUDE_DIR}/ui/image.hpp
-        ${EPIGIMP_ROOT_INCLUDE_DIR}/ui/ImageConversion.hpp
+file(GLOB UI_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
+        resources.qrc
 )
 
 add_executable(epigimp

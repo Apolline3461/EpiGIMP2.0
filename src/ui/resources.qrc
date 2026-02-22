@@ -8,7 +8,9 @@
     <file>icons/lock.svg</file>
     <file>icons/unlock.svg</file>
     <file>icons/bucket.svg</file>
+    <file>icons/bucket_selec.svg</file>
     <file>icons/color_picker.svg</file>
+    <file>icons/color_picker_selec.svg</file>
     <file>icons/undo.svg</file>
     <file>icons/redo.svg</file>
   </qresource>
