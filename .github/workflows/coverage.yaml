@@ -32,7 +32,7 @@ jobs:
       - name: Install deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build cmake gcovr \
+          sudo apt-get install -y ninja-build cmake gcovr xvfb \
             libgl1-mesa-dev libglu1-mesa-dev \
             libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-render-util0 libxcb-xinerama0 libxcb-cursor0
@@ -55,7 +55,9 @@ jobs:
         run: cmake --build build-cov --parallel
 
       - name: Test
-        run: ctest --test-dir build-cov --output-on-failure
+        run: xvfb-run -a ctest --test-dir build-cov --output-on-failure
+        env:
+          QT_QPA_PLATFORM: xcb
 
       - name: Generate coverage (gcovr)
         run: |

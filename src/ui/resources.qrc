@@ -1,6 +1,8 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
   <qresource prefix="/">
+    <file>icons/mouse.svg</file>
+    <file>icons/mouse_select.svg</file>
     <file>icons/pencil.svg</file>
     <file>icons/selection.svg</file>
     <file>icons/clear_selection.svg</file>
@@ -14,5 +16,12 @@
     <file>icons/color_picker_selec.svg</file>
     <file>icons/undo.svg</file>
     <file>icons/redo.svg</file>
+
+    <file>icons/add_layer.svg</file>
+    <file>icons/remove_layer.svg</file>
+    <file>icons/merge_layer_down.svg</file>
+    <file>icons/layer_up.svg</file>
+    <file>icons/layer_down.svg</file>
+
   </qresource>
 </RCC>

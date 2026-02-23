@@ -22,7 +22,12 @@ void History::push(CommandPtr cmd)
 
     // keep size within maxDepth_
     if (undo_.size() > maxDepth_)
-        undo_.erase(undo_.begin(), undo_.begin() + (undo_.size() - maxDepth_));
+    {
+        using Diff = decltype(undo_)::difference_type;
+
+        const std::size_t excess = undo_.size() - maxDepth_;
+        undo_.erase(undo_.begin(), undo_.begin() + static_cast<Diff>(excess));
+    }
 }
 
 bool History::canUndo() const noexcept

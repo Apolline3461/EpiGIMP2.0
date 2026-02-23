@@ -91,11 +91,29 @@ void StrokeCommand::buildChanges()
     const int w = img->width();
     const int h = img->height();
 
+    const int offX = layer->offsetX();
+    const int offY = layer->offsetY();
+
+    const Selection* sel = nullptr;
+    if (doc_)
+        sel = &doc_->selection();
+    const bool hasSel = sel && sel->hasMask() && sel->mask();
+
     std::unordered_map<std::uint64_t, PixelChange> map;
     map.reserve(256);
 
-    auto recordPixel = [&](int x, int y, std::uint32_t afterColor)
+    auto recordPixel = [&](int docX, int docY, std::uint32_t afterColor)
     {
+        if (hasSel)
+        {
+            if (docX < 0 || docY < 0 || docX >= doc_->width() || docY >= doc_->height())
+                return;
+            if (sel->t_at(docX, docY) == 0)
+                return;
+        }
+        const int x = docX - offX;
+        const int y = docY - offY;
+
         if (x < 0 || y < 0 || x >= w || y >= h)
             return;
 
