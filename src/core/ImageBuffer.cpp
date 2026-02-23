@@ -4,12 +4,14 @@
 
 #include "core/ImageBuffer.hpp"
 
+#include <common/Colors.hpp>
+
 ImageBuffer::ImageBuffer(const int width, const int height) : width_(width), height_(height)
 {
     assert(width_ > 0 && height_ > 0);
     stride_ = width_ * 4;
-    rgbaPixels_.resize(height_ * stride_);
-    fill(0x00000000u);
+    rgbaPixels_.resize(static_cast<std::size_t>(height_) * static_cast<std::size_t>(stride_));
+    fill(common::colors::Transparent);
 }
 
 int ImageBuffer::width() const noexcept

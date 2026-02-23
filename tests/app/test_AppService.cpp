@@ -5,54 +5,26 @@
 #include <memory>
 #include <string>
 #include <unordered_set>
-#include <gtest/gtest.h>
 
 #include "app/AppService.hpp"
+#include "AppServiceUtilsForTest.hpp"
+#include "common/Colors.hpp"
+#include "common/Geometry.hpp"
 #include "core/Document.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
-#include "io/EpgTypes.hpp"
-#include "io/IStorage.hpp"
-#include "common/Geometry.hpp"
-#include "common/Colors.hpp"
 
-class SpyStorage final : public IStorage {
-public:
-    bool openCalled = false;
-    bool saveCalled = false;
-    bool exportCalled = false;
+#include <gtest/gtest.h>
 
-    std::string lastOpenPath;
-    std::string lastSavePath;
-    std::string lastExportPath;
-    const Document* lastSavedDoc = nullptr;
-    const Document* lastExportedDoc = nullptr;
-
-    io::epg::OpenResult open(const std::string& path) override {
-        openCalled = true;
-        lastOpenPath = path;
-        io::epg::OpenResult result;
-        result.document = std::make_unique<Document>(1, 1, 72.f);
-        return result;
-    }
-
-    void save(const Document& doc, const std::string& path) override {
-        saveCalled = true;
-        lastSavePath = path;
-        lastSavedDoc = &doc;
-    }
-
-    void exportImage(const Document& doc, const std::string& path) override {
-        exportCalled = true;
-        lastExportPath = path;
-        lastExportedDoc = &doc;
-    }
-};
-
-static std::unique_ptr<app::AppService> makeApp(SpyStorage** outSpy = nullptr) {
-    auto spy = std::make_unique<SpyStorage>();
-    if (outSpy) *outSpy = spy.get();
-    return std::make_unique<app::AppService>(std::move(spy));
+static void addOneEditableLayer(app::AppService& svc, std::string name = "Layer 1")
+{
+    app::LayerSpec spec;
+    spec.name = std::move(name);
+    spec.visible = true;
+    spec.locked = false;
+    spec.opacity = 1.f;
+    spec.color = 0x00000000u;
+    svc.addLayer(spec);
 }
 
 TEST(AppService_State, documentReturnsConstRef) {
@@ -211,9 +183,79 @@ TEST(AppService_Layers, RemoveLayer_AfterUnlock_AllowsEmptyDocument) {
     EXPECT_EQ(app->document().layerCount(), 0);
 }
 
+TEST(AppService_Layers, MergeLayerDown_BackgroundThrows)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    EXPECT_THROW(app->mergeLayerDown(0), std::runtime_error);
+}
+
+TEST(AppService_Layers, ReorderLayer_ActiveLayerFollowsMovedLayer)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+
+    app->addLayer(spec); // idx 1
+    app->addLayer(spec); // idx 2
+    app->addLayer(spec); // idx 3
+
+    app->setActiveLayer(3);
+    ASSERT_EQ(app->activeLayer(), 3u);
+
+    // Move active layer from 3 to 1
+    app->reorderLayer(3, 1);
+
+    EXPECT_EQ(app->activeLayer(), 1u);
+}
+
+TEST(AppService_Layers, AddLayer_UsesSpecSize)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.name = "small";
+    spec.color = 0u;
+    spec.width = 10;
+    spec.height = 20;
+
+    app->addLayer(spec);
+
+    ASSERT_EQ(app->document().layerCount(), 2u);
+    auto l = app->document().layerAt(1);
+    ASSERT_NE(l, nullptr);
+    ASSERT_NE(l->image(), nullptr);
+    EXPECT_EQ(l->image()->width(), 10);
+    EXPECT_EQ(l->image()->height(), 20);
+}
+
+TEST(AppService_Layers, AddImageLayer_UsesImageSize)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+
+    ImageBuffer img(12, 7);
+    img.fill(0xFF00FFFFu);
+
+    app->addImageLayer(img, "img");
+
+    ASSERT_EQ(app->document().layerCount(), 2u);
+    auto l = app->document().layerAt(1);
+    ASSERT_NE(l, nullptr);
+    ASSERT_NE(l->image(), nullptr);
+    EXPECT_EQ(l->image()->width(), 12);
+    EXPECT_EQ(l->image()->height(), 7);
+}
+
+
 TEST(AppService_IO, Open_CallsStorage) {
     SpyStorage* spy = nullptr;
-    auto app = makeApp(&spy);
+    auto app = makeAppWithSpy(spy);
 
     app->open("foo.epg");
 
@@ -221,9 +263,10 @@ TEST(AppService_IO, Open_CallsStorage) {
     EXPECT_TRUE(spy->openCalled);
     EXPECT_EQ(spy->lastOpenPath, "foo.epg");
 }
+
 TEST(AppService_IO, Save_CallsStorage) {
     SpyStorage* spy = nullptr;
-    auto app = makeApp(&spy);
+    auto app = makeAppWithSpy(spy);
 
     app->newDocument(app::Size{10, 10}, 72.f);
     const Document* current = &app->document();
@@ -237,7 +280,7 @@ TEST(AppService_IO, Save_CallsStorage) {
 
 TEST(AppService_IO, exportImage_CallsStorage) {
     SpyStorage* spy = nullptr;
-    auto app = makeApp(&spy);
+    auto app = makeAppWithSpy(spy);
 
     app->newDocument(app::Size{10, 10}, 72.f);
     const Document* current = &app->document();
@@ -412,355 +455,6 @@ TEST(AppService_UndoRedo, MergeLayerDown_UndoRedo_RestoresLayerCount)
     EXPECT_EQ(app->document().layerCount(), 2);
 }
 
-TEST(AppService_Signals, documentChanged_EmittedOnNewDocument) {
-    const auto app = makeApp();
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { hits++; });
-
-    app->newDocument(app::Size{10, 10}, 72.f);
-
-    EXPECT_EQ(hits, 1);
-}
-
-TEST(AppService_Signals, AddLayer_EmitsDocumentChangedOnce)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app::LayerSpec spec{};
-    app->addLayer(spec); // +1
-
-    EXPECT_EQ(hits, 1);
-    app->undo(); // +1
-    app->redo(); // +1
-
-    EXPECT_EQ(hits, 3);
-}
-
-TEST(AppService_Signals, SetLayerLocked_UndoRedo_EmitsDocumentChangedOnceEach)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app->setLayerLocked(0, true); // +1
-    EXPECT_EQ(hits, 1);
-
-    app->undo(); // +1
-    app->redo(); // +1
-    EXPECT_EQ(hits, 3);
-}
-
-TEST(AppService_Signals, SetLayerVisible_UndoRedo_EmitsDocumentChangedOnceEach)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app->setLayerVisible(0, false); // +1
-    EXPECT_EQ(hits, 1);
-
-    app->undo(); // +1
-    app->redo(); // +1
-    EXPECT_EQ(hits, 3);
-}
-
-TEST(AppService_Signals, SetLayerOpacity_UndoRedo_EmitsDocumentChangedOnceEach)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app->setLayerOpacity(0, 0.25f); // +1
-    EXPECT_EQ(hits, 1);
-
-    app->undo(); // +1
-    app->redo(); // +1
-    EXPECT_EQ(hits, 3);
-}
-
-TEST(AppService_Signals, RemoveLayer_UndoRedo_EmitsDocumentChangedOnceEach)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = false;
-    app->addLayer(spec);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app->removeLayer(1); // +1
-    EXPECT_EQ(hits, 1);
-
-    app->undo(); // +1
-    app->redo(); // +1
-    EXPECT_EQ(hits, 3);
-}
-
-TEST(AppService_Signals, ReorderLayer_UndoRedo_EmitsDocumentChangedOnceEach)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = false;
-    app->addLayer(spec);
-    app->addLayer(spec);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app->reorderLayer(2, 1); // +1
-    EXPECT_EQ(hits, 1);
-
-    app->undo(); // +1
-    app->redo(); // +1
-    EXPECT_EQ(hits, 3);
-}
-
-TEST(AppService_Signals, MergeLayerDown_UndoRedo_EmitsDocumentChangedOnceEach)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = false;
-    app->addLayer(spec);
-    app->addLayer(spec);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app->mergeLayerDown(2); // +1
-    EXPECT_EQ(hits, 1);
-
-    app->undo(); // +1
-    app->redo(); // +1
-    EXPECT_EQ(hits, 3);
-}
-
-TEST(AppService_Signals, SetLayerLocked_NoChange_DoesNotEmit)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app->setLayerLocked(0, false);
-
-    EXPECT_EQ(hits, 0);
-}
-
-TEST(AppService_Signals, Selection_SetRect_EmitsDocumentChangedOnce)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app->setSelectionRect(Selection::Rect{1, 1, 2, 2}); // +1
-    EXPECT_EQ(hits, 1);
-}
-
-TEST(AppService_Signals, Selection_Clear_EmitsDocumentChangedOnce)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
-
-    app->setSelectionRect(Selection::Rect{1, 1, 2, 2}); // on ignore ce hit
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app->clearSelectionRect(); // +1
-    EXPECT_EQ(hits, 1);
-}
-
-TEST(AppService_Signals, Stroke_End_Undo_Redo_EmitsOnceEach)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{6, 3}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = false;
-    app->addLayer(spec);
-    app->setActiveLayer(1);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app::ToolParams tp{};
-    tp.color = 0xFF00FF00u;
-
-    const int before = hits;
-
-    app->beginStroke(tp, common::Point{1, 1});
-    app->moveStroke(common::Point{4, 1});
-
-    EXPECT_EQ(hits, before);
-
-    app->endStroke();  // commit -> +1
-    EXPECT_EQ(hits, before + 1);
-
-    app->undo();       // +1
-    app->redo();       // +1
-    EXPECT_EQ(hits, before + 3);
-}
-
-TEST(AppService_Signals, BucketFill_NoSelection_EmitsOnce)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{6, 6}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = false;
-    spec.color = 0xFFFFFFFFu;
-    app->addLayer(spec);
-    app->setActiveLayer(1);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app->bucketFill(common::Point{2, 2}, 0xFF112233u);
-    EXPECT_EQ(hits, 1);
-}
-
-TEST(AppService_Signals, BucketFill_UndoRedo_EmitsOnceEach)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{6, 6}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = false;
-    spec.color = 0xFFFFFFFFu;
-    app->addLayer(spec);
-    app->setActiveLayer(1);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app->bucketFill(common::Point{3, 3}, 0xFF00AA11u); // +1
-    app->undo();                                      // +1
-    app->redo();                                      // +1
-
-    EXPECT_EQ(hits, 3);
-}
-
-TEST(AppService_Signals, BucketFill_WithSelection_ClickOutside_DoesNotEmit)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{6, 6}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = false;
-    spec.color = 0xFFFFFFFFu;
-    app->addLayer(spec);
-    app->setActiveLayer(1);
-
-    // sélection au centre (2..3,2..3)
-    app->setSelectionRect(Selection::Rect{2, 2, 2, 2});
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    // clic hors sélection => no-op
-    app->bucketFill(common::Point{0, 0}, 0xFF0000FFu);
-
-    EXPECT_EQ(hits, 0);
-}
-
-TEST(AppService_Signals, BucketFill_WithSelection_ClickInside_EmitsOnceEachWithUndoRedo)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{6, 6}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = false;
-    spec.color = 0xFFFFFFFFu;
-    app->addLayer(spec);
-    app->setActiveLayer(1);
-
-    app->setSelectionRect(Selection::Rect{1, 1, 4, 4});
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app->bucketFill(common::Point{2, 2}, 0xFF123456u); // +1
-    app->undo();                                       // +1
-    app->redo();                                       // +1
-
-    EXPECT_EQ(hits, 3);
-}
-
-TEST(AppService_Signals, BucketFill_OutOfBounds_DoesNotEmit)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{4, 4}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = false;
-    spec.color = 0xFFFFFFFFu;
-    app->addLayer(spec);
-    app->setActiveLayer(1);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    app->bucketFill(common::Point{-1, 0}, 0xFF010203u);
-    app->bucketFill(common::Point{0, -1}, 0xFF010203u);
-    app->bucketFill(common::Point{4, 0}, 0xFF010203u);
-    app->bucketFill(common::Point{0, 4}, 0xFF010203u);
-
-    EXPECT_EQ(hits, 0);
-}
-
-TEST(AppService_Signals, BucketFill_LockedLayer_ThrowsAndDoesNotEmit)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{4, 4}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = true;
-    spec.color = 0xFFFFFFFFu;
-    app->addLayer(spec);
-    app->setActiveLayer(1);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    EXPECT_THROW(app->bucketFill(common::Point{1, 1}, 0xFF000000u), std::runtime_error);
-    EXPECT_EQ(hits, 0);
-}
-
-TEST(AppService_Signals, ReplaceBackgroundWithImage_EmitsDocumentChangedOnce)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{3, 3}, 72.f, common::colors::Transparent);
-
-    int hits = 0;
-    app->documentChanged.connect([&]() { ++hits; });
-
-    ImageBuffer src(3, 3);
-    src.fill(0xFF445566u);
-
-    app->replaceBackgroundWithImage(src, "opened");
-
-    EXPECT_EQ(hits, 1);
-}
-
 TEST(AppService_Picking, pickColorAt_ReadsPixelFromActiveLayer)
 {
     const auto app = makeApp();
@@ -841,6 +535,31 @@ TEST(AppService_Picking, pickColorAt_DoesNotAffectUndoRedo)
     EXPECT_EQ(app->canRedo(), beforeRedo);
 }
 
+TEST(AppService_Picking, PickColorAt_RespectsLayerOffsetAndSize)
+{
+    const auto app = makeApp();
+    app->newDocument(app::Size{10, 10}, 72.f);
+
+    // add 3x3 layer at offset (4,4), fill red
+    app::LayerSpec spec{};
+    spec.name = "tiny";
+    spec.width = 3;
+    spec.height = 3;
+    spec.color = 0xFF0000FFu;
+    spec.offsetX = 4;
+    spec.offsetY = 4;
+
+    app->addLayer(spec);
+    app->setActiveLayer(1);
+
+    // inside
+    EXPECT_EQ(app->pickColorAt({4,4}), 0xFF0000FFu);
+
+    // outside (but still within doc) => transparent
+    EXPECT_EQ(app->pickColorAt({0,0}), common::colors::Transparent);
+}
+
+
 TEST(AppService_Stroke, Stroke_DrawsPixels_AndIsUndoable)
 {
     const auto app = makeApp();
@@ -911,119 +630,62 @@ TEST(AppService_Stroke, BeginStroke_OnLockedLayer_Throws)
     EXPECT_THROW(app->beginStroke(tp, common::Point{0, 0}), std::runtime_error);
 }
 
-TEST(AppService_BucketFill, NoSelection_FillsAndUndoRedoWorks)
+TEST(AppService_Stroke, DoesNotPaintOutsideLayer_AndPaintsLocalPixelInside)
 {
     const auto app = makeApp();
-    app->newDocument(app::Size{5, 5}, 72.f);
+    app->newDocument({10, 10}, 72.f, /*bg*/ 0x000000FFu);
 
+    // Remplace layer actif par un layer 3x3 offset (4,4), pour contrôler exactement la zone.
     app::LayerSpec spec{};
+    spec.name = "L1";
+    spec.visible = true;
     spec.locked = false;
-    spec.color = common::colors::Transparent;
+    spec.opacity = 1.f;
+    spec.color = 0x00000000u; // transparent
     app->addLayer(spec);
+
+    ASSERT_EQ(app->document().layerCount(), 2u);
+
+    // Force image buffer 3x3 + offset (4,4)
+    auto layer = app->document().layerAt(1);
+    ASSERT_NE(layer, nullptr);
+    auto img = std::make_shared<ImageBuffer>(3, 3);
+    img->fill(0x00000000u);
+    layer->setImageBuffer(img);
+    layer->setOffset(4, 4);
     app->setActiveLayer(1);
 
-    auto img = app->document().layerAt(1)->image();
-    ASSERT_NE(img, nullptr);
+    // --- OUTSIDE : doc point (3,4) -> local (-1,0) => doit rien peindre
+    {
+        app::ToolParams params{};
+        params.color = 0xFF00FFFFu;
+        app->beginStroke(params, common::Point{3, 4});
+        app->endStroke();
 
-    img->setPixel(2, 2, 0xFF000000u); // zone source
-    const uint32_t fill = 0xFFFF0000u;
+        // vérifie qu'aucun pixel du layer 3x3 n'a changé
+        auto img = layer->image();
+        ASSERT_NE(img, nullptr);
+        for (int y = 0; y < img->height(); ++y)
+            for (int x = 0; x < img->width(); ++x)
+                EXPECT_EQ(img->getPixel(x, y), 0x00000000u);
+    }
 
-    app->bucketFill(common::Point{2, 2}, fill);
+    // --- INSIDE : doc point (5,6) -> local (1,2) => doit peindre img(1,2)
+    {
+        app::ToolParams params{};
+        params.color = 0x00FF00FFu; // vert opaque
+        app->beginStroke(params, common::Point{5, 6});
+        app->endStroke();
 
-    EXPECT_TRUE(app->canUndo());
-    EXPECT_EQ(img->getPixel(2, 2), fill);
+        auto img = layer->image();
+        ASSERT_NE(img, nullptr);
 
-    app->undo();
-    EXPECT_EQ(img->getPixel(2, 2), 0xFF000000u);
+        // pixel attendu peint
+        EXPECT_EQ(img->getPixel(1, 2), 0x00FF00FFu);
 
-    app->redo();
-    EXPECT_EQ(img->getPixel(2, 2), fill);
-}
-
-TEST(AppService_BucketFill, WithSelection_ClickOutside_IsNoOpAndNoHistory)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{6, 6}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = false;
-    spec.color = 0xFF00FF00u; // vert
-    app->addLayer(spec);
-    app->setActiveLayer(1);
-
-    // sélection au centre (2..3, 2..3)
-    app->setSelectionRect(Selection::Rect{2, 2, 2, 2});
-
-    const bool beforeUndo = app->canUndo();
-    const bool beforeRedo = app->canRedo();
-
-    // clic hors sélection
-    app->bucketFill(common::Point{0, 0}, 0xFFFF0000u);
-
-    // rien ne doit changer côté history
-    EXPECT_EQ(app->canUndo(), beforeUndo);
-    EXPECT_EQ(app->canRedo(), beforeRedo);
-}
-
-TEST(AppService_BucketFill, WithSelection_FillsOnlyInsideMask)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{6, 6}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = false;
-    spec.color = 0xFFFFFFFFu; // blanc partout
-    app->addLayer(spec);
-    app->setActiveLayer(1);
-
-    auto img = app->document().layerAt(1)->image();
-    ASSERT_NE(img, nullptr);
-
-    // sélection (1..4,1..4) => 4x4
-    app->setSelectionRect(Selection::Rect{1, 1, 4, 4});
-
-    const uint32_t fill = 0xFF112233u;
-    app->bucketFill(common::Point{2, 2}, fill);
-
-    // dans la sélection
-    EXPECT_EQ(img->getPixel(2, 2), fill);
-
-    // hors sélection (0,0) doit rester blanc
-    EXPECT_EQ(img->getPixel(0, 0), 0xFFFFFFFFu);
-}
-
-TEST(AppService_BucketFill, LockedLayer_Throws)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{4, 4}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = true;
-    spec.color = 0xFFFFFFFFu;
-    app->addLayer(spec);
-    app->setActiveLayer(1);
-
-    EXPECT_THROW(app->bucketFill(common::Point{1, 1}, 0xFF000000u), std::runtime_error);
-}
-
-TEST(AppService_BucketFill, OutOfBounds_IsNoOpAndNoHistory)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{4, 4}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = false;
-    spec.color = 0xFFFFFFFFu;
-    app->addLayer(spec);
-    app->setActiveLayer(1);
-
-    const bool beforeUndo = app->canUndo();
-    app->bucketFill(common::Point{-1, 0}, 0xFF000000u);
-    app->bucketFill(common::Point{0, -1}, 0xFF000000u);
-    app->bucketFill(common::Point{4, 0}, 0xFF000000u);
-    app->bucketFill(common::Point{0, 4}, 0xFF000000u);
-
-    EXPECT_EQ(app->canUndo(), beforeUndo);
+        // un autre pixel reste transparent
+        EXPECT_EQ(img->getPixel(0, 0), 0x00000000u);
+    }
 }
 
 TEST(AppService_OpenImageFlow, ReplaceBackgroundWithImage_KeepsSingleLayerAndCopiesPixels)
@@ -1096,3 +758,90 @@ TEST(AppService_OpenImageFlow, ReplaceBackgroundWithImage_ClearsUndoRedo)
     EXPECT_FALSE(app->canRedo());
 }
 
+TEST(AppService_SetLayerName, ChangesNameAndUndoRedoWorks)
+{
+    app::AppService svc(nullptr);
+    svc.newDocument({32, 32}, 72.f);
+
+    // addLayer pushes a command -> canUndo() is expected to be true now
+    addOneEditableLayer(svc, "Layer 1");
+    ASSERT_EQ(svc.document().layerCount(), 2u);
+    ASSERT_TRUE(svc.canUndo());
+
+    // Rename (this should add ONE more command if implemented via apply)
+    svc.setLayerName(1, "Renamed");
+    EXPECT_EQ(svc.document().layerAt(1)->name(), std::string("Renamed"));
+
+    // Undo #1: should undo rename, NOT remove the layer
+    svc.undo();
+    ASSERT_EQ(svc.document().layerCount(), 2u);
+    EXPECT_EQ(svc.document().layerAt(1)->name(), std::string("Layer 1"));
+
+    // Redo: should redo rename
+    svc.redo();
+    ASSERT_EQ(svc.document().layerCount(), 2u);
+    EXPECT_EQ(svc.document().layerAt(1)->name(), std::string("Renamed"));
+
+    // Undo twice: 1) undo rename, 2) undo addLayer -> back to background only
+    svc.undo();
+    svc.undo();
+    EXPECT_EQ(svc.document().layerCount(), 1u);
+}
+
+TEST(AppService_SetLayerName, ThrowsOnLockedLayerAndDoesNotRename)
+{
+    app::AppService svc(nullptr);
+    svc.newDocument({32, 32}, 72.f);
+
+    addOneEditableLayer(svc, "Layer 1");
+    ASSERT_EQ(svc.document().layerCount(), 2u);
+
+    svc.setLayerLocked(1, true);
+    ASSERT_TRUE(svc.document().layerAt(1)->locked());
+
+    EXPECT_THROW(svc.setLayerName(1, "ShouldFail"), std::runtime_error);
+    EXPECT_EQ(svc.document().layerAt(1)->name(), std::string("Layer 1"));
+}
+
+TEST(AppService_SetLayerName, NoOpIfSameNameDoesNotPushHistory)
+{
+    app::AppService svc(nullptr);
+    svc.newDocument({32, 32}, 72.f);
+
+    addOneEditableLayer(svc, "Layer 1");
+    ASSERT_EQ(svc.document().layerCount(), 2u);
+
+    // No-op rename (same name)
+    svc.setLayerName(1, "Layer 1");
+    EXPECT_EQ(svc.document().layerAt(1)->name(), std::string("Layer 1"));
+
+    // If no command was pushed, the next undo should undo addLayer and remove the layer
+    svc.undo();
+    EXPECT_EQ(svc.document().layerCount(), 1u);
+}
+
+TEST(AppService_Validation, NewDocument_ZeroWidth_ThrowsInvalidArgument)
+{
+    const auto app = makeApp();
+    EXPECT_THROW(app->newDocument(app::Size{0, 10}, 72.f), std::invalid_argument);
+}
+
+TEST(AppService_Validation, NewDocument_ZeroHeight_ThrowsInvalidArgument)
+{
+    const auto app = makeApp();
+    EXPECT_THROW(app->newDocument(app::Size{10, 0}, 72.f), std::invalid_argument);
+}
+
+TEST(AppService_Validation, NewDocument_ZeroByZero_ThrowsInvalidArgument)
+{
+    const auto app = makeApp();
+    EXPECT_THROW(app->newDocument(app::Size{0, 0}, 72.f), std::invalid_argument);
+}
+
+TEST(AppService_Validation, NewDocument_NegativeDimensions_ThrowsInvalidArgument)
+{
+    const auto app = makeApp();
+    EXPECT_THROW(app->newDocument(app::Size{-1, 10}, 72.f), std::invalid_argument);
+    EXPECT_THROW(app->newDocument(app::Size{10, -1}, 72.f), std::invalid_argument);
+    EXPECT_THROW(app->newDocument(app::Size{-1, -1}, 72.f), std::invalid_argument);
+}

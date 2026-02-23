@@ -5,6 +5,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "Selection.hpp"
@@ -22,11 +23,11 @@ class Document
     [[nodiscard]] int height() const noexcept;
     [[nodiscard]] float dpi() const noexcept;
 
-    size_t addLayer(std::shared_ptr<Layer> layer);
-    size_t addLayer(std::shared_ptr<Layer> layer, size_t idx);
+    std::optional<std::size_t> addLayer(std::shared_ptr<Layer> layer);
+    std::optional<std::size_t> addLayer(std::shared_ptr<Layer> layer, size_t idx);
     void removeLayer(size_t idx);
     void reorderLayer(size_t from, size_t to);
-    void mergeDown(int from);
+    void mergeDown(std::size_t from);
 
     [[nodiscard]] size_t layerCount() const noexcept;
     [[nodiscard]] std::shared_ptr<Layer> layerAt(size_t index) const;
