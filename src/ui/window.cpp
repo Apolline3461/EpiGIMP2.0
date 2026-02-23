@@ -96,23 +96,36 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
                                           (static_cast<uint32_t>(m_toolColor.green()) << 16) |
                                           (static_cast<uint32_t>(m_toolColor.blue()) << 8) |
                                           static_cast<uint32_t>(m_toolColor.alpha());
-
-                app().bucketFill(p, newColor);
+                try
+                {
+                    app().bucketFill(p, newColor);
+                }
+                catch (std::exception& e)
+                {
+                    statusBar()->showMessage(e.what(), 2000);
+                }
             });
     connect(canvas_, &CanvasWidget::beginStroke, this,
             [this](common::Point p)
             {
                 if (!m_pencilAct || !m_pencilAct->isChecked())
                     return;
-                app::ToolParams params;
-                params.tool = app::ToolKind::Pencil;
-                params.size = (m_pencilSizeSpin) ? m_pencilSizeSpin->value() : 8;
-                (void)0;  // hardness removed
-                params.color = (static_cast<uint32_t>(m_toolColor.red()) << 24) |
-                               (static_cast<uint32_t>(m_toolColor.green()) << 16) |
-                               (static_cast<uint32_t>(m_toolColor.blue()) << 8) |
-                               static_cast<uint32_t>(m_toolColor.alpha());
-                app().beginStroke(params, p);
+                try
+                {
+                    app::ToolParams params;
+                    params.tool = app::ToolKind::Pencil;
+                    params.size = (m_pencilSizeSpin) ? m_pencilSizeSpin->value() : 8;
+                    (void)0;  // hardness removed
+                    params.color = (static_cast<uint32_t>(m_toolColor.red()) << 24) |
+                                   (static_cast<uint32_t>(m_toolColor.green()) << 16) |
+                                   (static_cast<uint32_t>(m_toolColor.blue()) << 8) |
+                                   static_cast<uint32_t>(m_toolColor.alpha());
+                    app().beginStroke(params, p);
+                }
+                catch (const std::exception& e)
+                {
+                    statusBar()->showMessage(e.what(), 2000);
+                }
             });
 
     connect(canvas_, &CanvasWidget::moveStroke, this,
@@ -120,7 +133,14 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
             {
                 if (!m_pencilAct || !m_pencilAct->isChecked())
                     return;
-                app().moveStroke(p);
+                try
+                {
+                    app().moveStroke(p);
+                }
+                catch (std::exception& e)
+                {
+                    statusBar()->showMessage(e.what(), 2000);
+                }
             });
 
     connect(canvas_, &CanvasWidget::endStroke, this,
@@ -128,7 +148,14 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
             {
                 if (!m_pencilAct || !m_pencilAct->isChecked())
                     return;
-                app().endStroke();
+                try
+                {
+                    app().endStroke();
+                }
+                catch (std::exception& e)
+                {
+                    statusBar()->showMessage(e.what(), 2000);
+                }
             });
 
     app().documentChanged.connect([this]() { refreshUIAfterDocChange(); });
@@ -139,6 +166,7 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
 void MainWindow::refreshUIAfterDocChange()
 {
     const bool hasDoc = app().hasDocument();
+
     if (m_zoomInAct)
         m_zoomInAct->setEnabled(hasDoc);
     if (m_zoomOutAct)
@@ -157,6 +185,14 @@ void MainWindow::refreshUIAfterDocChange()
         clearUiStateOnClose();
         return;
     }
+    bool editable = false;
+    auto layer = app().document().layerAt(app().activeLayer());
+    editable = (layer && !layer->locked() && layer->image());
+
+    if (m_bucketAct)
+        m_bucketAct->setEnabled(hasDoc && editable);
+    if (m_pencilAct)
+        m_pencilAct->setEnabled(hasDoc && editable);
     canvas_->setImage(Renderer::render(app().document()));
 
     populateLayersList();
