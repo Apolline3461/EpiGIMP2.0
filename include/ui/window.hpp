@@ -17,6 +17,7 @@
 #include <QRect>
 #include <QScrollArea>
 #include <QString>
+#include <QToolButton>
 
 #include <memory>
 #include <optional>
@@ -36,6 +37,7 @@ class ImageLabel;
 class CanvasWidget;
 class QToolBar;
 class QActionGroup;
+class QSpinBox;
 
 class MainWindow : public QMainWindow
 {
@@ -46,6 +48,7 @@ class MainWindow : public QMainWindow
     explicit MainWindow(app::AppService& svc, QWidget* parent = nullptr);
     ~MainWindow() override {}
 
+    // NOLINTNEXTLINE(unknownMacro)
    private slots:
     void zoomIn();
     void zoomOut();
@@ -84,6 +87,7 @@ class MainWindow : public QMainWindow
     CanvasWidget* canvas_{nullptr};
 
     void refreshUIAfterDocChange();
+    void updateLayerOverlayFromSelection();
     void clearUiStateOnClose();
 
     void createActions();
@@ -94,6 +98,8 @@ class MainWindow : public QMainWindow
     void populateLayersList();
     QPixmap createLayerThumbnail(const std::shared_ptr<class Layer>& layer,
                                  const QSize& size) const;
+    std::optional<std::size_t> currentLayerIndexFromSelection() const;
+    void updateLayerHeaderButtonsEnabled();
 
     // void keyPressEvent(QKeyEvent* event) override;
     // void keyReleaseEvent(QKeyEvent* event) override;
@@ -109,6 +115,12 @@ class MainWindow : public QMainWindow
     QMenu* m_cmdMenu{nullptr};
 
     QToolBar* m_toolsTb = nullptr;
+    QToolButton* m_layerAddBtn = nullptr;
+    QToolButton* m_layerDeleteBtn = nullptr;
+    QToolButton* m_layerUpBtn = nullptr;
+    QToolButton* m_layerDownBtn = nullptr;
+    QToolButton* m_layerMergeDownBtn = nullptr;
+
     QActionGroup* m_toolsGroup = nullptr;
 
     QAction* m_newAct{nullptr};
@@ -128,12 +140,28 @@ class MainWindow : public QMainWindow
 
     QAction* m_clearSelectionAct{nullptr};
     QAction* m_selectToggleAct{nullptr};
-    QAction* m_bucketAct{nullptr};
-    QAction* m_colorPickerAct{nullptr};
-    QAction* m_pickAct{nullptr};
+
     bool m_bucketMode{false};
     bool m_pickMode{false};
     QColor m_bucketColor{Qt::black};
+    QAction* m_bucketAct{nullptr};
+    QAction* m_colorPickerAct{nullptr};
+    QAction* m_pickAct{nullptr};
+
+    QAction* m_moveLayerAct{nullptr};
+    bool m_moveLayerMode{false};
+    bool m_dragLayerActive{false};
+    std::size_t m_dragLayerIdx{0};
+    common::Point m_dragStartDoc{0, 0};
+    common::Point m_dragStartOffset{0, 0};
+    QImage m_dragBaseImage;   // rendu "base" pendant le drag (doc sans le layer déplacé)
+    QImage m_dragLayerImage;  // image du layer déplacé (seul)
+
+    QColor m_toolColor{Qt::black};
+
+    QAction* m_pencilAct{nullptr};
+    QDockWidget* m_pencilDock{nullptr};
+    QSpinBox* m_pencilSizeSpin{nullptr};
 
     bool m_handMode{false};
     bool m_panningActive{false};
