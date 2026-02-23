@@ -4,6 +4,7 @@ set(EPIGIMP_UI_TEST_SOURCES
         test_MainWindow.cpp
         test_ImageConversion.cpp
         test_PanClamp.cpp
+        test_ui_main.cpp
 )
 
 add_executable(test_ui
@@ -19,7 +20,7 @@ target_link_libraries(test_ui
         PRIVATE
         epigimp_ui
         Qt6::Widgets
-        GTest::gtest_main
+        GTest::gtest
 )
 
 include(GoogleTest)

@@ -95,6 +95,8 @@ jobs:
 
       - name: Test
         shell: bash
+        env:
+          QT_DEBUG_PLUGINS: 1
         run: |
           if [ -f build/CTestTestfile.cmake ] || [ -d build/Testing ]; then
             if [[ "${{ runner.os }}" == "Linux" ]]; then
