@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 
 #include "app/Command.hpp"
 #include "common/Geometry.hpp"
