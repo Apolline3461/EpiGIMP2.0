@@ -24,4 +24,6 @@ target_link_libraries(test_ui
 )
 
 include(GoogleTest)
-gtest_discover_tests(test_ui)
+gtest_discover_tests(test_ui
+        DISCOVERY_MODE PRE_TEST
+)
