@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <optional>
 
 #include "core/ImageBuffer.hpp"
 
@@ -70,4 +71,36 @@ void Selection::subtractRect(const Selection::Rect& rect)
             mask_->setPixel(xx, yy, 0x00000000u);
         }
     }
+}
+
+std::optional<Selection::Rect> Selection::boundingRect() const
+{
+    if (!mask_)
+        return std::nullopt;
+
+    const int w = mask_->width();
+    const int h = mask_->height();
+
+    int minX = w, minY = h;
+    int maxX = -1, maxY = -1;
+
+    for (int y = 0; y < h; ++y)
+    {
+        for (int x = 0; x < w; ++x)
+        {
+            if (t_at(x, y) != 0)
+            {
+                minX = std::min(minX, x);
+                minY = std::min(minY, y);
+                maxX = std::max(maxX, x);
+                maxY = std::max(maxY, y);
+            }
+        }
+    }
+
+    if (maxX < minX || maxY < minY)
+        return std::nullopt;
+
+    // Rect: x,y,w,h  (w/h inclusifs -> +1)
+    return Rect{minX, minY, (maxX - minX + 1), (maxY - minY + 1)};
 }
