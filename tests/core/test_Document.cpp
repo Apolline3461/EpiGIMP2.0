@@ -2,11 +2,13 @@
 // Created by apolline on 09/12/2025.
 //
 
-#include <gtest/gtest.h>
 #include <memory>
 
 #include "core/Document.hpp"
 #include "core/Layer.hpp"
+
+#include <core/ImageBuffer.hpp>
+#include <gtest/gtest.h>
 
 class ImageBuffer;
 
@@ -65,8 +67,8 @@ TEST(Document, AddLayerAppendsByDefault) {
     const auto L1 = makeLayer(1, "L1");
     const auto L2 = makeLayer(2, "L2");
 
-    const int idx1 = doc.addLayer(L1);
-    const int idx2 = doc.addLayer(L2);
+    const auto idx1 = doc.addLayer(L1);
+    const auto idx2 = doc.addLayer(L2);
 
     EXPECT_EQ(idx1, 0);
     EXPECT_EQ(idx2, 1);
@@ -85,7 +87,7 @@ TEST(Document, AddLayerInsertAtValidIndex) {
     doc.addLayer(L1);
     doc.addLayer(L2);
 
-    int idxInserted = doc.addLayer(L3, 1);
+    auto idxInserted = doc.addLayer(L3, 1);
 
     EXPECT_EQ(idxInserted, 1);
     EXPECT_EQ(doc.layerCount(), 3);
@@ -105,13 +107,13 @@ TEST(Document, AddLayerInsertAtInvalidIndex_outOfRange) {
     doc.addLayer(L1);
     ASSERT_EQ(doc.layerCount(), 1);
 
-    int idxNeg = doc.addLayer(L2, -1);
-    EXPECT_EQ(idxNeg, -1);
+    auto idxNeg = doc.addLayer(L2, -1);
+    EXPECT_FALSE(idxNeg.has_value());
     EXPECT_EQ(doc.layerCount(), 1);
     EXPECT_EQ(doc.layerAt(0), L1);
 
-    int idxTooBig = doc.addLayer(L3, 5);
-    EXPECT_EQ(idxTooBig, -1);
+    auto idxTooBig = doc.addLayer(L3, 5);
+    EXPECT_FALSE(idxTooBig.has_value());
     EXPECT_EQ(doc.layerCount(), 1);
     EXPECT_EQ(doc.layerAt(0), L1);
 }
@@ -150,7 +152,15 @@ TEST(Document, RemoveLayerIndexOutOfRangeIsNoOp) {
     EXPECT_EQ(doc.layerAt(1), L2);
 }
 
-TEST(Document, MergeDownOnBottomLayerIsNoOp) {
+static std::shared_ptr<Layer> makeLayerWithSolidImage(
+    uint64_t id, const std::string& name, int w, int h, uint32_t fill, float opacity = 1.f)
+{
+    auto img = std::make_shared<ImageBuffer>(w, h);
+    img->fill(fill);
+    return std::make_shared<Layer>(id, name, img, /*visible*/ true, /*locked*/ false, opacity);
+}
+
+TEST(Document_MergeDown, MergeDownOnBottomLayerIsNoOp) {
     Document doc(100, 100);
 
     auto L1 = makeLayer(1, "L1");
@@ -167,6 +177,40 @@ TEST(Document, MergeDownOnBottomLayerIsNoOp) {
     EXPECT_EQ(doc.layerCount(), 2);
     EXPECT_EQ(doc.layerAt(0), L1);
     EXPECT_EQ(doc.layerAt(1), L2);
+}
+
+TEST(Document_MergeDown, BlendsSrcOverDst_WithAlphaAndOpacity)
+{
+    Document doc(1, 1, 72.f);
+
+    // dst = bleu opaque
+    auto dst = makeLayerWithSolidImage(1, "dst", 1, 1, 0x0000FFFFu, 1.f);
+    // src = rouge 50% alpha
+    auto src = makeLayerWithSolidImage(2, "src", 1, 1, 0xFF000080u, 1.f);
+
+    ASSERT_TRUE(doc.addLayer(dst).has_value()); // index 0
+    ASSERT_TRUE(doc.addLayer(src).has_value()); // index 1
+
+    ASSERT_EQ(doc.layerCount(), 2u);
+    ASSERT_NE(dst->image(), nullptr);
+
+    doc.mergeDown(1);
+
+    ASSERT_EQ(doc.layerCount(), 1u);
+
+    const uint32_t got = dst->image()->getPixel(0, 0);
+
+    auto ch = [](uint32_t px, int shift) -> int {
+        return static_cast<int>((px >> shift) & 0xFFu);
+    };
+
+    // attendu : violet opaque ~ (128,0,128,255)
+    const uint32_t expected = 0x800080FFu;
+
+    EXPECT_NEAR(ch(got, 24), ch(expected, 24), 1) << "R";
+    EXPECT_NEAR(ch(got, 16), ch(expected, 16), 1) << "G";
+    EXPECT_NEAR(ch(got,  8), ch(expected,  8), 1) << "B";
+    EXPECT_NEAR(ch(got,  0), ch(expected,  0), 1) << "A";
 }
 
 TEST(Document, LayerPointersAreShared) {
@@ -188,10 +232,10 @@ TEST(Document, LayerPointersAreShared) {
     EXPECT_EQ(doc.layerAt(2), L3);
 }
 
-// TEST(Document, DefaultSelectionHasNoMask) {
-//     Document doc(100, 100);
-//     EXPECT_FALSE(doc.selection().hasMask());
-// }
+TEST(Document, DefaultSelectionHasNoMask) {
+    Document doc(100, 100);
+    EXPECT_FALSE(doc.selection().hasMask());
+}
 
 // -----------------------------------------------------------------------------
 // Fixture Tests
@@ -254,14 +298,13 @@ TEST_F(DocumentWithThreeLayers, ReorderLayerIndexOutOfRangeIsNoOp) {
     ASSERT_EQ(doc.layerCount(), 3);
 
     // from hors bornes
-    doc.reorderLayer(-1, 1);
+    doc.reorderLayer(45, 1);
     doc.reorderLayer(3, 1);
 
     // to hors bornes
     doc.reorderLayer(1, -1);
     doc.reorderLayer(1, 42);
 
-    // L'ordre doit rester [L1, L2, L3]
     EXPECT_EQ(doc.layerAt(0), L1);
     EXPECT_EQ(doc.layerAt(1), L2);
     EXPECT_EQ(doc.layerAt(2), L3);

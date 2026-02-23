@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <memory>
 #include <stdexcept>
 
 #include "core/ImageBuffer.hpp"
@@ -39,7 +41,7 @@ float Document::dpi() const noexcept
 
 size_t Document::layerCount() const noexcept
 {
-    return static_cast<int>(layers_.size());
+    return layers_.size();
 }
 
 std::shared_ptr<Layer> Document::layerAt(const size_t index) const
@@ -49,49 +51,60 @@ std::shared_ptr<Layer> Document::layerAt(const size_t index) const
     return layers_[index];
 }
 
-size_t Document::addLayer(std::shared_ptr<Layer> layer)
+std::optional<std::size_t> Document::addLayer(std::shared_ptr<Layer> layer)
 {
     if (!layer)
-        return -1;
+        return std::nullopt;
     layers_.push_back(std::move(layer));
     return layers_.size() - 1;
 }
 
-size_t Document::addLayer(std::shared_ptr<Layer> layer, const size_t idx)
+std::optional<std::size_t> Document::addLayer(std::shared_ptr<Layer> layer, const size_t idx)
 {
     if (!layer)
-        return -1;
+        return std::nullopt;
 
     if (idx > layers_.size())
-        return -1;
+        return std::nullopt;
 
     layers_.insert(layers_.begin() + static_cast<std::ptrdiff_t>(idx), std::move(layer));
     return idx;
 }
 
-void Document::removeLayer(size_t idx)
+void Document::removeLayer(const size_t idx)
 {
     const auto size = layers_.size();
     if (idx >= size)
         return;
-    layers_.erase(layers_.begin() + static_cast<std::ptrdiff_t>(idx));
+    using Diff = decltype(layers_)::difference_type;
+    layers_.erase(layers_.begin() + static_cast<Diff>(idx));
 }
 
-void Document::reorderLayer(size_t from, size_t to)
+void Document::reorderLayer(std::size_t from, std::size_t to)
 {
     const auto size = layers_.size();
-
     if (from >= size || to >= size || from == to)
         return;
 
-    auto tmpLayer = layers_[from];
-    layers_.erase(layers_.begin() + static_cast<std::ptrdiff_t>(from));
-    if (to > layers_.size())
-        to = layers_.size();
-    layers_.insert(layers_.begin() + static_cast<std::ptrdiff_t>(to), std::move(tmpLayer));
+    using Diff = decltype(layers_)::difference_type;
+    auto b = layers_.begin();
+
+    auto itFrom = b + static_cast<Diff>(from);
+    auto itTo = b + static_cast<Diff>(to);
+
+    if (from < to)
+    {
+        // move element [from] after shifting left the range (from+1..to)
+        std::rotate(itFrom, itFrom + 1, itTo + 1);
+    }
+    else
+    {
+        // move element [from] before shifting right the range (to..from-1)
+        std::rotate(itTo, itFrom, itFrom + 1);
+    }
 }
 
-void Document::mergeDown(const int from)
+void Document::mergeDown(const std::size_t from)
 {
     const auto size = layers_.size();
 
@@ -190,11 +203,6 @@ void Document::mergeDown(const int from)
         }
     }
 
-    layers_.erase(layers_.begin() + from);
+    using Diff = decltype(layers_)::difference_type;
+    layers_.erase(layers_.begin() + static_cast<Diff>(from));
 }
-
-// void Document::setLayers(std::vector<std::shared_ptr<Layer>> layers)
-// {
-//     layers_ = std::move(layers);
-//     layers_.erase(layers_.begin() + static_cast<std::ptrdiff_t>(from));
-// }

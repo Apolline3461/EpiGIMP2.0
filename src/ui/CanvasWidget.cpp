@@ -10,6 +10,8 @@
 
 #include <algorithm>
 
+#include "ui/PanClamp.hpp"
+
 namespace
 {
 static double clampScale(double s)
@@ -52,9 +54,6 @@ static common::Rect clampRectToImage(common::Rect r, int w, int h)
 }
 }  // namespace
 
-// TODO: clamp pan so image doesn't get lost completely off-screen
-// TODO: draw selection in doc space (and reproject to screen) to remain stable under zoom/pan changes during drag
-
 CanvasWidget::CanvasWidget(QWidget* parent) : QWidget(parent)
 {
     setMouseTracking(true);
@@ -72,13 +71,13 @@ void CanvasWidget::clear()
     img_ = QImage();
     hasSel_ = false;
     selScreen_ = QRect();
+    clearDragLayerPreview();
     resetView();
     update();
 }
 
 void CanvasWidget::setSelectionEnable(bool enable)
 {
-    // Tu dois ajouter `bool selectionEnabled_ = false;` dans le .hpp
     selectionEnabled_ = enable;
     if (!selectionEnabled_)
     {
@@ -86,6 +85,18 @@ void CanvasWidget::setSelectionEnable(bool enable)
         selScreen_ = QRect();
         update();
     }
+}
+
+void CanvasWidget::setSelectionRectOverlay(std::optional<common::Rect> r)
+{
+    selectionOverlay_ = r;
+    update();
+}
+
+void CanvasWidget::setLayerRectOverlay(std::optional<common::Rect> r)
+{
+    layerOverlay_ = r;
+    update();
 }
 
 void CanvasWidget::setSelectionRect(const QRect& r)
@@ -99,12 +110,58 @@ void CanvasWidget::clearSelectionRect()
 {
     hasSel_ = false;
     selScreen_ = QRect();
+    selectionOverlay_.reset();
     update();
+}
+
+void CanvasWidget::setMoveLayerEnable(bool enable)
+{
+    moveLayerEnabled_ = enable;
+    if (!moveLayerEnabled_)
+        draggingLayer_ = false;
+}
+
+void CanvasWidget::setDragLayerPreview(const QImage& layerImg, int x, int y)
+{
+    dragLayerImg_ = layerImg;
+    dragLayerPos_ = QPoint(x, y);
+    dragLayerPreviewOn_ = true;
+    update();
+}
+
+void CanvasWidget::setDragLayerPos(int x, int y)
+{
+    dragLayerPos_ = QPoint(x, y);
+    if (dragLayerPreviewOn_)
+        update();
+}
+
+void CanvasWidget::clearDragLayerPreview()
+{
+    dragLayerPreviewOn_ = false;
+    dragLayerImg_ = QImage();
+    update();
+}
+
+void CanvasWidget::setPencilEnable(bool enable)
+{
+    pencilEnabled_ = enable;
+}
+
+void CanvasWidget::setPencilSize(int s)
+{
+    pencilSize_ = s;
+}
+
+void CanvasWidget::setPencilColor(const QColor& c)
+{
+    pencilColor_ = c;
 }
 
 void CanvasWidget::setScale(double s)
 {
     scale_ = clampScale(s);
+    clampPan();
     update();
 }
 
@@ -118,6 +175,7 @@ void CanvasWidget::resetView()
 void CanvasWidget::setPan(QPointF p)
 {
     pan_ = p;
+    clampPan();
     update();
 }
 
@@ -154,7 +212,37 @@ void CanvasWidget::paintEvent(QPaintEvent*)
     p.save();
     p.translate(pan_);
     p.scale(scale_, scale_);
+
+    // base image
     p.drawImage(0, 0, img_);
+
+    // drag preview (drawn on top)
+    if (dragLayerPreviewOn_ && !dragLayerImg_.isNull())
+        p.drawImage(dragLayerPos_.x(), dragLayerPos_.y(), dragLayerImg_);
+
+    // overlays
+    if (layerOverlay_)
+    {
+        QPen pen(QColor(255, 220, 0));
+        pen.setStyle(Qt::DashLine);
+        pen.setWidthF(1.0 / scale_);
+        p.setPen(pen);
+        p.setBrush(Qt::NoBrush);
+        const auto& r = *layerOverlay_;
+        p.drawRect(r.x, r.y, r.w, r.h);
+    }
+
+    if (selectionOverlay_)
+    {
+        QPen pen(QColor(220, 0, 0));
+        pen.setStyle(Qt::DashLine);
+        pen.setWidthF(1.0 / scale_);
+        p.setPen(pen);
+        p.setBrush(Qt::NoBrush);
+        const auto& r = *selectionOverlay_;
+        p.drawRect(r.x, r.y, r.w, r.h);
+    }
+
     p.restore();
 
     if (hasSel_)
@@ -165,6 +253,43 @@ void CanvasWidget::paintEvent(QPaintEvent*)
         p.setPen(pen);
         p.setBrush(Qt::NoBrush);
         p.drawRect(selScreen_);
+    }
+    if (!previewPoints_.empty())
+    {
+        p.save();
+        p.setRenderHint(QPainter::Antialiasing, true);
+        QPen pen(Qt::NoPen);
+        p.setPen(pen);
+        QColor c = pencilColor_;
+        p.setBrush(QBrush(c));
+
+        const double s = scale_;
+        const double half = (static_cast<double>(pencilSize_) * 0.5) * s;
+
+        for (const auto& pt : previewPoints_)
+        {
+            QPoint sp = docToScreen(pt);
+            QRectF r(sp.x() - half, sp.y() - half, half * 2.0, half * 2.0);
+            p.drawEllipse(r);
+        }
+
+        // draw connecting lines for smoother preview
+        if (previewPoints_.size() >= 2)
+        {
+            QPen linePen(c);
+            linePen.setWidthF(std::max(1.0, s * static_cast<double>(pencilSize_)));
+            linePen.setCapStyle(Qt::RoundCap);
+            linePen.setJoinStyle(Qt::RoundJoin);
+            p.setPen(linePen);
+            for (size_t i = 1; i < previewPoints_.size(); ++i)
+            {
+                QPoint a = docToScreen(previewPoints_[i - 1]);
+                QPoint b = docToScreen(previewPoints_[i]);
+                p.drawLine(a, b);
+            }
+        }
+
+        p.restore();
     }
 }
 
@@ -195,7 +320,7 @@ void CanvasWidget::wheelEvent(QWheelEvent* e)
     scale_ = newScale;
     pan_.setX(mousePos.x() - docX * scale_);
     pan_.setY(mousePos.y() - docY * scale_);
-
+    clampPan();
     update();
     e->accept();
 }
@@ -204,7 +329,7 @@ void CanvasWidget::mousePressEvent(QMouseEvent* e)
 {
     lastMouse_ = e->pos();
 
-    if (e->button() == Qt::MiddleButton || e->button() == Qt::RightButton)
+    if (e->button() == Qt::MiddleButton)
     {
         panning_ = true;
         setCursor(Qt::ClosedHandCursor);
@@ -212,28 +337,53 @@ void CanvasWidget::mousePressEvent(QMouseEvent* e)
         return;
     }
 
-    if (e->button() == Qt::LeftButton)
+    if (e->button() != Qt::LeftButton)
     {
-        if (!img_.isNull() && selectionEnabled_)
-        {
-            hasSel_ = true;
-            selScreen_ = QRect(e->pos(), e->pos());
-            e->accept();
-            update();
-            return;
-        }
+        QWidget::mousePressEvent(e);
+        return;
+    }
+    if (img_.isNull())
+    {
+        e->accept();
+        return;
+    }
+    const common::Point pDoc = screenToDoc(e->pos());
 
-        // clic outil (bucket etc.)
-        if (!img_.isNull())
+    // Move-layer mode: only if click inside current layerOverlay_
+    if (moveLayerEnabled_ && layerOverlay_)
+    {
+        const auto& r = *layerOverlay_;
+        const bool inside =
+            (pDoc.x >= r.x && pDoc.y >= r.y && pDoc.x < r.x + r.w && pDoc.y < r.y + r.h);
+        if (inside)
         {
-            common::Point pDoc = screenToDoc(e->pos());
-            emit clickedDoc(pDoc);
+            draggingLayer_ = true;
+            dragStartDoc_ = pDoc;
+            emit beginDragDoc(pDoc);
         }
         e->accept();
         return;
     }
-
-    QWidget::mousePressEvent(e);
+    if (selectionEnabled_)
+    {
+        hasSel_ = true;
+        selScreen_ = QRect(e->pos(), e->pos());
+        update();
+        e->accept();
+        return;
+    }
+    if (pencilEnabled_)
+    {
+        drawing_ = true;
+        previewPoints_.clear();
+        previewPoints_.push_back(pDoc);
+        emit beginStroke(pDoc);
+        update();
+        e->accept();
+        return;
+    }
+    emit clickedDoc(pDoc);
+    e->accept();
 }
 
 void CanvasWidget::mouseMoveEvent(QMouseEvent* e)
@@ -245,7 +395,20 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* e)
     if (panning_)
     {
         pan_ += QPointF(delta);
+        clampPan();
         update();
+        e->accept();
+        return;
+    }
+
+    if (draggingLayer_ && moveLayerEnabled_ && (e->buttons() & Qt::LeftButton))
+    {
+        if (img_.isNull())
+        {
+            e->ignore();
+            return;
+        }
+        emit dragDoc(screenToDoc(e->pos()));
         e->accept();
         return;
     }
@@ -258,12 +421,22 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* e)
         return;
     }
 
+    if (drawing_ && (e->buttons() & Qt::LeftButton))
+    {
+        common::Point pDoc = screenToDoc(cur);
+        previewPoints_.push_back(pDoc);
+        emit moveStroke(pDoc);
+        update();
+        e->accept();
+        return;
+    }
+
     QWidget::mouseMoveEvent(e);
 }
 
 void CanvasWidget::mouseReleaseEvent(QMouseEvent* e)
 {
-    if (e->button() == Qt::MiddleButton || e->button() == Qt::RightButton)
+    if (e->button() == Qt::MiddleButton)
     {
         if (panning_)
         {
@@ -276,9 +449,16 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* e)
 
     if (e->button() == Qt::LeftButton)
     {
+        if (draggingLayer_ && moveLayerEnabled_)
+        {
+            draggingLayer_ = false;
+            emit endDragDoc(screenToDoc(e->pos()));
+            e->accept();
+            return;
+        }
+
         if (selectionEnabled_ && hasSel_)
         {
-            // Normalise screen selection
             selScreen_ = selScreen_.normalized();
 
             if (!img_.isNull())
@@ -292,20 +472,21 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* e)
                 common::Rect r = makeRectFromTwoPoints(a, b);
                 r = clampRectToImage(r, img_.width(), img_.height());
 
-                if (r.w <= 0 || r.h <= 0)
-                {
-                    hasSel_ = false;
-                    selScreen_ = QRect();
-                    update();
-                    emit selectionFinishedDoc(common::Rect{0, 0, 0, 0});  // ou n’émet pas du tout
-                }
-                else
-                {
-                    update();
-                    emit selectionFinishedDoc(r);
-                }
-            }
+                hasSel_ = false;
+                selScreen_ = QRect();
 
+                emit selectionFinishedDoc((r.w <= 0 || r.h <= 0) ? common::Rect{0, 0, 0, 0} : r);
+                update();
+            }
+            e->accept();
+            return;
+        }
+        if (drawing_)
+        {
+            drawing_ = false;
+            emit endStroke();
+            previewPoints_.clear();
+            update();
             e->accept();
             return;
         }
@@ -321,11 +502,18 @@ void CanvasWidget::drawChecker(QPainter& p)
     QColor c2(230, 230, 230);
 
     for (int y = 0; y < height(); y += tile)
-    {
         for (int x = 0; x < width(); x += tile)
-        {
-            const bool odd = ((x / tile) + (y / tile)) % 2;
-            p.fillRect(QRect(x, y, tile, tile), odd ? c1 : c2);
-        }
-    }
+            p.fillRect(QRect(x, y, tile, tile), (((x / tile) + (y / tile)) % 2) ? c1 : c2);
+}
+
+void CanvasWidget::clampPan()
+{
+    if (img_.isNull())
+        return;
+
+    const auto r = computeClampedPan(pan_.x(), pan_.y(), img_.width(), img_.height(), scale_,
+                                     width(), height(), 32.0);
+
+    pan_.setX(r.x);
+    pan_.setY(r.y);
 }

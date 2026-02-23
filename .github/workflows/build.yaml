@@ -49,7 +49,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build cmake \
+          sudo apt-get install -y ninja-build cmake xvfb \
             libgl1-mesa-dev libglu1-mesa-dev \
             libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-render-util0 libxcb-xinerama0 libxcb-cursor0
@@ -73,7 +73,7 @@ jobs:
           cache: true
 
       - name: Configure (Linux)
-        if: runner.os == 'linux'
+        if: runner.os == 'Linux'
         run: >
           cmake -B build
           -G "${{ matrix.generator }}"
@@ -81,7 +81,7 @@ jobs:
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
       - name: Configure (Windows)
-        if: runner.os == 'windows'
+        if: runner.os == 'Windows'
         run: >
           cmake -B build
           -G "${{ matrix.generator }}"
@@ -94,13 +94,19 @@ jobs:
         run: cmake --build build --config ${{ matrix.build-type }} --parallel
 
       - name: Test
+        shell: bash
+        env:
+          QT_DEBUG_PLUGINS: 1
         run: |
           if [ -f build/CTestTestfile.cmake ] || [ -d build/Testing ]; then
-            ctest --test-dir build --output-on-failure -C ${{ matrix.build-type }}
+            if [[ "${{ runner.os }}" == "Linux" ]]; then
+              xvfb-run -a ctest --test-dir build --output-on-failure -C ${{ matrix.build-type }}
+            else
+              ctest --test-dir build --output-on-failure -C ${{ matrix.build-type }}
+            fi
           else
             echo "No tests configured, skipping."
           fi
-        shell: bash
 
       - name: Upload artifacts
         if: github.ref_name == 'main' || github.ref_name == 'dev'
