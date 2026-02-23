@@ -937,12 +937,10 @@ void MainWindow::createLayersPanel()
                     return;
 
                 auto idxOpt = currentLayerIndexFromSelection();
-                if (!idxOpt.has_value())
+                if (!idxOpt.has_value() || idxOpt.value() == 0)
                     return;
 
                 const std::size_t idx = *idxOpt;
-                if (idx == 0)  // background
-                    return;
 
                 auto layer = app().document().layerAt(idx);
                 if (!layer || layer->locked())
@@ -1548,7 +1546,7 @@ void MainWindow::onMergeDown()
 
     const auto layerId = static_cast<std::uint64_t>(item->data(Qt::UserRole).toULongLong());
     const auto idxOpt = app::commands::findLayerIndexById(app().document(), layerId);
-    if (!idxOpt || idxOpt == 0)
+    if (!idxOpt.has_value() || idxOpt.value() == 0)
         return;
     const std::size_t idx = *idxOpt;
 
