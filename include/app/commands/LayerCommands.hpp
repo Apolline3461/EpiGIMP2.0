@@ -40,7 +40,8 @@ std::unique_ptr<Command> makeSetLayerOpacityCommand(Document* doc, std::uint64_t
                                                     float before, float after);
 
 std::unique_ptr<Command> makeSetLayerNameCommand(Document* doc, std::uint64_t layerId,
-                                                 std::string before, std::string after);
+                                                 const std::string& before,
+                                                 const std::string& after);
 
 std::unique_ptr<Command> makeMoveLayerCommand(Document* doc, std::uint64_t layerId,
                                               common::Point before, common::Point after);
