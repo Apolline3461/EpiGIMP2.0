@@ -1063,7 +1063,7 @@ void MainWindow::createToolBar()
     QHBoxLayout* bv = new QHBoxLayout(pencilWidget);
     bv->setContentsMargins(6, 6, 6, 6);
 
-    QLabel* sizeLbl = new QLabel(tr("Taille"), pencilWidget);
+    auto* sizeLbl = new QLabel(tr("Taille"), pencilWidget);
     m_pencilSizeSpin = new QSpinBox(pencilWidget);
     m_pencilSizeSpin->setRange(1, 200);
     m_pencilSizeSpin->setValue(8);
@@ -1071,7 +1071,7 @@ void MainWindow::createToolBar()
     bv->addWidget(m_pencilSizeSpin);
 
     // connect pencil size to canvas preview
-    if (m_pencilSizeSpin && canvas_)
+    if (canvas_)
     {
         connect(m_pencilSizeSpin, qOverload<int>(&QSpinBox::valueChanged), this,
                 [this](int v)
@@ -1216,11 +1216,9 @@ void MainWindow::onLayerDoubleClicked(QListWidgetItem* item)
         return;
     const auto layerId = static_cast<std::uint64_t>(item->data(Qt::UserRole).toULongLong());
     const auto idxOpt = app::commands::findLayerIndexById(app().document(), layerId);
-    if (!idxOpt)
+    if (!idxOpt || *idxOpt == 0)
         return;
     const std::size_t idx = *idxOpt;
-    if (idx == 0)
-        return;
 
     auto layer = app().document().layerAt(idx);
     if (!layer || layer->locked())
@@ -1295,10 +1293,10 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
     auto layer = app().document().layerAt(idx);
 
     QMenu menu(this);
-    QAction* upAct = menu.addAction(tr("Monter"));
-    QAction* downAct = menu.addAction(tr("Descendre"));
+    QAction const* upAct = menu.addAction(tr("Monter"));
+    QAction const* downAct = menu.addAction(tr("Descendre"));
     menu.addSeparator();
-    QAction* mergeDownAct = menu.addAction(tr("Merge Down"));
+    QAction const* mergeDownAct = menu.addAction(tr("Merge Down"));
     menu.addSeparator();
     QAction* renameAct = menu.addAction(tr("Renommer"));
     QAction* resizeAct = menu.addAction(tr("Redimensionner calque"));
