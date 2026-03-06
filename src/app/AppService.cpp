@@ -59,6 +59,7 @@ void AppService::closeDocument()
 {
     doc_.reset();
     history_.clear();
+    dirty_ = false;
     activeLayer_ = 0;
     nextLayerId_ = 1;
     documentChanged.notify();
@@ -70,6 +71,7 @@ void AppService::newDocument(Size size, float dpi, std::uint32_t bgColor)
         throw std::invalid_argument("newDocument: invalid document size");
     doc_ = std::make_unique<Document>(size.w, size.h, dpi);
     history_.clear();
+    dirty_ = false;
     activeLayer_ = 0;
     nextLayerId_ = 1;
 
@@ -105,6 +107,7 @@ void AppService::open(const std::string& path)
         throw std::runtime_error("Failed Open: failed to load document");
     doc_ = std::move(result.document);
     history_.clear();
+    dirty_ = false;
     activeLayer_ = pickEditableLayerIndex(*doc_);
 
     nextLayerId_ = computeNextLayerId(*doc_);
@@ -149,6 +152,7 @@ void AppService::save(const std::string& path)
     if (!doc_)
         throw std::runtime_error("Failed Save: document is null");
     storage_->save(*doc_, path);
+    dirty_ = false;
 }
 
 void AppService::exportImage(const std::string& path)
@@ -618,13 +622,14 @@ bool AppService::canRedo() const noexcept
     return history_.canRedo();
 }
 
-void AppService::apply(app::History::CommandPtr cmd)
+void AppService::apply(History::CommandPtr cmd)
 {
     if (!cmd)
         return;
 
     cmd->redo();
     history_.push(std::move(cmd));
+    dirty_ = true;
     documentChanged.notify();
 }
 
