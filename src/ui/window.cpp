@@ -245,6 +245,745 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
     refreshUIAfterDocChange();
 }
 
+void MainWindow::zoomIn()
+{
+    if (!canvas_ || !canvas_->hasImage())
+        return;
+    canvas_->setScale(canvas_->scale() * 1.25);
+}
+
+void MainWindow::zoomOut()
+{
+    if (!canvas_ || !canvas_->hasImage())
+        return;
+    canvas_->setScale(canvas_->scale() / 1.25);
+}
+
+void MainWindow::resetZoom()
+{
+    if (!canvas_)
+        return;
+    canvas_->setScale(1.0);
+}
+
+void MainWindow::clearSelection()
+{
+    if (!app().hasDocument())
+        return;
+    app().clearSelectionRect();
+}
+
+void MainWindow::toggleSelectionMode(bool enabled)
+{
+    if (enabled)
+    {
+        if (m_moveLayerAct)
+            m_moveLayerAct->setChecked(false);
+        if (m_bucketAct)
+            m_bucketAct->setChecked(false);
+        m_bucketMode = false;
+    }
+    if (canvas_)
+        canvas_->setSelectionEnable(enabled);
+    if (m_selectToggleAct)
+        m_selectToggleAct->setChecked(enabled);
+}
+
+void MainWindow::newImage()
+{
+    if (!confirmDiscardIfDirty(tr("Créer une nouvelle image"), false))
+        return;
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Nouvelle image"));
+
+    QVBoxLayout* mainLayout = new QVBoxLayout(&dialog);
+
+    QSpinBox* wSpin = new QSpinBox(&dialog);
+    wSpin->setRange(1, 10000);
+    wSpin->setValue(800);
+
+    QSpinBox* hSpin = new QSpinBox(&dialog);
+    hSpin->setRange(1, 10000);
+    hSpin->setValue(600);
+
+    auto* wLay = new QHBoxLayout();
+    wLay->addWidget(new QLabel(tr("Largeur (px):"), &dialog));
+    wLay->addWidget(wSpin);
+    wLay->addStretch();
+
+    auto* hLay = new QHBoxLayout();
+    hLay->addWidget(new QLabel(tr("Hauteur (px):"), &dialog));
+    hLay->addWidget(hSpin);
+    hLay->addStretch();
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+    // --- Background controls ---
+    auto* bgLayout = new QHBoxLayout();
+
+    auto* transparentBgCheck = new QCheckBox(tr("Créer un calque transparent"), &dialog);
+    transparentBgCheck->setChecked(false);
+
+    auto* colorBtn = new QPushButton(tr("Choisir la couleur"), &dialog);
+    auto* colorPreview = new QLabel(&dialog);
+    colorPreview->setFixedSize(24, 24);
+    colorPreview->setFrameStyle(QFrame::Box | QFrame::Plain);
+    colorPreview->setAutoFillBackground(true);
+
+    // default: white background
+    QColor canvasColor = QColor(255, 255, 255, 255);
+
+    auto updatePreview = [&]()
+    {
+        QPalette pal = colorPreview->palette();
+        pal.setColor(QPalette::Window, canvasColor);
+        colorPreview->setPalette(pal);
+    };
+    updatePreview();
+
+    auto updateBgUiEnabled = [&]()
+    {
+        const bool isTransparent = transparentBgCheck->isChecked();
+        colorBtn->setEnabled(!isTransparent);
+        colorPreview->setEnabled(!isTransparent);
+    };
+    updateBgUiEnabled();
+
+    connect(transparentBgCheck, &QCheckBox::toggled, &dialog, [&](bool) { updateBgUiEnabled(); });
+
+    connect(colorBtn, &QPushButton::clicked, &dialog,
+            [&]()
+            {
+                QColor c =
+                    QColorDialog::getColor(canvasColor, &dialog, tr("Choisir la couleur du fond"));
+                if (c.isValid())
+                {
+                    canvasColor = c;
+                    updatePreview();
+                }
+            });
+
+    bgLayout->addWidget(transparentBgCheck);
+    bgLayout->addSpacing(8);
+    bgLayout->addWidget(colorBtn);
+    bgLayout->addWidget(colorPreview);
+    bgLayout->addStretch();
+
+    mainLayout->addLayout(bgLayout);
+    mainLayout->addLayout(wLay);
+    mainLayout->addLayout(hLay);
+    mainLayout->addWidget(buttons);
+
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    m_currentFileName.clear();
+    std::uint32_t bgColor = common::colors::White;
+
+    if (transparentBgCheck->isChecked())
+    {
+        bgColor = common::colors::Transparent;
+    }
+    else
+    {
+        bgColor = (static_cast<uint32_t>(canvasColor.red()) << 24) |
+                  (static_cast<uint32_t>(canvasColor.green()) << 16) |
+                  (static_cast<uint32_t>(canvasColor.blue()) << 8) |
+                  static_cast<uint32_t>(canvasColor.alpha());
+    }
+
+    app().newDocument({wSpin->value(), hSpin->value()}, 72.f, bgColor);
+    setWindowTitle(tr("Sans titre - EpiGimp 2.0"));
+    statusBar()->showMessage(
+        tr("Nouvelle image créée: %1x%2").arg(wSpin->value()).arg(hSpin->value()), 2000);
+    setDirty(false);
+}
+
+void MainWindow::openImage()
+{
+    if (!confirmDiscardIfDirty(tr("Ouvrir une image"), false))
+        return;
+    QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+
+    QString fileName = QFileDialog::getOpenFileName(
+        this, tr("Ouvrir une image"), picturesPath,
+        tr("Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp);;Tous les fichiers (*)"));
+
+    if (fileName.isEmpty())
+        return;
+
+    QImageReader reader(fileName);
+    reader.setAutoTransform(true);
+    const QImage image = reader.read();
+    if (image.isNull())
+    {
+        QMessageBox::critical(this, tr("Erreur"),
+                              tr("Impossible de charger l'image %1:\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(reader.errorString()));
+        return;
+    }
+
+    m_currentFileName = fileName;
+
+    app().newDocument({image.width(), image.height()}, 72.f, common::colors::Transparent);
+
+    ImageBuffer buf = ImageConversion::qImageToImageBuffer(image, image.width(), image.height());
+    app().replaceBackgroundWithImage(buf, QFileInfo(fileName).baseName().toStdString());
+
+    setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
+    statusBar()->showMessage(tr("Image chargée: %1").arg(QFileInfo(fileName).fileName()), 2000);
+    setDirty(false);
+}
+
+void MainWindow::saveImage()
+{
+    if (!app().hasDocument())
+    {
+        QMessageBox::information(this, tr("Information"), tr("Aucune image à sauvegarder."));
+        return;
+    }
+
+    const QString startDir =
+        m_currentFileName.isEmpty()
+            ? QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)
+            : QFileInfo(m_currentFileName).absolutePath();
+
+    QString fileName = QFileDialog::getSaveFileName(
+        this, tr("Exporter l'image"), startDir + "/untitled.png",
+        tr("PNG (*.png);;JPEG (*.jpg *.jpeg);;BMP (*.bmp);;Tous les fichiers (*)"));
+
+    if (fileName.isEmpty())
+        return;
+
+    try
+    {
+        app().exportImage(fileName.toStdString());
+        m_currentFileName = fileName;
+        statusBar()->showMessage(tr("Image exportée: %1").arg(QFileInfo(fileName).fileName()),
+                                 3000);
+        setDirty(false);
+    }
+    catch (const std::exception& e)
+    {
+        QMessageBox::critical(this, tr("Erreur"),
+                              tr("Impossible d'exporter %1.\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(QString::fromLocal8Bit(e.what())));
+    }
+}
+
+void MainWindow::closeImage()
+{
+    if (!confirmDiscardIfDirty(tr("Fermer le document"), true))
+        return;
+    if (!app().hasDocument())
+        return;
+    app().closeDocument();
+    setWindowTitle(tr("EpiGimp 2.0"));
+    statusBar()->showMessage(tr("Image fermée"), 2000);
+    setDirty(false);
+}
+
+void MainWindow::openEpg()
+{
+    if (!confirmDiscardIfDirty(tr("Créer une fichier EPG"), true))
+        return;
+    const QString startDir =
+        m_currentFileName.isEmpty()
+            ? QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+            : QFileInfo(m_currentFileName).absolutePath();
+
+    const QString fileName =
+        QFileDialog::getOpenFileName(this, tr("Ouvrir un fichier EpiGimp"), startDir,
+                                     tr("EpiGimp (*.epg);;Tous les fichiers (*)"));
+
+    if (fileName.isEmpty())
+        return;
+
+    try
+    {
+        app().open(fileName.toStdString());
+        m_currentFileName = fileName;
+
+        setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
+        statusBar()->showMessage(tr("Fichier EPG chargé: %1").arg(QFileInfo(fileName).fileName()),
+                                 3000);
+        setDirty(false);
+    }
+    catch (const std::exception& e)
+    {
+        QMessageBox::critical(this, tr("Erreur"),
+                              tr("Impossible d'ouvrir %1.\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(QString::fromLocal8Bit(e.what())));
+    }
+}
+
+void MainWindow::saveAsEpg()
+{
+    if (!app().hasDocument())
+    {
+        QMessageBox::information(this, tr("Information"), tr("Aucune image à sauvegarder."));
+        return;
+    }
+
+    const QString startDir =
+        m_currentFileName.isEmpty()
+            ? QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+            : QFileInfo(m_currentFileName).absolutePath();
+
+    QString fileName =
+        QFileDialog::getSaveFileName(this, tr("Enregistrer au format EpiGimp"),
+                                     startDir + "/untitled.epg", tr("EpiGimp (*.epg)"));
+
+    if (fileName.isEmpty())
+        return;
+
+    if (!fileName.endsWith(".epg", Qt::CaseInsensitive))
+        fileName += ".epg";
+
+    try
+    {
+        app().save(fileName.toStdString());
+        m_currentFileName = fileName;
+
+        setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
+        statusBar()->showMessage(
+            tr("Fichier EPG sauvegardé: %1").arg(QFileInfo(fileName).fileName()), 3000);
+        setDirty(false);
+    }
+    catch (const std::exception& e)
+    {
+        QMessageBox::critical(this, tr("Erreur"),
+                              tr("Impossible de sauvegarder %1.\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(QString::fromLocal8Bit(e.what())));
+    }
+}
+
+void MainWindow::addNewLayer()
+{
+    if (!app().hasDocument())
+    {
+        QMessageBox::information(
+            this, tr("Info"), tr("Aucun document. Charge une image ou crée un nouveau document."));
+        return;
+    }
+
+    const std::string name = "Layer " + std::to_string(app().document().layerCount());
+
+    app::LayerSpec spec;
+    spec.name = name;
+    spec.visible = true;
+    spec.locked = false;
+    spec.opacity = 1.f;
+
+    const int defW = app().document().width();
+    const int defH = app().document().height();
+
+    QDialog dlg(this);
+    dlg.setWindowTitle(tr("Ajouter un calque"));
+    auto* dlgLayout = new QVBoxLayout(&dlg);
+
+    // --- Size row ---
+    auto* sizeLayout = new QHBoxLayout();
+    auto* wLabel = new QLabel(tr("Largeur:"), &dlg);
+    auto* wSpin = new QSpinBox(&dlg);
+    wSpin->setRange(1, 10000);
+    wSpin->setValue(defW);
+
+    auto* hLabel = new QLabel(tr("Hauteur:"), &dlg);
+    auto* hSpin = new QSpinBox(&dlg);
+    hSpin->setRange(1, 10000);
+    hSpin->setValue(defH);
+
+    sizeLayout->addWidget(wLabel);
+    sizeLayout->addWidget(wSpin);
+    sizeLayout->addSpacing(8);
+    sizeLayout->addWidget(hLabel);
+    sizeLayout->addWidget(hSpin);
+    dlgLayout->addLayout(sizeLayout);
+
+    // --- Color / transparent row ---
+    auto* colorLayout = new QHBoxLayout();
+
+    // New behavior: default color always defined, checkbox is "transparent layer"
+    auto* transparentCheck = new QCheckBox(tr("Créer un calque transparent"), &dlg);
+
+    auto* colorBtn = new QPushButton(tr("Choisir la couleur"), &dlg);
+    auto* colorPreview = new QLabel(&dlg);
+    colorPreview->setFixedSize(24, 24);
+    colorPreview->setFrameStyle(QFrame::Box | QFrame::Plain);
+    colorPreview->setAutoFillBackground(true);
+
+    QColor chosenColor(255, 255, 255, 255);  // default fill: white opaque
+
+    auto updatePreview = [&]()
+    {
+        if (transparentCheck->isChecked())
+        {
+            // show "transparent" preview (simple: transparent bg)
+            QPalette pal = colorPreview->palette();
+            pal.setColor(QPalette::Window, Qt::transparent);
+            colorPreview->setPalette(pal);
+        }
+        else
+        {
+            QPalette pal = colorPreview->palette();
+            pal.setColor(QPalette::Window, chosenColor);
+            colorPreview->setPalette(pal);
+        }
+        colorPreview->update();
+    };
+
+    updatePreview();
+
+    QObject::connect(colorBtn, &QPushButton::clicked, &dlg,
+                     [&]()
+                     {
+                         QColor c =
+                             QColorDialog::getColor(chosenColor, &dlg, tr("Choisir la couleur"));
+                         if (c.isValid())
+                         {
+                             chosenColor = c;
+                             updatePreview();
+                         }
+                     });
+
+    QObject::connect(transparentCheck, &QCheckBox::toggled, &dlg,
+                     [&](bool on)
+                     {
+                         colorBtn->setEnabled(!on);
+                         updatePreview();
+                     });
+
+    colorLayout->addWidget(transparentCheck);
+    colorLayout->addStretch();
+    colorLayout->addWidget(colorBtn);
+    colorLayout->addWidget(colorPreview);
+    dlgLayout->addLayout(colorLayout);
+
+    // --- Buttons row ---
+    auto* buttons = new QHBoxLayout();
+    buttons->addStretch();
+    auto* okBtn = new QPushButton(tr("OK"), &dlg);
+    auto* cancelBtn = new QPushButton(tr("Annuler"), &dlg);
+    buttons->addWidget(okBtn);
+    buttons->addWidget(cancelBtn);
+    dlgLayout->addLayout(buttons);
+
+    QObject::connect(okBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+    QObject::connect(cancelBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
+
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    const int w = wSpin->value();
+    const int h = hSpin->value();
+    if (w <= 0 || h <= 0)
+        return;
+
+    spec.width = w;
+    spec.height = h;
+
+    if (transparentCheck->isChecked())
+    {
+        spec.color = common::colors::Transparent;
+    }
+    else
+    {
+        spec.color = (static_cast<uint32_t>(chosenColor.red()) << 24) |
+                     (static_cast<uint32_t>(chosenColor.green()) << 16) |
+                     (static_cast<uint32_t>(chosenColor.blue()) << 8) |
+                     static_cast<uint32_t>(chosenColor.alpha());
+    }
+
+    app().addLayer(spec);
+}
+
+void MainWindow::addImageAsLayer()
+{
+    QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+
+    QString fileName = QFileDialog::getOpenFileName(
+        this, tr("Ajouter une image en nouveau calque"), picturesPath,
+        tr("Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp);;Tous les fichiers (*)"));
+
+    if (fileName.isEmpty())
+        return;
+
+    QImageReader reader(fileName);
+    reader.setAutoTransform(true);
+    const QImage image = reader.read();
+
+    if (image.isNull())
+    {
+        QMessageBox::critical(this, tr("Erreur"),
+                              tr("Impossible de charger l'image %1:\n%2")
+                                  .arg(QDir::toNativeSeparators(fileName))
+                                  .arg(reader.errorString()));
+        return;
+    }
+
+    if (!app().hasDocument())
+    {
+        m_currentFileName = fileName;
+        app().newDocument({image.width(), image.height()}, 72.F);
+        setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
+    }
+
+    // Create a new transparent buffer matching document size and blit the loaded image at (0,0)
+
+    ImageBuffer buf = ImageConversion::qImageToImageBuffer(image, image.width(), image.height());
+
+    app().addImageLayer(buf, QFileInfo(fileName).baseName().toStdString());
+    statusBar()->showMessage(
+        tr("Image ajoutée en tant que calque: %1").arg(QFileInfo(fileName).fileName()));
+}
+
+void MainWindow::onLayerDoubleClicked(QListWidgetItem* item)
+{
+    // Double-click on a layer item starts inline editing of the name (if editable)
+    if (!app().hasDocument() || !item)
+        return;
+    const auto layerId = static_cast<std::uint64_t>(item->data(Qt::UserRole).toULongLong());
+    const auto idxOpt = app::commands::findLayerIndexById(app().document(), layerId);
+    if (!idxOpt)
+        return;
+    const std::size_t idx = *idxOpt;
+    if (idx == 0)
+        return;
+
+    auto layer = app().document().layerAt(idx);
+    if (!layer || layer->locked())
+        return;
+
+    bool ok = false;
+    const QString current = QString::fromStdString(layer->name());
+    const QString text = QInputDialog::getText(this, tr("Renommer le calque"), tr("Nom:"),
+                                               QLineEdit::Normal, current, &ok);
+    if (ok)
+        app().setLayerName(idx, text.toStdString());
+}
+
+void MainWindow::moveLayerUp()
+{
+    if (!app().hasDocument() || !m_layersList)
+        return;
+
+    auto* cur = m_layersList->currentItem();
+    if (!cur)
+        return;
+
+    const auto layerId = static_cast<std::uint64_t>(cur->data(Qt::UserRole).toULongLong());
+    const std::optional<size_t> from = app::commands::findLayerIndexById(app().document(), layerId);
+    if (!from.has_value())
+        return;
+    const auto n = app().document().layerCount();
+    if (*from >= n - 1)
+        return;
+
+    const auto to = *from + 1;  // doc index : plus grand = plus au-dessus
+    m_pendingSelectLayerId_ = layerId;
+    app().reorderLayer(*from, to);
+}
+
+void MainWindow::moveLayerDown()
+{
+    if (!app().hasDocument() || !m_layersList)
+        return;
+
+    auto* cur = m_layersList->currentItem();
+    if (!cur)
+        return;
+
+    const auto layerId = static_cast<std::uint64_t>(cur->data(Qt::UserRole).toULongLong());
+    const std::optional<size_t> from = app::commands::findLayerIndexById(app().document(), layerId);
+
+    if (!from.has_value() || *from == 0)
+        return;
+
+    const auto to = *from - 1;
+    m_pendingSelectLayerId_ = layerId;
+    app().reorderLayer(*from, to);
+}
+
+void MainWindow::onShowLayerContextMenu(const QPoint& pos)
+{
+    if (!m_layersList || !app().hasDocument())
+        return;
+
+    QListWidgetItem* item = m_layersList->itemAt(pos);
+    if (!item)
+        item = m_layersList->currentItem();
+    if (!item)
+        return;
+
+    const auto layerId = static_cast<std::uint64_t>(item->data(Qt::UserRole).toULongLong());
+    const auto idxOpt = app::commands::findLayerIndexById(app().document(), layerId);
+    if (!idxOpt.has_value())
+        return;
+    const size_t idx = idxOpt.value();
+    auto layer = app().document().layerAt(idx);
+
+    QMenu menu(this);
+    QAction const* upAct = menu.addAction(tr("Monter"));
+    QAction const* downAct = menu.addAction(tr("Descendre"));
+    menu.addSeparator();
+    QAction const* mergeDownAct = menu.addAction(tr("Merge Down"));
+    menu.addSeparator();
+    QAction* renameAct = menu.addAction(tr("Renommer"));
+    QAction* resizeAct = menu.addAction(tr("Redimensionner calque"));
+    QAction* deleteAct = menu.addAction(tr("Supprimer"));
+
+    const bool isBottomLayer = (idx == 0);
+    const bool isLockedLayer = layer ? layer->locked() : false;
+    renameAct->setEnabled(!isBottomLayer && !isLockedLayer);
+    deleteAct->setEnabled(!isBottomLayer && !isLockedLayer);
+    resizeAct->setEnabled(!isBottomLayer && !isLockedLayer);
+
+    const QAction* act = menu.exec(m_layersList->mapToGlobal(pos));
+    if (!act)
+        return;
+
+    if (act == renameAct)
+    {
+        bool ok = false;
+        const QString current = QString::fromStdString(layer ? layer->name() : "");
+        const QString text = QInputDialog::getText(this, tr("Renommer le calque"), tr("Nom:"),
+                                                   QLineEdit::Normal, current, &ok);
+        if (ok)
+            app().setLayerName(idx, text.toStdString());
+    }
+    else if (act == resizeAct)
+    {
+        if (!layer || !layer->image())
+            return;
+
+        const int curW = layer->image()->width();
+        const int curH = layer->image()->height();
+        if (curW <= 0 || curH <= 0)
+            return;
+
+        QDialog dlg(this);
+        dlg.setWindowTitle(tr("Redimensionner le calque"));
+
+        auto* v = new QVBoxLayout(&dlg);
+
+        // Row: W / H
+        auto* row = new QHBoxLayout();
+        auto* wLabel = new QLabel(tr("Largeur:"), &dlg);
+        auto* wSpin = new QSpinBox(&dlg);
+        wSpin->setRange(1, 20000);
+        wSpin->setValue(curW);
+
+        auto* hLabel = new QLabel(tr("Hauteur:"), &dlg);
+        auto* hSpin = new QSpinBox(&dlg);
+        hSpin->setRange(1, 20000);
+        hSpin->setValue(curH);
+
+        row->addWidget(wLabel);
+        row->addWidget(wSpin);
+        row->addSpacing(10);
+        row->addWidget(hLabel);
+        row->addWidget(hSpin);
+        v->addLayout(row);
+
+        // Row: keep ratio
+        auto* keepRatio = new QCheckBox(tr("Garder proportions 🔗"), &dlg);
+        keepRatio->setChecked(true);
+        v->addWidget(keepRatio);
+
+        // Buttons
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+        v->addWidget(buttons);
+        connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+        connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+        // Ratio logic
+        const double ratio = static_cast<double>(curW) / static_cast<double>(curH);
+        bool guard = false;
+
+        auto syncHFromW = [&]()
+        {
+            if (!keepRatio->isChecked() || guard)
+                return;
+            guard = true;
+            const int w = wSpin->value();
+            const int h = std::max(1, static_cast<int>(std::lround(w / ratio)));
+            hSpin->setValue(h);
+            guard = false;
+        };
+
+        auto syncWFromH = [&]()
+        {
+            if (!keepRatio->isChecked() || guard)
+                return;
+            guard = true;
+            const int h = hSpin->value();
+            const int w = std::max(1, static_cast<int>(std::lround(h * ratio)));
+            wSpin->setValue(w);
+            guard = false;
+        };
+
+        connect(wSpin, qOverload<int>(&QSpinBox::valueChanged), &dlg, [&](int) { syncHFromW(); });
+        connect(hSpin, qOverload<int>(&QSpinBox::valueChanged), &dlg, [&](int) { syncWFromH(); });
+        connect(keepRatio, &QCheckBox::toggled, &dlg,
+                [&](bool on)
+                {
+                    if (on)
+                        syncHFromW();
+                });
+
+        if (dlg.exec() != QDialog::Accepted)
+            return;
+
+        const int newW = wSpin->value();
+        const int newH = hSpin->value();
+
+        app().resizeLayer(idx, newW, newH);
+    }
+    else if (act == deleteAct)
+    {
+        const QString layerName = QString::fromStdString(layer ? layer->name() : "");
+        const int ret = QMessageBox::question(this, tr("Supprimer le calque"),
+                                              tr("Supprimer le calque %1 ?").arg(layerName),
+                                              QMessageBox::Yes | QMessageBox::No);
+        if (ret == QMessageBox::Yes)
+            app().removeLayer(idx);
+    }
+    else if (act == mergeDownAct)
+        app().mergeLayerDown(idx);
+    else if (act == upAct)
+        moveLayerUp();
+    else if (act == downAct)
+        moveLayerDown();
+}
+
+void MainWindow::onMergeDown()
+{
+    if (!m_layersList || !app().hasDocument())
+        return;
+
+    QListWidgetItem* item = m_layersList->currentItem();
+    if (!item)
+        return;
+
+    const auto layerId = static_cast<std::uint64_t>(item->data(Qt::UserRole).toULongLong());
+    const auto idxOpt = app::commands::findLayerIndexById(app().document(), layerId);
+    if (!idxOpt.has_value() || idxOpt.value() == 0)
+        return;
+    const std::size_t idx = *idxOpt;
+
+    auto layer = app().document().layerAt(idx);
+    if (!layer || layer->locked())
+        return;
+    app().mergeLayerDown(idx);
+}
+
 void MainWindow::refreshUIAfterDocChange()
 {
     if (m_dragLayerActive)
@@ -724,186 +1463,6 @@ void MainWindow::createMenus()
         m_cmdMenu->addAction(m_redoAct);
 }
 
-void MainWindow::addNewLayer()
-{
-    if (!app().hasDocument())
-    {
-        QMessageBox::information(
-            this, tr("Info"), tr("Aucun document. Charge une image ou crée un nouveau document."));
-        return;
-    }
-
-    const std::string name = "Layer " + std::to_string(app().document().layerCount());
-
-    app::LayerSpec spec;
-    spec.name = name;
-    spec.visible = true;
-    spec.locked = false;
-    spec.opacity = 1.f;
-
-    const int defW = app().document().width();
-    const int defH = app().document().height();
-
-    QDialog dlg(this);
-    dlg.setWindowTitle(tr("Ajouter un calque"));
-    auto* dlgLayout = new QVBoxLayout(&dlg);
-
-    // --- Size row ---
-    auto* sizeLayout = new QHBoxLayout();
-    auto* wLabel = new QLabel(tr("Largeur:"), &dlg);
-    auto* wSpin = new QSpinBox(&dlg);
-    wSpin->setRange(1, 10000);
-    wSpin->setValue(defW);
-
-    auto* hLabel = new QLabel(tr("Hauteur:"), &dlg);
-    auto* hSpin = new QSpinBox(&dlg);
-    hSpin->setRange(1, 10000);
-    hSpin->setValue(defH);
-
-    sizeLayout->addWidget(wLabel);
-    sizeLayout->addWidget(wSpin);
-    sizeLayout->addSpacing(8);
-    sizeLayout->addWidget(hLabel);
-    sizeLayout->addWidget(hSpin);
-    dlgLayout->addLayout(sizeLayout);
-
-    // --- Color / transparent row ---
-    auto* colorLayout = new QHBoxLayout();
-
-    // New behavior: default color always defined, checkbox is "transparent layer"
-    auto* transparentCheck = new QCheckBox(tr("Créer un calque transparent"), &dlg);
-
-    auto* colorBtn = new QPushButton(tr("Choisir la couleur"), &dlg);
-    auto* colorPreview = new QLabel(&dlg);
-    colorPreview->setFixedSize(24, 24);
-    colorPreview->setFrameStyle(QFrame::Box | QFrame::Plain);
-    colorPreview->setAutoFillBackground(true);
-
-    QColor chosenColor(255, 255, 255, 255);  // default fill: white opaque
-
-    auto updatePreview = [&]()
-    {
-        if (transparentCheck->isChecked())
-        {
-            // show "transparent" preview (simple: transparent bg)
-            QPalette pal = colorPreview->palette();
-            pal.setColor(QPalette::Window, Qt::transparent);
-            colorPreview->setPalette(pal);
-        }
-        else
-        {
-            QPalette pal = colorPreview->palette();
-            pal.setColor(QPalette::Window, chosenColor);
-            colorPreview->setPalette(pal);
-        }
-        colorPreview->update();
-    };
-
-    updatePreview();
-
-    QObject::connect(colorBtn, &QPushButton::clicked, &dlg,
-                     [&]()
-                     {
-                         QColor c =
-                             QColorDialog::getColor(chosenColor, &dlg, tr("Choisir la couleur"));
-                         if (c.isValid())
-                         {
-                             chosenColor = c;
-                             updatePreview();
-                         }
-                     });
-
-    QObject::connect(transparentCheck, &QCheckBox::toggled, &dlg,
-                     [&](bool on)
-                     {
-                         colorBtn->setEnabled(!on);
-                         updatePreview();
-                     });
-
-    colorLayout->addWidget(transparentCheck);
-    colorLayout->addStretch();
-    colorLayout->addWidget(colorBtn);
-    colorLayout->addWidget(colorPreview);
-    dlgLayout->addLayout(colorLayout);
-
-    // --- Buttons row ---
-    auto* buttons = new QHBoxLayout();
-    buttons->addStretch();
-    auto* okBtn = new QPushButton(tr("OK"), &dlg);
-    auto* cancelBtn = new QPushButton(tr("Annuler"), &dlg);
-    buttons->addWidget(okBtn);
-    buttons->addWidget(cancelBtn);
-    dlgLayout->addLayout(buttons);
-
-    QObject::connect(okBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
-    QObject::connect(cancelBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
-
-    if (dlg.exec() != QDialog::Accepted)
-        return;
-
-    const int w = wSpin->value();
-    const int h = hSpin->value();
-    if (w <= 0 || h <= 0)
-        return;
-
-    spec.width = w;
-    spec.height = h;
-
-    if (transparentCheck->isChecked())
-    {
-        spec.color = common::colors::Transparent;
-    }
-    else
-    {
-        spec.color = (static_cast<uint32_t>(chosenColor.red()) << 24) |
-                     (static_cast<uint32_t>(chosenColor.green()) << 16) |
-                     (static_cast<uint32_t>(chosenColor.blue()) << 8) |
-                     static_cast<uint32_t>(chosenColor.alpha());
-    }
-
-    app().addLayer(spec);
-}
-
-void MainWindow::addImageAsLayer()
-{
-    QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
-
-    QString fileName = QFileDialog::getOpenFileName(
-        this, tr("Ajouter une image en nouveau calque"), picturesPath,
-        tr("Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp);;Tous les fichiers (*)"));
-
-    if (fileName.isEmpty())
-        return;
-
-    QImageReader reader(fileName);
-    reader.setAutoTransform(true);
-    const QImage image = reader.read();
-
-    if (image.isNull())
-    {
-        QMessageBox::critical(this, tr("Erreur"),
-                              tr("Impossible de charger l'image %1:\n%2")
-                                  .arg(QDir::toNativeSeparators(fileName))
-                                  .arg(reader.errorString()));
-        return;
-    }
-
-    if (!app().hasDocument())
-    {
-        m_currentFileName = fileName;
-        app().newDocument({image.width(), image.height()}, 72.F);
-        setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
-    }
-
-    // Create a new transparent buffer matching document size and blit the loaded image at (0,0)
-
-    ImageBuffer buf = ImageConversion::qImageToImageBuffer(image, image.width(), image.height());
-
-    app().addImageLayer(buf, QFileInfo(fileName).baseName().toStdString());
-    statusBar()->showMessage(
-        tr("Image ajoutée en tant que calque: %1").arg(QFileInfo(fileName).fileName()));
-}
-
 void MainWindow::createLayersPanel()
 {
     m_layersDock = new QDockWidget(tr("Calques"), this);
@@ -1174,14 +1733,14 @@ bool MainWindow::confirmDiscardIfDirty(const QString& actionLabel, bool epg)
     return true;
 }
 
-void MainWindow::closeEvent(QCloseEvent* e)
+void MainWindow::closeEvent(QCloseEvent* event)
 {
     if (!confirmDiscardIfDirty(tr("Quitter"), true))
     {
-        e->ignore();
+        event->ignore();
         return;
     }
-    e->accept();
+    event->accept();
 }
 
 void MainWindow::populateLayersList()
@@ -1304,225 +1863,6 @@ void MainWindow::populateLayersList()
     }
 }
 
-void MainWindow::onLayerDoubleClicked(QListWidgetItem* item)
-{
-    // Double-click on a layer item starts inline editing of the name (if editable)
-    if (!app().hasDocument() || !item)
-        return;
-    const auto layerId = static_cast<std::uint64_t>(item->data(Qt::UserRole).toULongLong());
-    const auto idxOpt = app::commands::findLayerIndexById(app().document(), layerId);
-    if (!idxOpt)
-        return;
-    const std::size_t idx = *idxOpt;
-    if (idx == 0)
-        return;
-
-    auto layer = app().document().layerAt(idx);
-    if (!layer || layer->locked())
-        return;
-
-    bool ok = false;
-    const QString current = QString::fromStdString(layer->name());
-    const QString text = QInputDialog::getText(this, tr("Renommer le calque"), tr("Nom:"),
-                                               QLineEdit::Normal, current, &ok);
-    if (ok)
-        app().setLayerName(idx, text.toStdString());
-}
-
-void MainWindow::moveLayerUp()
-{
-    if (!app().hasDocument() || !m_layersList)
-        return;
-
-    auto* cur = m_layersList->currentItem();
-    if (!cur)
-        return;
-
-    const auto layerId = static_cast<std::uint64_t>(cur->data(Qt::UserRole).toULongLong());
-    const std::optional<size_t> from = app::commands::findLayerIndexById(app().document(), layerId);
-    if (!from.has_value())
-        return;
-    const auto n = app().document().layerCount();
-    if (*from >= n - 1)
-        return;
-
-    const auto to = *from + 1;  // doc index : plus grand = plus au-dessus
-    m_pendingSelectLayerId_ = layerId;
-    app().reorderLayer(*from, to);
-}
-
-void MainWindow::moveLayerDown()
-{
-    if (!app().hasDocument() || !m_layersList)
-        return;
-
-    auto* cur = m_layersList->currentItem();
-    if (!cur)
-        return;
-
-    const auto layerId = static_cast<std::uint64_t>(cur->data(Qt::UserRole).toULongLong());
-    const std::optional<size_t> from = app::commands::findLayerIndexById(app().document(), layerId);
-
-    if (!from.has_value() || *from == 0)
-        return;
-
-    const auto to = *from - 1;
-    m_pendingSelectLayerId_ = layerId;
-    app().reorderLayer(*from, to);
-}
-
-void MainWindow::onShowLayerContextMenu(const QPoint& pos)
-{
-    if (!m_layersList || !app().hasDocument())
-        return;
-
-    QListWidgetItem* item = m_layersList->itemAt(pos);
-    if (!item)
-        item = m_layersList->currentItem();
-    if (!item)
-        return;
-
-    const auto layerId = static_cast<std::uint64_t>(item->data(Qt::UserRole).toULongLong());
-    const auto idxOpt = app::commands::findLayerIndexById(app().document(), layerId);
-    if (!idxOpt.has_value())
-        return;
-    const size_t idx = idxOpt.value();
-    auto layer = app().document().layerAt(idx);
-
-    QMenu menu(this);
-    QAction const* upAct = menu.addAction(tr("Monter"));
-    QAction const* downAct = menu.addAction(tr("Descendre"));
-    menu.addSeparator();
-    QAction const* mergeDownAct = menu.addAction(tr("Merge Down"));
-    menu.addSeparator();
-    QAction* renameAct = menu.addAction(tr("Renommer"));
-    QAction* resizeAct = menu.addAction(tr("Redimensionner calque"));
-    QAction* deleteAct = menu.addAction(tr("Supprimer"));
-
-    const bool isBottomLayer = (idx == 0);
-    const bool isLockedLayer = layer ? layer->locked() : false;
-    renameAct->setEnabled(!isBottomLayer && !isLockedLayer);
-    deleteAct->setEnabled(!isBottomLayer && !isLockedLayer);
-    resizeAct->setEnabled(!isBottomLayer && !isLockedLayer);
-
-    const QAction* act = menu.exec(m_layersList->mapToGlobal(pos));
-    if (!act)
-        return;
-
-    if (act == renameAct)
-    {
-        bool ok = false;
-        const QString current = QString::fromStdString(layer ? layer->name() : "");
-        const QString text = QInputDialog::getText(this, tr("Renommer le calque"), tr("Nom:"),
-                                                   QLineEdit::Normal, current, &ok);
-        if (ok)
-            app().setLayerName(idx, text.toStdString());
-    }
-    else if (act == resizeAct)
-    {
-        if (!layer || !layer->image())
-            return;
-
-        const int curW = layer->image()->width();
-        const int curH = layer->image()->height();
-        if (curW <= 0 || curH <= 0)
-            return;
-
-        QDialog dlg(this);
-        dlg.setWindowTitle(tr("Redimensionner le calque"));
-
-        auto* v = new QVBoxLayout(&dlg);
-
-        // Row: W / H
-        auto* row = new QHBoxLayout();
-        auto* wLabel = new QLabel(tr("Largeur:"), &dlg);
-        auto* wSpin = new QSpinBox(&dlg);
-        wSpin->setRange(1, 20000);
-        wSpin->setValue(curW);
-
-        auto* hLabel = new QLabel(tr("Hauteur:"), &dlg);
-        auto* hSpin = new QSpinBox(&dlg);
-        hSpin->setRange(1, 20000);
-        hSpin->setValue(curH);
-
-        row->addWidget(wLabel);
-        row->addWidget(wSpin);
-        row->addSpacing(10);
-        row->addWidget(hLabel);
-        row->addWidget(hSpin);
-        v->addLayout(row);
-
-        // Row: keep ratio
-        auto* keepRatio = new QCheckBox(tr("Garder proportions 🔗"), &dlg);
-        keepRatio->setChecked(true);
-        v->addWidget(keepRatio);
-
-        // Buttons
-        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
-        v->addWidget(buttons);
-        connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
-        connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
-
-        // Ratio logic
-        const double ratio = static_cast<double>(curW) / static_cast<double>(curH);
-        bool guard = false;
-
-        auto syncHFromW = [&]()
-        {
-            if (!keepRatio->isChecked() || guard)
-                return;
-            guard = true;
-            const int w = wSpin->value();
-            const int h = std::max(1, static_cast<int>(std::lround(w / ratio)));
-            hSpin->setValue(h);
-            guard = false;
-        };
-
-        auto syncWFromH = [&]()
-        {
-            if (!keepRatio->isChecked() || guard)
-                return;
-            guard = true;
-            const int h = hSpin->value();
-            const int w = std::max(1, static_cast<int>(std::lround(h * ratio)));
-            wSpin->setValue(w);
-            guard = false;
-        };
-
-        connect(wSpin, qOverload<int>(&QSpinBox::valueChanged), &dlg, [&](int) { syncHFromW(); });
-        connect(hSpin, qOverload<int>(&QSpinBox::valueChanged), &dlg, [&](int) { syncWFromH(); });
-        connect(keepRatio, &QCheckBox::toggled, &dlg,
-                [&](bool on)
-                {
-                    if (on)
-                        syncHFromW();
-                });
-
-        if (dlg.exec() != QDialog::Accepted)
-            return;
-
-        const int newW = wSpin->value();
-        const int newH = hSpin->value();
-
-        app().resizeLayer(idx, newW, newH);
-    }
-    else if (act == deleteAct)
-    {
-        const QString layerName = QString::fromStdString(layer ? layer->name() : "");
-        const int ret = QMessageBox::question(this, tr("Supprimer le calque"),
-                                              tr("Supprimer le calque %1 ?").arg(layerName),
-                                              QMessageBox::Yes | QMessageBox::No);
-        if (ret == QMessageBox::Yes)
-            app().removeLayer(idx);
-    }
-    else if (act == mergeDownAct)
-        app().mergeLayerDown(idx);
-    else if (act == upAct)
-        moveLayerUp();
-    else if (act == downAct)
-        moveLayerDown();
-}
-
 QPixmap MainWindow::createLayerThumbnail(const std::shared_ptr<Layer>& layer,
                                          const QSize& size) const
 {
@@ -1632,346 +1972,6 @@ void MainWindow::updateLayerHeaderButtonsEnabled()
         m_layerUpBtn->setEnabled(idx + 1 < n);
     if (m_layerDownBtn)
         m_layerDownBtn->setEnabled(idx > 0);
-}
-
-void MainWindow::onMergeDown()
-{
-    if (!m_layersList || !app().hasDocument())
-        return;
-
-    QListWidgetItem* item = m_layersList->currentItem();
-    if (!item)
-        return;
-
-    const auto layerId = static_cast<std::uint64_t>(item->data(Qt::UserRole).toULongLong());
-    const auto idxOpt = app::commands::findLayerIndexById(app().document(), layerId);
-    if (!idxOpt.has_value() || idxOpt.value() == 0)
-        return;
-    const std::size_t idx = *idxOpt;
-
-    auto layer = app().document().layerAt(idx);
-    if (!layer || layer->locked())
-        return;
-    app().mergeLayerDown(idx);
-}
-
-void MainWindow::saveAsEpg()
-{
-    if (!app().hasDocument())
-    {
-        QMessageBox::information(this, tr("Information"), tr("Aucune image à sauvegarder."));
-        return;
-    }
-
-    const QString startDir =
-        m_currentFileName.isEmpty()
-            ? QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
-            : QFileInfo(m_currentFileName).absolutePath();
-
-    QString fileName =
-        QFileDialog::getSaveFileName(this, tr("Enregistrer au format EpiGimp"),
-                                     startDir + "/untitled.epg", tr("EpiGimp (*.epg)"));
-
-    if (fileName.isEmpty())
-        return;
-
-    if (!fileName.endsWith(".epg", Qt::CaseInsensitive))
-        fileName += ".epg";
-
-    try
-    {
-        app().save(fileName.toStdString());
-        m_currentFileName = fileName;
-
-        setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
-        statusBar()->showMessage(
-            tr("Fichier EPG sauvegardé: %1").arg(QFileInfo(fileName).fileName()), 3000);
-        setDirty(false);
-    }
-    catch (const std::exception& e)
-    {
-        QMessageBox::critical(this, tr("Erreur"),
-                              tr("Impossible de sauvegarder %1.\n%2")
-                                  .arg(QDir::toNativeSeparators(fileName))
-                                  .arg(QString::fromLocal8Bit(e.what())));
-    }
-}
-
-void MainWindow::zoomIn()
-{
-    if (!canvas_ || !canvas_->hasImage())
-        return;
-    canvas_->setScale(canvas_->scale() * 1.25);
-}
-
-void MainWindow::zoomOut()
-{
-    if (!canvas_ || !canvas_->hasImage())
-        return;
-    canvas_->setScale(canvas_->scale() / 1.25);
-}
-
-void MainWindow::resetZoom()
-{
-    if (!canvas_)
-        return;
-    canvas_->setScale(1.0);
-}
-
-void MainWindow::clearSelection()
-{
-    if (!app().hasDocument())
-        return;
-    app().clearSelectionRect();
-}
-
-void MainWindow::toggleSelectionMode(bool enabled)
-{
-    if (enabled)
-    {
-        if (m_moveLayerAct)
-            m_moveLayerAct->setChecked(false);
-        if (m_bucketAct)
-            m_bucketAct->setChecked(false);
-        m_bucketMode = false;
-    }
-    if (canvas_)
-        canvas_->setSelectionEnable(enabled);
-    if (m_selectToggleAct)
-        m_selectToggleAct->setChecked(enabled);
-}
-
-void MainWindow::newImage()
-{
-    if (!confirmDiscardIfDirty(tr("Créer une nouvelle image"), false))
-        return;
-    QDialog dialog(this);
-    dialog.setWindowTitle(tr("Nouvelle image"));
-
-    QVBoxLayout* mainLayout = new QVBoxLayout(&dialog);
-
-    QSpinBox* wSpin = new QSpinBox(&dialog);
-    wSpin->setRange(1, 10000);
-    wSpin->setValue(800);
-
-    QSpinBox* hSpin = new QSpinBox(&dialog);
-    hSpin->setRange(1, 10000);
-    hSpin->setValue(600);
-
-    auto* wLay = new QHBoxLayout();
-    wLay->addWidget(new QLabel(tr("Largeur (px):"), &dialog));
-    wLay->addWidget(wSpin);
-    wLay->addStretch();
-
-    auto* hLay = new QHBoxLayout();
-    hLay->addWidget(new QLabel(tr("Hauteur (px):"), &dialog));
-    hLay->addWidget(hSpin);
-    hLay->addStretch();
-
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-
-    // --- Background controls ---
-    auto* bgLayout = new QHBoxLayout();
-
-    auto* transparentBgCheck = new QCheckBox(tr("Créer un calque transparent"), &dialog);
-    transparentBgCheck->setChecked(false);
-
-    auto* colorBtn = new QPushButton(tr("Choisir la couleur"), &dialog);
-    auto* colorPreview = new QLabel(&dialog);
-    colorPreview->setFixedSize(24, 24);
-    colorPreview->setFrameStyle(QFrame::Box | QFrame::Plain);
-    colorPreview->setAutoFillBackground(true);
-
-    // default: white background
-    QColor canvasColor = QColor(255, 255, 255, 255);
-
-    auto updatePreview = [&]()
-    {
-        QPalette pal = colorPreview->palette();
-        pal.setColor(QPalette::Window, canvasColor);
-        colorPreview->setPalette(pal);
-    };
-    updatePreview();
-
-    auto updateBgUiEnabled = [&]()
-    {
-        const bool isTransparent = transparentBgCheck->isChecked();
-        colorBtn->setEnabled(!isTransparent);
-        colorPreview->setEnabled(!isTransparent);
-    };
-    updateBgUiEnabled();
-
-    connect(transparentBgCheck, &QCheckBox::toggled, &dialog, [&](bool) { updateBgUiEnabled(); });
-
-    connect(colorBtn, &QPushButton::clicked, &dialog,
-            [&]()
-            {
-                QColor c =
-                    QColorDialog::getColor(canvasColor, &dialog, tr("Choisir la couleur du fond"));
-                if (c.isValid())
-                {
-                    canvasColor = c;
-                    updatePreview();
-                }
-            });
-
-    bgLayout->addWidget(transparentBgCheck);
-    bgLayout->addSpacing(8);
-    bgLayout->addWidget(colorBtn);
-    bgLayout->addWidget(colorPreview);
-    bgLayout->addStretch();
-
-    mainLayout->addLayout(bgLayout);
-    mainLayout->addLayout(wLay);
-    mainLayout->addLayout(hLay);
-    mainLayout->addWidget(buttons);
-
-    if (dialog.exec() != QDialog::Accepted)
-        return;
-
-    m_currentFileName.clear();
-    std::uint32_t bgColor = common::colors::White;
-
-    if (transparentBgCheck->isChecked())
-    {
-        bgColor = common::colors::Transparent;
-    }
-    else
-    {
-        bgColor = (static_cast<uint32_t>(canvasColor.red()) << 24) |
-                  (static_cast<uint32_t>(canvasColor.green()) << 16) |
-                  (static_cast<uint32_t>(canvasColor.blue()) << 8) |
-                  static_cast<uint32_t>(canvasColor.alpha());
-    }
-
-    app().newDocument({wSpin->value(), hSpin->value()}, 72.f, bgColor);
-    setWindowTitle(tr("Sans titre - EpiGimp 2.0"));
-    statusBar()->showMessage(
-        tr("Nouvelle image créée: %1x%2").arg(wSpin->value()).arg(hSpin->value()), 2000);
-    setDirty(false);
-}
-
-void MainWindow::openImage()
-{
-    if (!confirmDiscardIfDirty(tr("Ouvrir une image"), false))
-        return;
-    QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
-
-    QString fileName = QFileDialog::getOpenFileName(
-        this, tr("Ouvrir une image"), picturesPath,
-        tr("Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp);;Tous les fichiers (*)"));
-
-    if (fileName.isEmpty())
-        return;
-
-    QImageReader reader(fileName);
-    reader.setAutoTransform(true);
-    const QImage image = reader.read();
-    if (image.isNull())
-    {
-        QMessageBox::critical(this, tr("Erreur"),
-                              tr("Impossible de charger l'image %1:\n%2")
-                                  .arg(QDir::toNativeSeparators(fileName))
-                                  .arg(reader.errorString()));
-        return;
-    }
-
-    m_currentFileName = fileName;
-
-    app().newDocument({image.width(), image.height()}, 72.f, common::colors::Transparent);
-
-    ImageBuffer buf = ImageConversion::qImageToImageBuffer(image, image.width(), image.height());
-    app().replaceBackgroundWithImage(buf, QFileInfo(fileName).baseName().toStdString());
-
-    setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
-    statusBar()->showMessage(tr("Image chargée: %1").arg(QFileInfo(fileName).fileName()), 2000);
-    setDirty(false);
-}
-
-void MainWindow::saveImage()
-{
-    if (!app().hasDocument())
-    {
-        QMessageBox::information(this, tr("Information"), tr("Aucune image à sauvegarder."));
-        return;
-    }
-
-    const QString startDir =
-        m_currentFileName.isEmpty()
-            ? QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)
-            : QFileInfo(m_currentFileName).absolutePath();
-
-    QString fileName = QFileDialog::getSaveFileName(
-        this, tr("Exporter l'image"), startDir + "/untitled.png",
-        tr("PNG (*.png);;JPEG (*.jpg *.jpeg);;BMP (*.bmp);;Tous les fichiers (*)"));
-
-    if (fileName.isEmpty())
-        return;
-
-    try
-    {
-        app().exportImage(fileName.toStdString());
-        m_currentFileName = fileName;
-        statusBar()->showMessage(tr("Image exportée: %1").arg(QFileInfo(fileName).fileName()),
-                                 3000);
-        setDirty(false);
-    }
-    catch (const std::exception& e)
-    {
-        QMessageBox::critical(this, tr("Erreur"),
-                              tr("Impossible d'exporter %1.\n%2")
-                                  .arg(QDir::toNativeSeparators(fileName))
-                                  .arg(QString::fromLocal8Bit(e.what())));
-    }
-}
-
-void MainWindow::closeImage()
-{
-    if (!confirmDiscardIfDirty(tr("Fermer le document"), true))
-        return;
-    if (!app().hasDocument())
-        return;
-    app().closeDocument();
-    setWindowTitle(tr("EpiGimp 2.0"));
-    statusBar()->showMessage(tr("Image fermée"), 2000);
-    setDirty(false);
-}
-
-void MainWindow::openEpg()
-{
-    if (!confirmDiscardIfDirty(tr("Créer une fichier EPG"), true))
-        return;
-    const QString startDir =
-        m_currentFileName.isEmpty()
-            ? QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
-            : QFileInfo(m_currentFileName).absolutePath();
-
-    const QString fileName =
-        QFileDialog::getOpenFileName(this, tr("Ouvrir un fichier EpiGimp"), startDir,
-                                     tr("EpiGimp (*.epg);;Tous les fichiers (*)"));
-
-    if (fileName.isEmpty())
-        return;
-
-    try
-    {
-        app().open(fileName.toStdString());
-        m_currentFileName = fileName;
-
-        setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
-        statusBar()->showMessage(tr("Fichier EPG chargé: %1").arg(QFileInfo(fileName).fileName()),
-                                 3000);
-        setDirty(false);
-    }
-    catch (const std::exception& e)
-    {
-        QMessageBox::critical(this, tr("Erreur"),
-                              tr("Impossible d'ouvrir %1.\n%2")
-                                  .arg(QDir::toNativeSeparators(fileName))
-                                  .arg(QString::fromLocal8Bit(e.what())));
-    }
 }
 
 void MainWindow::selectLayerInListById(std::uint64_t id)
