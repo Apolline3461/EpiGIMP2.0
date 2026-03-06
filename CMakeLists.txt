@@ -83,7 +83,8 @@ FetchContent_Declare(
     stb
     GIT_REPOSITORY https://github.com/nothings/stb.git
     GIT_TAG f1c79c02822848a9bed4315b12c8c8f3761e1296
-    GIT_SHALLOW TRUE
+    GIT_SHALLOW FALSE
+    GIT_PROGRESS TRUE
 )
 FetchContent_MakeAvailable(stb)
 add_library(stb_headers INTERFACE)
@@ -92,12 +93,6 @@ target_include_directories(stb_headers SYSTEM INTERFACE ${stb_SOURCE_DIR})
 # Configuration par couche
 # ============================================================
 set(EPIGIMP_ROOT_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
-
-option(ENABLE_COVERAGE "Enable coverage flags" OFF)
-if(ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    add_compile_options(-O0 -g --coverage)
-    add_link_options(--coverage)
-endif()
 
 add_subdirectory(src/core)
 add_subdirectory(src/io)
