@@ -60,6 +60,14 @@ class AppService
     void replaceBackgroundWithImage(const ImageBuffer& img, std::string name = "Background");
     void save(const std::string& path);
     void exportImage(const std::string& path);
+    bool isDirty() const noexcept
+    {
+        return dirty_;
+    }
+    void markSaved() noexcept
+    {
+        dirty_ = false;
+    }
     void closeDocument();
 
     std::size_t activeLayer() const;
@@ -104,8 +112,7 @@ class AppService
     std::size_t activeLayer_ = 0;
     std::uint64_t nextLayerId_ = 1;
     std::unique_ptr<commands::StrokeCommand> currentStroke_;
-    // std::vector<common::PointPoint> pointToDraw_;
-    // std::optional<common::Point> lastPointToDraw_;
     void apply(std::unique_ptr<Command> cmd);
+    bool dirty_ = false;
 };
 };  // namespace app
