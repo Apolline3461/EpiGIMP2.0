@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QAction>
+#include <QCloseEvent>
 #include <QColor>
 #include <QDockWidget>
 #include <QEvent>
@@ -95,6 +96,12 @@ class MainWindow : public QMainWindow
     void createLayersPanel();
     void createToolBar();
 
+    void setDirty(bool on);
+    void updateWindowTitle();
+    bool confirmDiscardIfDirty(const QString& actionLabel, bool epg);
+
+    void closeEvent(QCloseEvent* event) override;
+
     void populateLayersList();
     QPixmap createLayerThumbnail(const std::shared_ptr<class Layer>& layer,
                                  const QSize& size) const;
@@ -173,6 +180,8 @@ class MainWindow : public QMainWindow
     QListWidget* m_layersList{nullptr};
     QAction* m_layerUpAct{nullptr};
     QAction* m_layerDownAct{nullptr};
+
+    bool m_dirty{false};
 
     // Document and layers UI
     std::optional<std::uint64_t> m_pendingSelectLayerId_;
