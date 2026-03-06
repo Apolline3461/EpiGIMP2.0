@@ -234,7 +234,13 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
                 app().moveLayer(m_dragLayerIdx, newX, newY);
             });
 
-    app().documentChanged.connect([this]() { refreshUIAfterDocChange(); });
+    app().documentChanged.connect(
+        [this]()
+        {
+            refreshUIAfterDocChange();
+            if (app().hasDocument())
+                setDirty(app().isDirty());
+        });
 
     refreshUIAfterDocChange();
 }
@@ -1123,6 +1129,61 @@ void MainWindow::createToolBar()
     m_pencilDock->setVisible(false);
 }
 
+void MainWindow::setDirty(bool on)
+{
+    m_dirty = on;
+    updateWindowTitle();
+}
+
+void MainWindow::updateWindowTitle()
+{
+    QString base =
+        m_currentFileName.isEmpty() ? tr("Sans titre") : QFileInfo(m_currentFileName).fileName();
+
+    if (m_dirty)
+        base += " *";
+    setWindowTitle(tr("%1 - EpiGimp 2.0").arg(base));
+}
+
+bool MainWindow::confirmDiscardIfDirty(const QString& actionLabel, bool epg)
+{
+    if (!app().hasDocument() || !app().isDirty())
+        return true;
+
+    const auto ret = QMessageBox::warning(
+        this, tr("Modifications non enregistrées"),
+        tr("Le document a des modifications non enregistrées.\n\n%1 sans enregistrer ?")
+            .arg(actionLabel),
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Save);
+
+    if (ret == QMessageBox::Cancel)
+        return false;
+
+    if (ret == QMessageBox::Save)
+    {
+        if (epg)
+        {
+            saveAsEpg();
+        }
+        else
+        {
+            saveImage();
+        }
+        return !m_dirty;
+    }
+    return true;
+}
+
+void MainWindow::closeEvent(QCloseEvent* e)
+{
+    if (!confirmDiscardIfDirty(tr("Quitter"), true))
+    {
+        e->ignore();
+        return;
+    }
+    e->accept();
+}
+
 void MainWindow::populateLayersList()
 {
     if (!m_layersList)
@@ -1625,6 +1686,7 @@ void MainWindow::saveAsEpg()
         setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
         statusBar()->showMessage(
             tr("Fichier EPG sauvegardé: %1").arg(QFileInfo(fileName).fileName()), 3000);
+        setDirty(false);
     }
     catch (const std::exception& e)
     {
@@ -1681,6 +1743,8 @@ void MainWindow::toggleSelectionMode(bool enabled)
 
 void MainWindow::newImage()
 {
+    if (!confirmDiscardIfDirty(tr("Créer une nouvelle image"), false))
+        return;
     QDialog dialog(this);
     dialog.setWindowTitle(tr("Nouvelle image"));
 
@@ -1786,10 +1850,13 @@ void MainWindow::newImage()
     setWindowTitle(tr("Sans titre - EpiGimp 2.0"));
     statusBar()->showMessage(
         tr("Nouvelle image créée: %1x%2").arg(wSpin->value()).arg(hSpin->value()), 2000);
+    setDirty(false);
 }
 
 void MainWindow::openImage()
 {
+    if (!confirmDiscardIfDirty(tr("Ouvrir une image"), false))
+        return;
     QString picturesPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
 
     QString fileName = QFileDialog::getOpenFileName(
@@ -1820,6 +1887,7 @@ void MainWindow::openImage()
 
     setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
     statusBar()->showMessage(tr("Image chargée: %1").arg(QFileInfo(fileName).fileName()), 2000);
+    setDirty(false);
 }
 
 void MainWindow::saveImage()
@@ -1848,6 +1916,7 @@ void MainWindow::saveImage()
         m_currentFileName = fileName;
         statusBar()->showMessage(tr("Image exportée: %1").arg(QFileInfo(fileName).fileName()),
                                  3000);
+        setDirty(false);
     }
     catch (const std::exception& e)
     {
@@ -1860,15 +1929,20 @@ void MainWindow::saveImage()
 
 void MainWindow::closeImage()
 {
+    if (!confirmDiscardIfDirty(tr("Fermer le document"), true))
+        return;
     if (!app().hasDocument())
         return;
     app().closeDocument();
     setWindowTitle(tr("EpiGimp 2.0"));
     statusBar()->showMessage(tr("Image fermée"), 2000);
+    setDirty(false);
 }
 
 void MainWindow::openEpg()
 {
+    if (!confirmDiscardIfDirty(tr("Créer une fichier EPG"), true))
+        return;
     const QString startDir =
         m_currentFileName.isEmpty()
             ? QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
@@ -1889,6 +1963,7 @@ void MainWindow::openEpg()
         setWindowTitle(tr("%1 - EpiGimp 2.0").arg(QFileInfo(fileName).fileName()));
         statusBar()->showMessage(tr("Fichier EPG chargé: %1").arg(QFileInfo(fileName).fileName()),
                                  3000);
+        setDirty(false);
     }
     catch (const std::exception& e)
     {
