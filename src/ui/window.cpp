@@ -95,33 +95,49 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
                     statusBar()->showMessage(e.what(), 2000);
                 }
             });
+
     connect(canvas_, &CanvasWidget::beginStroke, this,
             [this](common::Point p)
             {
-                if (!m_pencilAct || !m_pencilAct->isChecked())
+                const bool pencilOn = (m_pencilAct && m_pencilAct->isChecked());
+                const bool eraserOn = (m_eraseAct && m_eraseAct->isChecked());
+                if (!pencilOn && !eraserOn)
                     return;
-                try
+
+                app::ToolParams params;
+                params.tool = eraserOn ? app::ToolKind::Eraser : app::ToolKind::Pencil;
+                params.size = (m_pencilSizeSpin) ? m_pencilSizeSpin->value() : 8;
+
+                if (params.tool == app::ToolKind::Eraser)
                 {
-                    app::ToolParams params;
-                    params.tool = app::ToolKind::Pencil;
-                    params.size = (m_pencilSizeSpin) ? m_pencilSizeSpin->value() : 8;
-                    (void)0;  // hardness removed
+                    params.color = common::colors::Transparent;
+                }
+                else
+                {
                     params.color = (static_cast<uint32_t>(m_toolColor.red()) << 24) |
                                    (static_cast<uint32_t>(m_toolColor.green()) << 16) |
                                    (static_cast<uint32_t>(m_toolColor.blue()) << 8) |
                                    static_cast<uint32_t>(m_toolColor.alpha());
+                }
+                try
+                {
                     app().beginStroke(params, p);
                 }
                 catch (const std::exception& e)
                 {
-                    statusBar()->showMessage(e.what(), 2000);
+                    // Option: statusBar message
+                    if (statusBar())
+                        statusBar()->showMessage(tr("Impossible de dessiner: %1").arg(e.what()),
+                                                 2000);
                 }
             });
 
     connect(canvas_, &CanvasWidget::moveStroke, this,
             [this](common::Point p)
             {
-                if (!m_pencilAct || !m_pencilAct->isChecked())
+                const bool pencilOn = (m_pencilAct && m_pencilAct->isChecked());
+                const bool eraserOn = (m_eraseAct && m_eraseAct->isChecked());
+                if (!pencilOn && !eraserOn)
                     return;
                 try
                 {
@@ -136,7 +152,9 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
     connect(canvas_, &CanvasWidget::endStroke, this,
             [this]()
             {
-                if (!m_pencilAct || !m_pencilAct->isChecked())
+                const bool pencilOn = (m_pencilAct && m_pencilAct->isChecked());
+                const bool eraserOn = (m_eraseAct && m_eraseAct->isChecked());
+                if (!pencilOn && !eraserOn)
                     return;
                 try
                 {
@@ -281,7 +299,18 @@ void MainWindow::toggleSelectionMode(bool enabled)
             m_moveLayerAct->setChecked(false);
         if (m_bucketAct)
             m_bucketAct->setChecked(false);
+        if (m_pickAct)
+            m_pickAct->setChecked(false);
+        if (m_pencilAct)
+            m_pencilAct->setChecked(false);
+        if (m_eraseAct)
+            m_eraseAct->setChecked(false);
+
         m_bucketMode = false;
+        m_pickMode = false;
+
+        if (canvas_)
+            canvas_->setPencilEnable(false);
     }
     if (canvas_)
         canvas_->setSelectionEnable(enabled);
@@ -984,6 +1013,14 @@ void MainWindow::onMergeDown()
     app().mergeLayerDown(idx);
 }
 
+void MainWindow::syncStrokeToolState()
+{
+    const bool pencilOn = m_pencilAct && m_pencilAct->isChecked();
+    const bool eraserOn = m_eraseAct && m_eraseAct->isChecked();
+    if (canvas_)
+        canvas_->setPencilEnable(pencilOn || eraserOn);
+}
+
 void MainWindow::refreshUIAfterDocChange()
 {
     if (m_dragLayerActive)
@@ -1024,6 +1061,8 @@ void MainWindow::refreshUIAfterDocChange()
         m_moveLayerAct->setEnabled(hasDoc && editable);
     if (m_pencilAct)
         m_pencilAct->setEnabled(hasDoc && editable);
+    if (m_eraseAct)
+        m_eraseAct->setEnabled(hasDoc && editable);
 
     if (!hasDoc)
     {
@@ -1034,7 +1073,7 @@ void MainWindow::refreshUIAfterDocChange()
             canvas_->clearDragLayerPreview();
         }
         if (m_pencilAct)
-            m_pencilAct->setChecked(false);
+            syncStrokeToolState();
         if (m_pencilDock)
             m_pencilDock->setVisible(false);
         if (m_moveLayerAct)
@@ -1045,6 +1084,8 @@ void MainWindow::refreshUIAfterDocChange()
             m_pickAct->setChecked(false);
         if (m_selectToggleAct)
             m_selectToggleAct->setChecked(false);
+        if (m_eraseAct)
+            syncStrokeToolState();
 
         clearUiStateOnClose();
         return;
@@ -1146,6 +1187,8 @@ void MainWindow::clearUiStateOnClose()
         m_moveLayerAct->setChecked(false);
     if (m_pencilAct)
         m_pencilAct->setChecked(false);
+    if (m_eraseAct)
+        m_eraseAct->setChecked(false);
 
     m_bucketMode = false;
     m_pickMode = false;
@@ -1257,6 +1300,7 @@ void MainWindow::createActions()
                     canvas_->setSelectionEnable(false);
             }
         });
+
     /* Color Picker */
     m_pickAct = new QAction(tr("Pipette"), this);
     m_pickAct->setCheckable(true);
@@ -1311,7 +1355,7 @@ void MainWindow::createActions()
             [this](bool on)
             {
                 if (canvas_)
-                    canvas_->setPencilEnable(on);
+                    syncStrokeToolState();
                 if (m_pencilDock)
                     m_pencilDock->setVisible(on);
                 if (on)
@@ -1401,6 +1445,36 @@ void MainWindow::createActions()
                     m_bucketAct->setIcon(QIcon(":/icons/bucket.svg"));
             });
     m_bucketAct->setObjectName("act.bucket");
+
+    m_eraseAct = new QAction(tr("Gomme"), this);
+    m_eraseAct->setCheckable(true);
+    m_eraseAct->setShortcut(QKeySequence("Maj+E"));
+    m_eraseAct->setStatusTip(tr("Effacer"));
+    m_eraseAct->setIcon(QIcon(":/icons/eraser.svg"));
+    connect(m_eraseAct, &QAction::toggled, this,
+            [this](bool on)
+            {
+                if (canvas_)
+                {
+                    syncStrokeToolState();
+                    canvas_->setSelectionEnable(false);
+                }
+                if (on)
+                {
+                    if (m_moveLayerAct)
+                        m_moveLayerAct->setChecked(false);
+                    if (m_bucketAct)
+                        m_bucketAct->setChecked(false);
+                    if (m_pickAct)
+                        m_pickAct->setChecked(false);
+                    if (m_selectToggleAct)
+                        m_selectToggleAct->setChecked(false);
+
+                    m_bucketMode = false;
+                    m_pickMode = false;
+                }
+            });
+    m_eraseAct->setObjectName("act.erase");
 
     auto* escClearAct = new QAction(this);
     escClearAct->setShortcut(QKeySequence(Qt::Key_Escape));
@@ -1643,11 +1717,18 @@ void MainWindow::createToolBar()
         m_toolsGroup->addAction(m_pickAct);
         m_toolsTb->addAction(m_pickAct);
     }
+
     if (m_pencilAct)
     {
         m_pencilAct->setToolTip(tr("Pinceau"));
         m_toolsGroup->addAction(m_pencilAct);
         m_toolsTb->addAction(m_pencilAct);
+    }
+
+    if (m_eraseAct)
+    {
+        m_toolsGroup->addAction(m_eraseAct);
+        m_toolsTb->addAction(m_eraseAct);
     }
 
     m_toolsTb->addSeparator();
@@ -1656,6 +1737,7 @@ void MainWindow::createToolBar()
         m_toolsTb->addAction(m_undoAct);
     if (m_redoAct)
         m_toolsTb->addAction(m_redoAct);
+
     // Pencil properties dock
     m_pencilDock = new QDockWidget(tr("Pinceau"), this);
     QWidget* pencilWidget = new QWidget(m_pencilDock);

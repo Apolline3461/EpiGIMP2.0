@@ -145,7 +145,8 @@ void StrokeCommand::buildChanges()
         const int rInt = static_cast<int>(std::ceil(radius));
 
         // Use after color directly (no hardness adjustment)
-        const std::uint32_t afterColor = params_.color;
+        const std::uint32_t afterColor =
+            (params_.tool == ToolKind::Eraser) ? common::colors::Transparent : params_.color;
 
         const int x0 = cx - rInt;
         const int x1 = cx + rInt;

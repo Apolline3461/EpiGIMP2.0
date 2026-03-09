@@ -13,6 +13,7 @@ namespace app
 enum class ToolKind : std::uint8_t
 {
     Pencil,
+    Eraser,
 };
 
 struct ToolParams
