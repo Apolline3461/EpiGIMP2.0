@@ -1017,8 +1017,11 @@ void MainWindow::syncStrokeToolState()
 {
     const bool pencilOn = m_pencilAct && m_pencilAct->isChecked();
     const bool eraserOn = m_eraseAct && m_eraseAct->isChecked();
-    if (canvas_)
-        canvas_->setPencilEnable(pencilOn || eraserOn);
+    if (!canvas_)
+        return;
+
+    canvas_->setPencilEnable(pencilOn);
+    canvas_->setEraserEnable(eraserOn);
 }
 
 void MainWindow::refreshUIAfterDocChange()
@@ -1368,6 +1371,8 @@ void MainWindow::createActions()
                         m_pickAct->setChecked(false);
                     if (m_selectToggleAct)
                         m_selectToggleAct->setChecked(false);
+                    if (m_eraseAct)
+                        m_eraseAct->setChecked(false);
                     m_bucketMode = false;
                     m_pickMode = false;
                     if (canvas_)
@@ -1469,7 +1474,8 @@ void MainWindow::createActions()
                         m_pickAct->setChecked(false);
                     if (m_selectToggleAct)
                         m_selectToggleAct->setChecked(false);
-
+                    if (m_pencilAct)
+                        m_pencilAct->setChecked(false);
                     m_bucketMode = false;
                     m_pickMode = false;
                 }
