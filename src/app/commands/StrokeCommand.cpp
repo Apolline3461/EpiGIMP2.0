@@ -113,7 +113,39 @@ void StrokeCommand::buildChanges()
         return (before & 0xFFFFFF00u) | static_cast<std::uint32_t>(newA);
     };
 
-    auto recordPixel = [&](int docX, int docY, std::uint32_t afterColor)
+    auto blendOver = [&](std::uint32_t dst, std::uint32_t src, float op) -> std::uint32_t
+    {
+        op = std::clamp(op, 0.f, 1.f);
+
+        const float dr = float((dst >> 24) & 0xFFu) / 255.f;
+        const float dg = float((dst >> 16) & 0xFFu) / 255.f;
+        const float db = float((dst >> 8) & 0xFFu) / 255.f;
+        const float da = float(dst & 0xFFu) / 255.f;
+
+        const float sr = float((src >> 24) & 0xFFu) / 255.f;
+        const float sg = float((src >> 16) & 0xFFu) / 255.f;
+        const float sb = float((src >> 8) & 0xFFu) / 255.f;
+        const float sa = (float(src & 0xFFu) / 255.f) * op;  // alpha effectif
+
+        // "source over" en alpha non-premultiplié
+        const float outA = sa + da * (1.f - sa);
+        if (outA <= 0.f)
+            return 0u;
+
+        const float outR = (sr * sa + dr * da * (1.f - sa)) / outA;
+        const float outG = (sg * sa + dg * da * (1.f - sa)) / outA;
+        const float outB = (sb * sa + db * da * (1.f - sa)) / outA;
+
+        const auto to8 = [](float v) -> std::uint32_t
+        {
+            v = std::clamp(v, 0.f, 1.f);
+            return static_cast<std::uint32_t>(std::lround(v * 255.f));
+        };
+
+        return (to8(outR) << 24) | (to8(outG) << 16) | (to8(outB) << 8) | to8(outA);
+    };
+
+    auto recordPixel = [&](int docX, int docY)
     {
         if (hasSel)
         {
@@ -139,12 +171,19 @@ void StrokeCommand::buildChanges()
             ch.x = x;
             ch.y = y;
             ch.before = img->getPixel(x, y);
-            ch.after = afterColor;
+            if (params_.tool == ToolKind::Eraser)
+                ch.after = applyEraser(ch.before, params_.opacity);
+            else
+                ch.after = blendOver(ch.before, params_.color, params_.opacity);
             map.emplace(key, ch);
         }
         else
         {
-            it->second.after = afterColor;
+            const std::uint32_t base = it->second.after;
+            if (params_.tool == ToolKind::Eraser)
+                it->second.after = applyEraser(base, params_.opacity);
+            else
+                it->second.after = blendOver(base, params_.color, params_.opacity);
         }
     };
 
@@ -154,10 +193,6 @@ void StrokeCommand::buildChanges()
         const int diameter = std::max(1, params_.size);
         const double radius = static_cast<double>(diameter) * 0.5;
         const int rInt = static_cast<int>(std::ceil(radius));
-
-        // Use after color directly (no hardness adjustment)
-        const std::uint32_t afterColor =
-            (params_.tool == ToolKind::Eraser) ? common::colors::Transparent : params_.color;
 
         const int x0 = cx - rInt;
         const int x1 = cx + rInt;
@@ -172,7 +207,7 @@ void StrokeCommand::buildChanges()
                 const double dx = static_cast<double>(xx) - static_cast<double>(cx);
                 const double dy = static_cast<double>(yy) - static_cast<double>(cy);
                 if (dx * dx + dy * dy <= r2)
-                    recordPixel(xx, yy, afterColor);
+                    recordPixel(xx, yy);
             }
         }
     };

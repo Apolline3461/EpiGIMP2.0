@@ -96,44 +96,44 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
                 }
             });
 
-    connect(canvas_, &CanvasWidget::beginStroke, this,
-            [this](common::Point p)
+    connect(
+        canvas_, &CanvasWidget::beginStroke, this,
+        [this](common::Point p)
+        {
+            const bool pencilOn = (m_pencilAct && m_pencilAct->isChecked());
+            const bool eraserOn = (m_eraseAct && m_eraseAct->isChecked());
+            if (!pencilOn && !eraserOn)
+                return;
+
+            app::ToolParams params;
+            params.tool = eraserOn ? app::ToolKind::Eraser : app::ToolKind::Pencil;
+
+            if (params.tool == app::ToolKind::Eraser)
             {
-                const bool pencilOn = (m_pencilAct && m_pencilAct->isChecked());
-                const bool eraserOn = (m_eraseAct && m_eraseAct->isChecked());
-                if (!pencilOn && !eraserOn)
-                    return;
-
-                app::ToolParams params;
-                params.tool = eraserOn ? app::ToolKind::Eraser : app::ToolKind::Pencil;
-
-                if (params.tool == app::ToolKind::Eraser)
-                {
-                    params.size = (m_eraseSizeSpin) ? m_eraseSizeSpin->value() : 8;
-                    params.opacity = (m_eraseOpacitySpin) ? m_eraseOpacitySpin->value() / 100.0 : 1;
-                    params.color = common::colors::Transparent;
-                }
-                else
-                {
-                    params.size = (m_pencilSizeSpin) ? m_pencilSizeSpin->value() : 8;
-                    params.opacity = (m_pencilOpacitySpin) ? m_pencilOpacitySpin->value() / 100 : 1;
-                    params.color = (static_cast<uint32_t>(m_toolColor.red()) << 24) |
-                                   (static_cast<uint32_t>(m_toolColor.green()) << 16) |
-                                   (static_cast<uint32_t>(m_toolColor.blue()) << 8) |
-                                   static_cast<uint32_t>(m_toolColor.alpha());
-                }
-                try
-                {
-                    app().beginStroke(params, p);
-                }
-                catch (const std::exception& e)
-                {
-                    // Option: statusBar message
-                    if (statusBar())
-                        statusBar()->showMessage(tr("Impossible de dessiner: %1").arg(e.what()),
-                                                 2000);
-                }
-            });
+                params.size = (m_eraseSizeSpin) ? m_eraseSizeSpin->value() : 8;
+                params.opacity = (m_eraseOpacitySpin) ? (m_eraseOpacitySpin->value() / 100.0) : 1.F;
+            }
+            else
+            {
+                params.size = (m_pencilSizeSpin) ? m_pencilSizeSpin->value() : 8;
+                params.opacity =
+                    (m_pencilOpacitySpin) ? (m_pencilOpacitySpin->value() / 100.0) : 1.F;
+                params.color = (static_cast<uint32_t>(m_toolColor.red()) << 24) |
+                               (static_cast<uint32_t>(m_toolColor.green()) << 16) |
+                               (static_cast<uint32_t>(m_toolColor.blue()) << 8) |
+                               static_cast<uint32_t>(m_toolColor.alpha());
+            }
+            try
+            {
+                app().beginStroke(params, p);
+            }
+            catch (const std::exception& e)
+            {
+                // Option: statusBar message
+                if (statusBar())
+                    statusBar()->showMessage(tr("Impossible de dessiner: %1").arg(e.what()), 2000);
+            }
+        });
 
     connect(canvas_, &CanvasWidget::moveStroke, this,
             [this](common::Point p)
@@ -1366,7 +1366,6 @@ void MainWindow::createActions()
                 {
                     syncStrokeToolState();
                     canvas_->setSelectionEnable(false);
-                    canvas_->setPencilEnable(on);
                 }
                 if (m_pencilDock)
                     m_pencilDock->setVisible(on);
@@ -1805,13 +1804,13 @@ void MainWindow::createToolBar()
         // connect pencil size and opacity to canvas preview
 
         connect(m_pencilSizeSpin, qOverload<int>(&QSpinBox::valueChanged), this,
-                [this](int v)
+                [this](const int v)
                 {
                     if (canvas_)
                         canvas_->setPencilSize(v);
                 });
         connect(m_pencilOpacitySpin, qOverload<int>(&QSpinBox::valueChanged), this,
-                [this](int v)
+                [this](const double v)
                 {
                     if (canvas_)
                         canvas_->setPencilOpacity(v / 100.0);
@@ -1822,13 +1821,13 @@ void MainWindow::createToolBar()
         // connect eraser size and opacity to canvas preview
 
         connect(m_eraseSizeSpin, qOverload<int>(&QSpinBox::valueChanged), this,
-                [this](int v)
+                [this](const int v)
                 {
                     if (canvas_)
                         canvas_->setEraserSize(v);
                 });
         connect(m_eraseOpacitySpin, qOverload<int>(&QSpinBox::valueChanged), this,
-                [this](int v)
+                [this](double v)
                 {
                     if (canvas_)
                         canvas_->setEraserOpacity(v / 100.0);
