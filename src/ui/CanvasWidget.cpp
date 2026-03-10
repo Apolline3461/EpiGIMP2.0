@@ -158,6 +158,11 @@ void CanvasWidget::setPencilColor(const QColor& c)
     pencilColor_ = c;
 }
 
+void CanvasWidget::setPencilOpacity(double a)
+{
+    pencilOpacity_ = std::clamp(a, 0.0, 1.0);
+}
+
 void CanvasWidget::setEraserEnable(bool enable)
 {
     eraserEnabled_ = enable;

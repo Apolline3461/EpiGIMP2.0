@@ -44,6 +44,7 @@ class CanvasWidget : public QWidget
     void setPencilEnable(bool enable);
     void setPencilSize(int s);
     void setPencilColor(const QColor& c);
+    void setPencilOpacity(double a);
 
     void setEraserEnable(bool enable);
     void setEraserSize(int s);
@@ -98,6 +99,7 @@ class CanvasWidget : public QWidget
     std::vector<common::Point> previewPoints_;
     QColor pencilColor_ = QColor(0, 0, 0, 255);
     int pencilSize_ = 1;
+    double pencilOpacity_ = 1.0;
 
     bool eraserEnabled_ = false;
     int eraserSize_ = 1;

@@ -102,6 +102,17 @@ void StrokeCommand::buildChanges()
     std::unordered_map<std::uint64_t, PixelChange> map;
     map.reserve(256);
 
+    auto applyEraser = [&](std::uint32_t before, float op) -> std::uint32_t
+    {
+        // RGBA: R<<24 G<<16 B<<8 A
+        const uint8_t a = static_cast<uint8_t>(before & 0xFFu);
+        const float keep = 1.f - std::clamp(op, 0.f, 1.f);
+        const uint8_t newA = static_cast<uint8_t>(std::lround(static_cast<float>(a) * keep));
+
+        // on garde RGB, on change alpha
+        return (before & 0xFFFFFF00u) | static_cast<std::uint32_t>(newA);
+    };
+
     auto recordPixel = [&](int docX, int docY, std::uint32_t afterColor)
     {
         if (hasSel)

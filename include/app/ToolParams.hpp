@@ -21,6 +21,7 @@ struct ToolParams
     ToolKind tool = ToolKind::Pencil;
     std::uint32_t color = common::colors::Black;
     int size = 1;
+    float opacity = 1.0;
 };
 
 }  // namespace app
