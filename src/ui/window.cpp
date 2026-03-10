@@ -111,13 +111,16 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
             if (params.tool == app::ToolKind::Eraser)
             {
                 params.size = (m_eraseSizeSpin) ? m_eraseSizeSpin->value() : 8;
-                params.opacity = (m_eraseOpacitySpin) ? (m_eraseOpacitySpin->value() / 100.F) : 1.F;
+                params.opacity = (m_eraseOpacitySpin)
+                                     ? (static_cast<float>(m_eraseOpacitySpin->value()) / 100.F)
+                                     : 1.F;
             }
             else
             {
                 params.size = (m_pencilSizeSpin) ? m_pencilSizeSpin->value() : 8;
-                params.opacity =
-                    (m_pencilOpacitySpin) ? (m_pencilOpacitySpin->value() / 100.F) : 1.F;
+                params.opacity = (m_pencilOpacitySpin)
+                                     ? (static_cast<float>(m_pencilOpacitySpin->value()) / 100.F)
+                                     : 1.F;
                 params.color = (static_cast<uint32_t>(m_toolColor.red()) << 24) |
                                (static_cast<uint32_t>(m_toolColor.green()) << 16) |
                                (static_cast<uint32_t>(m_toolColor.blue()) << 8) |
