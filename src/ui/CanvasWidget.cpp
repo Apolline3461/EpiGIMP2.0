@@ -158,6 +158,26 @@ void CanvasWidget::setPencilColor(const QColor& c)
     pencilColor_ = c;
 }
 
+void CanvasWidget::setPencilOpacity(double a)
+{
+    pencilOpacity_ = std::clamp(a, 0.0, 1.0);
+}
+
+void CanvasWidget::setEraserEnable(bool enable)
+{
+    eraserEnabled_ = enable;
+}
+
+void CanvasWidget::setEraserSize(int s)
+{
+    eraserSize_ = s;
+}
+
+void CanvasWidget::setEraserOpacity(double a)
+{
+    eraserOpacity_ = std::clamp(a, 0.0, 1.0);
+}
+
 void CanvasWidget::setScale(double s)
 {
     scale_ = clampScale(s);
@@ -258,13 +278,31 @@ void CanvasWidget::paintEvent(QPaintEvent*)
     {
         p.save();
         p.setRenderHint(QPainter::Antialiasing, true);
-        QPen pen(Qt::NoPen);
-        p.setPen(pen);
-        QColor c = pencilColor_;
-        p.setBrush(QBrush(c));
+
+        const bool erasing = eraserEnabled_;
+        const int toolSize = erasing ? eraserSize_ : pencilSize_;
 
         const double s = scale_;
-        const double half = (static_cast<double>(pencilSize_) * 0.5) * s;
+        const double half = (static_cast<double>(toolSize) * 0.5) * s;
+
+        QColor c = erasing ? QColor(255, 255, 255, static_cast<int>(eraserOpacity_ * 180.0))
+                           : pencilColor_;
+
+        // Dessin "gomme": rempli clair + contour (sinon on ne voit rien)
+        if (erasing)
+        {
+            QPen outline(QColor(0, 0, 0, 80));
+            outline.setWidthF(std::max(1.0, s));
+            outline.setCapStyle(Qt::RoundCap);
+            outline.setJoinStyle(Qt::RoundJoin);
+            p.setPen(outline);
+            p.setBrush(QBrush(c));
+        }
+        else
+        {
+            p.setPen(Qt::NoPen);
+            p.setBrush(QBrush(c));
+        }
 
         for (const auto& pt : previewPoints_)
         {
@@ -273,14 +311,19 @@ void CanvasWidget::paintEvent(QPaintEvent*)
             p.drawEllipse(r);
         }
 
-        // draw connecting lines for smoother preview
+        // lignes
         if (previewPoints_.size() >= 2)
         {
-            QPen linePen(c);
-            linePen.setWidthF(std::max(1.0, s * static_cast<double>(pencilSize_)));
+            QPen linePen(erasing ? QColor(255, 255, 255, static_cast<int>(eraserOpacity_ * 180.0))
+                                 : c);
+            linePen.setWidthF(std::max(1.0, s * static_cast<double>(toolSize)));
             linePen.setCapStyle(Qt::RoundCap);
             linePen.setJoinStyle(Qt::RoundJoin);
+            if (erasing)
+                linePen.setColor(QColor(255, 255, 255, static_cast<int>(eraserOpacity_ * 180.0)));
+
             p.setPen(linePen);
+            p.setBrush(Qt::NoBrush);
             for (size_t i = 1; i < previewPoints_.size(); ++i)
             {
                 QPoint a = docToScreen(previewPoints_[i - 1]);
@@ -372,7 +415,7 @@ void CanvasWidget::mousePressEvent(QMouseEvent* e)
         e->accept();
         return;
     }
-    if (pencilEnabled_)
+    if (pencilEnabled_ || eraserEnabled_)
     {
         drawing_ = true;
         previewPoints_.clear();

@@ -87,6 +87,7 @@ class MainWindow : public QMainWindow
 
     CanvasWidget* canvas_{nullptr};
 
+    void syncStrokeToolState();
     void refreshUIAfterDocChange();
     void updateLayerOverlayFromSelection();
     void clearUiStateOnClose();
@@ -169,6 +170,12 @@ class MainWindow : public QMainWindow
     QAction* m_pencilAct{nullptr};
     QDockWidget* m_pencilDock{nullptr};
     QSpinBox* m_pencilSizeSpin{nullptr};
+    QSpinBox* m_pencilOpacitySpin{nullptr};
+
+    QAction* m_eraseAct{nullptr};
+    QDockWidget* m_eraseDock{nullptr};
+    QSpinBox* m_eraseSizeSpin{nullptr};
+    QSpinBox* m_eraseOpacitySpin{nullptr};
 
     bool m_handMode{false};
     bool m_panningActive{false};

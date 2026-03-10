@@ -327,11 +327,22 @@ void AppService::mergeLayerDown(std::size_t from)
     if (from == 0)
         throw std::runtime_error("Cannot merge down background");
 
-    auto layer = doc_->layerAt(static_cast<int>(from));
-    if (!layer)
+    auto srcLayer = doc_->layerAt(from);
+
+    if (!srcLayer)
         throw std::out_of_range("mergeLayerDown: invalid index");
 
-    apply(commands::makeMergeDownCommand(doc_.get(), layer, static_cast<int>(from), &activeLayer_));
+    if (srcLayer->locked())
+        throw std::runtime_error("Cannot merge locked layer");
+
+    auto dstLayer = doc_->layerAt(from - 1);
+    if (!dstLayer)
+        throw std::out_of_range("mergeLayerDown: invalid target index");
+
+    if (dstLayer->locked())
+        throw std::runtime_error("Cannot merge locked layer");
+
+    apply(commands::makeMergeDownCommand(doc_.get(), srcLayer, from, &activeLayer_));
 }
 
 void AppService::moveLayer(std::size_t idx, int newOffsetX, int newOffsetY)
@@ -497,6 +508,11 @@ void AppService::setSelectionRect(Selection::Rect r)
     if (!doc_)
         throw std::runtime_error("setSelectionRect: document is null");
     doc_->selection().clear();
+    if (r.w <= 0 || r.h <= 0)
+    {
+        documentChanged.notify();
+        return;
+    }
     doc_->selection().addRect(r, std::make_shared<ImageBuffer>(doc_->width(), doc_->height()));
     documentChanged.notify();
 }
