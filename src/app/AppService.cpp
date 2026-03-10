@@ -497,6 +497,11 @@ void AppService::setSelectionRect(Selection::Rect r)
     if (!doc_)
         throw std::runtime_error("setSelectionRect: document is null");
     doc_->selection().clear();
+    if (r.w <= 0 || r.h <= 0)
+    {
+        documentChanged.notify();
+        return;
+    }
     doc_->selection().addRect(r, std::make_shared<ImageBuffer>(doc_->width(), doc_->height()));
     documentChanged.notify();
 }
