@@ -7,6 +7,8 @@ set(EPIGIMP_APP_TEST_SOURCES
         test_MoveLayer.cpp
         test_ResizeLayer.cpp
         test_Pencil.cpp
+        test_Eraser.cpp
+        test_StrokeBehavior.cpp
 )
 
 add_executable(test_app

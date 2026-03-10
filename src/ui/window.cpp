@@ -95,33 +95,55 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
                     statusBar()->showMessage(e.what(), 2000);
                 }
             });
-    connect(canvas_, &CanvasWidget::beginStroke, this,
-            [this](common::Point p)
+
+    connect(
+        canvas_, &CanvasWidget::beginStroke, this,
+        [this](common::Point p)
+        {
+            const bool pencilOn = (m_pencilAct && m_pencilAct->isChecked());
+            const bool eraserOn = (m_eraseAct && m_eraseAct->isChecked());
+            if (!pencilOn && !eraserOn)
+                return;
+
+            app::ToolParams params;
+            params.tool = eraserOn ? app::ToolKind::Eraser : app::ToolKind::Pencil;
+
+            if (params.tool == app::ToolKind::Eraser)
             {
-                if (!m_pencilAct || !m_pencilAct->isChecked())
-                    return;
-                try
-                {
-                    app::ToolParams params;
-                    params.tool = app::ToolKind::Pencil;
-                    params.size = (m_pencilSizeSpin) ? m_pencilSizeSpin->value() : 8;
-                    (void)0;  // hardness removed
-                    params.color = (static_cast<uint32_t>(m_toolColor.red()) << 24) |
-                                   (static_cast<uint32_t>(m_toolColor.green()) << 16) |
-                                   (static_cast<uint32_t>(m_toolColor.blue()) << 8) |
-                                   static_cast<uint32_t>(m_toolColor.alpha());
-                    app().beginStroke(params, p);
-                }
-                catch (const std::exception& e)
-                {
-                    statusBar()->showMessage(e.what(), 2000);
-                }
-            });
+                params.size = (m_eraseSizeSpin) ? m_eraseSizeSpin->value() : 8;
+                params.opacity = (m_eraseOpacitySpin)
+                                     ? (static_cast<float>(m_eraseOpacitySpin->value()) / 100.F)
+                                     : 1.F;
+            }
+            else
+            {
+                params.size = (m_pencilSizeSpin) ? m_pencilSizeSpin->value() : 8;
+                params.opacity = (m_pencilOpacitySpin)
+                                     ? (static_cast<float>(m_pencilOpacitySpin->value()) / 100.F)
+                                     : 1.F;
+                params.color = (static_cast<uint32_t>(m_toolColor.red()) << 24) |
+                               (static_cast<uint32_t>(m_toolColor.green()) << 16) |
+                               (static_cast<uint32_t>(m_toolColor.blue()) << 8) |
+                               static_cast<uint32_t>(m_toolColor.alpha());
+            }
+            try
+            {
+                app().beginStroke(params, p);
+            }
+            catch (const std::exception& e)
+            {
+                // Option: statusBar message
+                if (statusBar())
+                    statusBar()->showMessage(tr("Impossible de dessiner: %1").arg(e.what()), 2000);
+            }
+        });
 
     connect(canvas_, &CanvasWidget::moveStroke, this,
             [this](common::Point p)
             {
-                if (!m_pencilAct || !m_pencilAct->isChecked())
+                const bool pencilOn = (m_pencilAct && m_pencilAct->isChecked());
+                const bool eraserOn = (m_eraseAct && m_eraseAct->isChecked());
+                if (!pencilOn && !eraserOn)
                     return;
                 try
                 {
@@ -136,7 +158,9 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
     connect(canvas_, &CanvasWidget::endStroke, this,
             [this]()
             {
-                if (!m_pencilAct || !m_pencilAct->isChecked())
+                const bool pencilOn = (m_pencilAct && m_pencilAct->isChecked());
+                const bool eraserOn = (m_eraseAct && m_eraseAct->isChecked());
+                if (!pencilOn && !eraserOn)
                     return;
                 try
                 {
@@ -281,7 +305,18 @@ void MainWindow::toggleSelectionMode(bool enabled)
             m_moveLayerAct->setChecked(false);
         if (m_bucketAct)
             m_bucketAct->setChecked(false);
+        if (m_pickAct)
+            m_pickAct->setChecked(false);
+        if (m_pencilAct)
+            m_pencilAct->setChecked(false);
+        if (m_eraseAct)
+            m_eraseAct->setChecked(false);
+
         m_bucketMode = false;
+        m_pickMode = false;
+
+        if (canvas_)
+            canvas_->setPencilEnable(false);
     }
     if (canvas_)
         canvas_->setSelectionEnable(enabled);
@@ -984,6 +1019,17 @@ void MainWindow::onMergeDown()
     app().mergeLayerDown(idx);
 }
 
+void MainWindow::syncStrokeToolState()
+{
+    const bool pencilOn = m_pencilAct && m_pencilAct->isChecked();
+    const bool eraserOn = m_eraseAct && m_eraseAct->isChecked();
+    if (!canvas_)
+        return;
+
+    canvas_->setPencilEnable(pencilOn);
+    canvas_->setEraserEnable(eraserOn);
+}
+
 void MainWindow::refreshUIAfterDocChange()
 {
     if (m_dragLayerActive)
@@ -1024,6 +1070,8 @@ void MainWindow::refreshUIAfterDocChange()
         m_moveLayerAct->setEnabled(hasDoc && editable);
     if (m_pencilAct)
         m_pencilAct->setEnabled(hasDoc && editable);
+    if (m_eraseAct)
+        m_eraseAct->setEnabled(hasDoc && editable);
 
     if (!hasDoc)
     {
@@ -1034,9 +1082,11 @@ void MainWindow::refreshUIAfterDocChange()
             canvas_->clearDragLayerPreview();
         }
         if (m_pencilAct)
-            m_pencilAct->setChecked(false);
+            syncStrokeToolState();
         if (m_pencilDock)
             m_pencilDock->setVisible(false);
+        if (m_eraseDock)
+            m_eraseDock->setVisible(false);
         if (m_moveLayerAct)
             m_moveLayerAct->setChecked(false);
         if (m_bucketAct)
@@ -1045,6 +1095,8 @@ void MainWindow::refreshUIAfterDocChange()
             m_pickAct->setChecked(false);
         if (m_selectToggleAct)
             m_selectToggleAct->setChecked(false);
+        if (m_eraseAct)
+            syncStrokeToolState();
 
         clearUiStateOnClose();
         return;
@@ -1146,6 +1198,8 @@ void MainWindow::clearUiStateOnClose()
         m_moveLayerAct->setChecked(false);
     if (m_pencilAct)
         m_pencilAct->setChecked(false);
+    if (m_eraseAct)
+        m_eraseAct->setChecked(false);
 
     m_bucketMode = false;
     m_pickMode = false;
@@ -1257,6 +1311,7 @@ void MainWindow::createActions()
                     canvas_->setSelectionEnable(false);
             }
         });
+
     /* Color Picker */
     m_pickAct = new QAction(tr("Pipette"), this);
     m_pickAct->setCheckable(true);
@@ -1311,7 +1366,10 @@ void MainWindow::createActions()
             [this](bool on)
             {
                 if (canvas_)
-                    canvas_->setPencilEnable(on);
+                {
+                    syncStrokeToolState();
+                    canvas_->setSelectionEnable(false);
+                }
                 if (m_pencilDock)
                     m_pencilDock->setVisible(on);
                 if (on)
@@ -1324,10 +1382,12 @@ void MainWindow::createActions()
                         m_pickAct->setChecked(false);
                     if (m_selectToggleAct)
                         m_selectToggleAct->setChecked(false);
+                    if (m_eraseAct)
+                        m_eraseAct->setChecked(false);
+                    if (m_eraseDock)
+                        m_eraseDock->setVisible(false);
                     m_bucketMode = false;
                     m_pickMode = false;
-                    if (canvas_)
-                        canvas_->setSelectionEnable(false);
                 }
             });
     m_colorPickerAct->setObjectName("act.colorPick");
@@ -1401,6 +1461,42 @@ void MainWindow::createActions()
                     m_bucketAct->setIcon(QIcon(":/icons/bucket.svg"));
             });
     m_bucketAct->setObjectName("act.bucket");
+
+    m_eraseAct = new QAction(tr("Gomme"), this);
+    m_eraseAct->setCheckable(true);
+    m_eraseAct->setShortcut(QKeySequence("Maj+E"));
+    m_eraseAct->setStatusTip(tr("Effacer"));
+    m_eraseAct->setIcon(QIcon(":/icons/eraser.svg"));
+    connect(m_eraseAct, &QAction::toggled, this,
+            [this](bool on)
+            {
+                if (canvas_)
+                {
+                    syncStrokeToolState();
+                    canvas_->setSelectionEnable(false);
+                    canvas_->setEraserEnable(on);
+                }
+                if (m_eraseDock)
+                    m_eraseDock->setVisible(on);
+                if (on)
+                {
+                    if (m_moveLayerAct)
+                        m_moveLayerAct->setChecked(false);
+                    if (m_bucketAct)
+                        m_bucketAct->setChecked(false);
+                    if (m_pickAct)
+                        m_pickAct->setChecked(false);
+                    if (m_selectToggleAct)
+                        m_selectToggleAct->setChecked(false);
+                    if (m_pencilAct)
+                        m_pencilAct->setChecked(false);
+                    if (m_pencilDock)
+                        m_pencilDock->setVisible(false);
+                    m_bucketMode = false;
+                    m_pickMode = false;
+                }
+            });
+    m_eraseAct->setObjectName("act.erase");
 
     auto* escClearAct = new QAction(this);
     escClearAct->setShortcut(QKeySequence(Qt::Key_Escape));
@@ -1643,11 +1739,18 @@ void MainWindow::createToolBar()
         m_toolsGroup->addAction(m_pickAct);
         m_toolsTb->addAction(m_pickAct);
     }
+
     if (m_pencilAct)
     {
         m_pencilAct->setToolTip(tr("Pinceau"));
         m_toolsGroup->addAction(m_pencilAct);
         m_toolsTb->addAction(m_pencilAct);
+    }
+
+    if (m_eraseAct)
+    {
+        m_toolsGroup->addAction(m_eraseAct);
+        m_toolsTb->addAction(m_eraseAct);
     }
 
     m_toolsTb->addSeparator();
@@ -1656,36 +1759,96 @@ void MainWindow::createToolBar()
         m_toolsTb->addAction(m_undoAct);
     if (m_redoAct)
         m_toolsTb->addAction(m_redoAct);
+
     // Pencil properties dock
     m_pencilDock = new QDockWidget(tr("Pinceau"), this);
-    QWidget* pencilWidget = new QWidget(m_pencilDock);
-    QHBoxLayout* bv = new QHBoxLayout(pencilWidget);
+    auto* pencilWidget = new QWidget(m_pencilDock);
+    auto* bv = new QHBoxLayout(pencilWidget);
     bv->setContentsMargins(6, 6, 6, 6);
 
-    auto* sizeLbl = new QLabel(tr("Taille"), pencilWidget);
+    auto* sizeLblPen = new QLabel(tr("Taille"), pencilWidget);
     m_pencilSizeSpin = new QSpinBox(pencilWidget);
     m_pencilSizeSpin->setRange(1, 200);
     m_pencilSizeSpin->setValue(8);
-    bv->addWidget(sizeLbl);
-    bv->addWidget(m_pencilSizeSpin);
 
-    // connect pencil size to canvas preview
+    auto* opacityLblPen = new QLabel(tr("Opacity"), pencilWidget);
+    m_pencilOpacitySpin = new QSpinBox(pencilWidget);
+    m_pencilOpacitySpin->setRange(1, 100);
+    m_pencilOpacitySpin->setValue(100);
+
+    bv->addWidget(sizeLblPen);
+    bv->addWidget(m_pencilSizeSpin);
+    bv->addWidget(opacityLblPen);
+    bv->addWidget(m_pencilOpacitySpin);
+
+    m_eraseDock = new QDockWidget(tr("Gomme"), this);
+    auto* eraseWidget = new QWidget(m_eraseDock);
+    auto* layout = new QVBoxLayout(eraseWidget);
+    layout->setContentsMargins(6, 6, 6, 6);
+
+    auto* sizeLblEr = new QLabel(tr("Taille"), eraseWidget);
+    m_eraseSizeSpin = new QSpinBox(eraseWidget);
+    m_eraseSizeSpin->setRange(1, 200);
+    m_eraseSizeSpin->setValue(8);
+
+    auto* opacityLblEr = new QLabel(tr("Opacity"), eraseWidget);
+    m_eraseOpacitySpin = new QSpinBox(eraseWidget);
+    m_eraseOpacitySpin->setRange(1, 100);
+    m_eraseOpacitySpin->setValue(100);
+
+    layout->addWidget(sizeLblEr);
+    layout->addWidget(m_eraseSizeSpin);
+    layout->addWidget(opacityLblEr);
+    layout->addWidget(m_eraseOpacitySpin);
+    layout->addSpacing(12);
+
     if (canvas_)
     {
+        // connect pencil size and opacity to canvas preview
+
         connect(m_pencilSizeSpin, qOverload<int>(&QSpinBox::valueChanged), this,
-                [this](int v)
+                [this](const int v)
                 {
                     if (canvas_)
                         canvas_->setPencilSize(v);
                 });
-        // initialize canvas size
+        connect(m_pencilOpacitySpin, qOverload<int>(&QSpinBox::valueChanged), this,
+                [this](const double v)
+                {
+                    if (canvas_)
+                        canvas_->setPencilOpacity(v / 100.0);
+                });
         canvas_->setPencilSize(m_pencilSizeSpin->value());
+        canvas_->setPencilOpacity(m_pencilOpacitySpin->value() / 100.0);
+
+        // connect eraser size and opacity to canvas preview
+
+        connect(m_eraseSizeSpin, qOverload<int>(&QSpinBox::valueChanged), this,
+                [this](const int v)
+                {
+                    if (canvas_)
+                        canvas_->setEraserSize(v);
+                });
+        connect(m_eraseOpacitySpin, qOverload<int>(&QSpinBox::valueChanged), this,
+                [this](double v)
+                {
+                    if (canvas_)
+                        canvas_->setEraserOpacity(v / 100.0);
+                });
+        // initialize canvas size
+        canvas_->setEraserSize(m_eraseSizeSpin->value());
+        canvas_->setEraserOpacity(m_eraseOpacitySpin->value() / 100.0);
     }
 
     pencilWidget->setLayout(bv);
     m_pencilDock->setWidget(pencilWidget);
     addDockWidget(Qt::TopDockWidgetArea, m_pencilDock);
     m_pencilDock->setVisible(false);
+
+    eraseWidget->setLayout(layout);
+    m_eraseDock->setWidget(eraseWidget);
+    addDockWidget(Qt::TopDockWidgetArea, m_eraseDock);
+    m_eraseDock->setVisible(false);
 }
 
 void MainWindow::setDirty(bool on)

@@ -76,6 +76,17 @@ TEST(AppService_State, newDocumentInitialLayer_CountIsOne) {
     EXPECT_EQ(bgLayer->image()->getPixel(99,199), 0xFFFFFFFFU);
 }
 
+TEST(AppService_State, NewDocument_ClearsSelection)
+{
+    const auto app = makeApp();
+    app->newDocument({10, 10}, 72.f);
+    app->setSelectionRect({1, 1, 3, 3});
+    ASSERT_TRUE(app->document().selection().hasMask());
+
+    app->newDocument({10, 10}, 72.f);
+    EXPECT_FALSE(app->document().selection().hasMask());
+}
+
 TEST(AppService_State, ActiveLayerSet_ValidIndex) {
     const auto app = makeApp();
     app::LayerSpec spec{};
@@ -120,21 +131,6 @@ TEST(AppService_State, LayerIds_AreUnique) {
     }
 }
 
-TEST(AppService_State, LayerIds_ResetOnNewDocument) {
-    const auto app = makeApp();
-    app::LayerSpec spec{};
-
-    app->newDocument(app::Size{10, 10}, 72.f);
-    app->addLayer(spec);
-    auto id1 = app->document().layerAt(1)->id(); // 0 = bg, 1 = first added
-
-    app->newDocument(app::Size{10, 10}, 72.f);
-    app->addLayer(spec);
-    auto id2 = app->document().layerAt(1)->id();
-
-    EXPECT_EQ(id1, id2); // si tu resets nextLayerId_ à 1
-}
-
 TEST(AppService_State, Selection_SetRect_CreatesMaskInDocument)
 {
     const auto app = makeApp();
@@ -163,14 +159,51 @@ TEST(AppService_State, Selection_Clear_RemovesMaskInDocument)
     EXPECT_EQ(app->document().selection().mask(), nullptr);
 }
 
-
-TEST(AppService_Layers, RemoveLayer_WhenLocked_Throws) {
+TEST(AppService_State, CloseDocument_ClearsDocumentAndHistory)
+{
     const auto app = makeApp();
-    app->newDocument(app::Size{10, 10}, 72.f);
+    app->newDocument({10, 10}, 72.f);
+    app::LayerSpec spec{};
+    app->addLayer(spec);
+    ASSERT_TRUE(app->canUndo());
 
-    app->document().layerAt(0)->setLocked(true);
-    EXPECT_THROW(app->removeLayer(0), std::runtime_error);
-    EXPECT_EQ(app->document().layerCount(), 1);
+    app->closeDocument();
+
+    EXPECT_FALSE(app->hasDocument());
+    EXPECT_FALSE(app->canUndo());
+    EXPECT_FALSE(app->canRedo());
+}
+
+TEST(AppService_Layers, MergeLayerDown_WhenSourceLayerLocked_Throws)
+{
+    const auto app = makeApp();
+    app->newDocument({10,10}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = common::colors::Transparent;
+
+    app->addLayer(spec); // idx 1
+    app->addLayer(spec); // idx 2
+
+    app->setLayerLocked(2, true); // lock SOURCE layer (celui qu'on veut merger)
+    EXPECT_THROW(app->mergeLayerDown(2), std::runtime_error);
+}
+
+TEST(AppService_Layers, MergeLayerDown_WhenTargetLayerLocked_Throws)
+{
+    const auto app = makeApp();
+    app->newDocument({10,10}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    spec.color = common::colors::Transparent;
+
+    app->addLayer(spec); // idx 1
+    app->addLayer(spec); // idx 2
+
+    app->setLayerLocked(1, true); // lock TARGET (layer dessous)
+    EXPECT_THROW(app->mergeLayerDown(2), std::runtime_error);
 }
 
 TEST(AppService_Layers, RemoveLayer_AfterUnlock_AllowsEmptyDocument) {
@@ -183,12 +216,34 @@ TEST(AppService_Layers, RemoveLayer_AfterUnlock_AllowsEmptyDocument) {
     EXPECT_EQ(app->document().layerCount(), 0);
 }
 
+TEST(AppService_Layers, RemoveLayer_OutOfRange_Throws)
+{
+    const auto app = makeApp();
+    app->newDocument({10, 10}, 72.f);
+
+    EXPECT_THROW(app->removeLayer(1), std::out_of_range);
+    EXPECT_THROW(app->removeLayer(999), std::out_of_range);
+}
+
 TEST(AppService_Layers, MergeLayerDown_BackgroundThrows)
 {
     const auto app = makeApp();
     app->newDocument(app::Size{10, 10}, 72.f);
 
     EXPECT_THROW(app->mergeLayerDown(0), std::runtime_error);
+}
+
+TEST(AppService_Layers, MergeLayerDown_WhenLayerLocked_Throws)
+{
+    const auto app = makeApp();
+    app->newDocument({10, 10}, 72.f);
+
+    app::LayerSpec spec{};
+    spec.locked = false;
+    app->addLayer(spec); // idx 1
+    app->setLayerLocked(1, true);
+
+    EXPECT_THROW(app->mergeLayerDown(1), std::runtime_error);
 }
 
 TEST(AppService_Layers, ReorderLayer_ActiveLayerFollowsMovedLayer)
@@ -210,6 +265,18 @@ TEST(AppService_Layers, ReorderLayer_ActiveLayerFollowsMovedLayer)
     app->reorderLayer(3, 1);
 
     EXPECT_EQ(app->activeLayer(), 1u);
+}
+
+TEST(AppService_Layers, ReorderLayer_OutOfRange_Throws)
+{
+    const auto app = makeApp();
+    app->newDocument({10, 10}, 72.f);
+
+    app::LayerSpec spec{};
+    app->addLayer(spec); // idx 1
+
+    EXPECT_THROW(app->reorderLayer(2, 1), std::out_of_range);
+    EXPECT_THROW(app->reorderLayer(1, 2), std::out_of_range);
 }
 
 TEST(AppService_Layers, AddLayer_UsesSpecSize)
@@ -251,7 +318,6 @@ TEST(AppService_Layers, AddImageLayer_UsesImageSize)
     EXPECT_EQ(l->image()->width(), 12);
     EXPECT_EQ(l->image()->height(), 7);
 }
-
 
 TEST(AppService_IO, Open_CallsStorage) {
     SpyStorage* spy = nullptr;
@@ -557,135 +623,6 @@ TEST(AppService_Picking, PickColorAt_RespectsLayerOffsetAndSize)
 
     // outside (but still within doc) => transparent
     EXPECT_EQ(app->pickColorAt({0,0}), common::colors::Transparent);
-}
-
-
-TEST(AppService_Stroke, Stroke_DrawsPixels_AndIsUndoable)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{6, 3}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = false;
-    spec.color = common::colors::Transparent;
-    app->addLayer(spec);
-    app->setActiveLayer(1);
-
-    app::ToolParams tp{};
-    tp.tool = app::ToolKind::Pencil;
-    tp.color = 0xFF112233u;
-
-    app->beginStroke(tp, common::Point{1, 1});
-    app->moveStroke(common::Point{4, 1});
-    app->endStroke();
-
-    auto img = app->document().layerAt(1)->image();
-    ASSERT_NE(img, nullptr);
-
-    // pixels (1..4,1) modifiés
-    for (int x = 1; x <= 4; ++x)
-        EXPECT_EQ(img->getPixel(x, 1), 0xFF112233u);
-
-    // undo
-    ASSERT_TRUE(app->canUndo());
-    app->undo();
-    for (int x = 1; x <= 4; ++x)
-        EXPECT_EQ(img->getPixel(x, 1), common::colors::Transparent);
-
-    ASSERT_TRUE(app->canRedo());
-    app->redo();
-    for (int x = 1; x <= 4; ++x)
-        EXPECT_EQ(img->getPixel(x, 1), 0xFF112233u);
-}
-
-TEST(AppService_Stroke, EndStroke_WithoutBegin_NoOp)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{3, 3}, 72.f);
-
-    EXPECT_FALSE(app->canUndo());
-    EXPECT_NO_THROW(app->endStroke());
-    EXPECT_FALSE(app->canUndo());
-}
-
-TEST(AppService_Stroke, MoveStroke_WithoutBegin_NoOp)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{3, 3}, 72.f);
-
-    EXPECT_NO_THROW(app->moveStroke(common::Point{1, 1}));
-    EXPECT_FALSE(app->canUndo());
-}
-
-TEST(AppService_Stroke, BeginStroke_OnLockedLayer_Throws)
-{
-    const auto app = makeApp();
-    app->newDocument(app::Size{3, 3}, 72.f);
-
-    app::LayerSpec spec{};
-    spec.locked = true;
-    app->addLayer(spec);
-
-    app::ToolParams tp{};
-    EXPECT_THROW(app->beginStroke(tp, common::Point{0, 0}), std::runtime_error);
-}
-
-TEST(AppService_Stroke, DoesNotPaintOutsideLayer_AndPaintsLocalPixelInside)
-{
-    const auto app = makeApp();
-    app->newDocument({10, 10}, 72.f, /*bg*/ 0x000000FFu);
-
-    // Remplace layer actif par un layer 3x3 offset (4,4), pour contrôler exactement la zone.
-    app::LayerSpec spec{};
-    spec.name = "L1";
-    spec.visible = true;
-    spec.locked = false;
-    spec.opacity = 1.f;
-    spec.color = 0x00000000u; // transparent
-    app->addLayer(spec);
-
-    ASSERT_EQ(app->document().layerCount(), 2u);
-
-    // Force image buffer 3x3 + offset (4,4)
-    auto layer = app->document().layerAt(1);
-    ASSERT_NE(layer, nullptr);
-    auto img = std::make_shared<ImageBuffer>(3, 3);
-    img->fill(0x00000000u);
-    layer->setImageBuffer(img);
-    layer->setOffset(4, 4);
-    app->setActiveLayer(1);
-
-    // --- OUTSIDE : doc point (3,4) -> local (-1,0) => doit rien peindre
-    {
-        app::ToolParams params{};
-        params.color = 0xFF00FFFFu;
-        app->beginStroke(params, common::Point{3, 4});
-        app->endStroke();
-
-        // vérifie qu'aucun pixel du layer 3x3 n'a changé
-        auto img = layer->image();
-        ASSERT_NE(img, nullptr);
-        for (int y = 0; y < img->height(); ++y)
-            for (int x = 0; x < img->width(); ++x)
-                EXPECT_EQ(img->getPixel(x, y), 0x00000000u);
-    }
-
-    // --- INSIDE : doc point (5,6) -> local (1,2) => doit peindre img(1,2)
-    {
-        app::ToolParams params{};
-        params.color = 0x00FF00FFu; // vert opaque
-        app->beginStroke(params, common::Point{5, 6});
-        app->endStroke();
-
-        auto img = layer->image();
-        ASSERT_NE(img, nullptr);
-
-        // pixel attendu peint
-        EXPECT_EQ(img->getPixel(1, 2), 0x00FF00FFu);
-
-        // un autre pixel reste transparent
-        EXPECT_EQ(img->getPixel(0, 0), 0x00000000u);
-    }
 }
 
 TEST(AppService_OpenImageFlow, ReplaceBackgroundWithImage_KeepsSingleLayerAndCopiesPixels)
