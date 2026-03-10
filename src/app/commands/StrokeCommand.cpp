@@ -179,7 +179,7 @@ void StrokeCommand::buildChanges()
         }
         else
         {
-            const std::uint32_t base = it->second.after;
+            const std::uint32_t base = it->second.before;
             if (params_.tool == ToolKind::Eraser)
                 it->second.after = applyEraser(base, params_.opacity);
             else
