@@ -43,6 +43,8 @@
 MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(parent), svc_(svc)
 {
     canvas_ = new CanvasWidget(this);
+    canvas_->setObjectName("canvas");
+    canvas_->setFocusPolicy(Qt::StrongFocus);
     setCentralWidget(canvas_);
 
     resize(1080, 720);
@@ -267,6 +269,98 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
         });
 
     refreshUIAfterDocChange();
+}
+
+void MainWindow::showShortcutHelpDialog()
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(tr("Raccourcis clavier"));
+    dlg.setModal(true);
+    dlg.resize(640, 520);
+
+    auto* layout = new QVBoxLayout(&dlg);
+
+    auto* text = new QTextEdit(&dlg);
+    text->setReadOnly(true);
+    text->setAcceptRichText(false);
+
+    // Police monospace pour aligner proprement
+    QFont f = text->font();
+    f.setFamily(QStringLiteral("Monospace"));
+    f.setStyleHint(QFont::Monospace);
+    text->setFont(f);
+
+    auto addSection = [&](const QString& title, const QList<const QAction*>& actions)
+    {
+        QString out;
+        out += QStringLiteral("\n");
+        out += title.toUpper() + QStringLiteral("\n");
+        out += QStringLiteral("----------------------------------------\n");
+        for (const QAction* a : actions)
+        {
+            if (!a)
+                continue;
+            // ignore actions without shortcut if you want:
+            // if (a->shortcut().isEmpty()) continue;
+
+            out += formatActionShortcut(a) + QStringLiteral("\n");
+        }
+        out += QStringLiteral("\n");
+        return out;
+    };
+
+    QString content;
+    content += tr("Astuce : appuie sur Ctrl+/ n'importe où pour ouvrir cette aide.\n");
+
+    // --- FILE
+    content +=
+        addSection(tr("Fichier"), {m_newAct, m_openAct, m_saveAct, m_closeAct, m_exitAct,
+                                   m_openEpgAct, m_saveEpgAct, m_addLayerAct, m_addImageLayerAct});
+
+    // --- VIEW / ZOOM
+    content += addSection(tr("Vue / Zoom"), {m_zoomInAct, m_zoomOutAct, m_resetZoomAct, m_zoom05Act,
+                                             m_zoom1Act, m_zoom2Act});
+
+    // --- EDIT / HISTORY
+    content += addSection(tr("Historique"), {m_undoAct, m_redoAct});
+
+    // --- TOOLS
+    content += addSection(tr("Outils"),
+                          {m_moveLayerAct, m_selectToggleAct, m_clearSelectionAct, m_bucketAct,
+                           m_pickAct, m_pencilAct, m_eraseAct, m_colorPickerAct});
+
+    // --- LAYERS (actions)
+    content += addSection(
+        tr("Calques"),
+        {
+            m_layerUpAct, m_layerDownAct
+            // Ajoute ici tes futures actions clavier : MergeDown, Delete, Lock, Visible, Rename...
+        });
+
+    // --- CANVAS keyboard (pas des QActions actuellement => on l’écrit en dur)
+    // (Tu peux plus tard convertir en QActions si tu veux)
+    // content += QStringLiteral("\n");
+    // content += tr("CANVAS (clavier)\n");
+    // content += QStringLiteral("----------------------------------------\n");
+    // content += tr("Flèches : déplacer le curseur (si tu ajoutes le curseur clavier)\n");
+    // content += tr("Entrée/Espace : commencer/terminer un trait (si implémenté)\n");
+    // content += tr("Échap : annuler (sélection/trait)\n");
+    // content += tr("+ / - : zoomer / dézoomer (si tu ajoutes les raccourcis)\n");
+    // content += tr("0 : zoom 100%% (si tu ajoutes le raccourci)\n");
+
+    text->setPlainText(content);
+
+    layout->addWidget(text);
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dlg);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    layout->addWidget(buttons);
+
+    // Focus direct pour navigation clavier
+    text->setFocus();
+
+    dlg.exec();
 }
 
 void MainWindow::zoomIn()
@@ -1212,16 +1306,19 @@ void MainWindow::createActions()
     m_newAct = new QAction(tr("&Nouveau..."), this);
     m_newAct->setShortcut(QKeySequence::New);
     m_newAct->setStatusTip(tr("Créer une nouvelle image"));
+    m_newAct->setObjectName("newAct");
     connect(m_newAct, &QAction::triggered, this, &MainWindow::newImage);
 
     m_openAct = new QAction(tr("&Ouvrir..."), this);
     m_openAct->setShortcut(QKeySequence::Open);
     m_openAct->setStatusTip(tr("Ouvrir une image existante"));
+    m_openAct->setObjectName("openAct");
     connect(m_openAct, &QAction::triggered, this, &MainWindow::openImage);
 
     m_saveAct = new QAction(tr("&Enregistrer sous..."), this);
     m_saveAct->setShortcut(QKeySequence::SaveAs);
     m_saveAct->setStatusTip(tr("Enregistrer l'image sous un nouveau nom"));
+    m_saveAct->setObjectName("saveAct");
     connect(m_saveAct, &QAction::triggered, this, &MainWindow::saveImage);
 
     m_closeAct = new QAction(tr("&Fermer"), this);
@@ -1233,23 +1330,32 @@ void MainWindow::createActions()
     m_exitAct = new QAction(tr("&Quitter"), this);
     m_exitAct->setShortcut(QKeySequence::Quit);
     m_exitAct->setStatusTip(tr("Quitter l'application"));
+    m_exitAct->setObjectName("exitAct");
     connect(m_exitAct, &QAction::triggered, this, &QWidget::close);
 
     m_openEpgAct = new QAction(tr("Ouvrir un fichier &EPG..."), this);
     m_openEpgAct->setStatusTip(tr("Ouvrir un fichier EpiGimp (.epg)"));
+    m_openEpgAct->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+O")));
+    m_openEpgAct->setObjectName("openEpgAct");
     connect(m_openEpgAct, &QAction::triggered, this, &MainWindow::openEpg);
 
     m_saveEpgAct = new QAction(tr("Enregistrer au format &EPG..."), this);
     m_saveEpgAct->setStatusTip(tr("Enregistrer l'image au format EpiGimp (.epg)"));
+    m_saveEpgAct->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+S")));
+    m_saveEpgAct->setObjectName("saveEpgAct");
     connect(m_saveEpgAct, &QAction::triggered, this, &MainWindow::saveAsEpg);
 
     m_addLayerAct = new QAction(tr("Ajouter un calque"), this);
     m_addLayerAct->setStatusTip(tr("Ajouter un nouveau calque vide au document"));
+    m_addLayerAct->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+N")));
+    m_addLayerAct->setObjectName("addLayerAct");
     connect(m_addLayerAct, &QAction::triggered, this, &MainWindow::addNewLayer);
 
     m_addImageLayerAct = new QAction(tr("Ajouter une image en calque"), this);
     m_addImageLayerAct->setStatusTip(
         tr("Charger une image et l'ajouter en tant que nouveau calque"));
+    m_addImageLayerAct->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+O")));
+    m_addImageLayerAct->setObjectName("addImageLayerAct");
     connect(m_addImageLayerAct, &QAction::triggered, this, &MainWindow::addImageAsLayer);
 
     /* Undo / Redo actions */
@@ -1258,6 +1364,7 @@ void MainWindow::createActions()
     m_undoAct->setStatusTip(tr("Annuler la dernière action"));
     m_undoAct->setIcon(QIcon(":/icons/undo.svg"));
     m_undoAct->setEnabled(false);
+    m_undoAct->setObjectName("undoAct");
     connect(m_undoAct, &QAction::triggered, this, [this]() { app().undo(); });
 
     m_redoAct = new QAction(tr("&Rétablir"), this);
@@ -1265,6 +1372,7 @@ void MainWindow::createActions()
     m_redoAct->setStatusTip(tr("Rétablir la dernière action annulée"));
     m_redoAct->setIcon(QIcon(":/icons/redo.svg"));
     m_redoAct->setEnabled(false);
+    m_redoAct->setObjectName("redoAct");
     connect(m_redoAct, &QAction::triggered, this, [this]() { app().redo(); });
 
     /* Actions available on layers */
@@ -1272,11 +1380,13 @@ void MainWindow::createActions()
     m_layerUpAct = new QAction(tr("Monter le calque"), this);
     m_layerUpAct->setStatusTip(tr("Déplacer le calque vers le haut (au-dessus)"));
     m_layerUpAct->setShortcut(QKeySequence("Ctrl+]"));
+    m_layerUpAct->setObjectName("layerUpAct");
     connect(m_layerUpAct, &QAction::triggered, this, &MainWindow::moveLayerUp);
 
     m_layerDownAct = new QAction(tr("Descendre le calque"), this);
     m_layerDownAct->setStatusTip(tr("Déplacer le calque vers le bas (en dessous)"));
     m_layerDownAct->setShortcut(QKeySequence("Ctrl+["));
+    m_layerDownAct->setObjectName("layerDownAct");
     connect(m_layerDownAct, &QAction::triggered, this, &MainWindow::moveLayerDown);
 
     m_moveLayerAct = new QAction(tr("Déplacer le calque"), this);
@@ -1317,7 +1427,6 @@ void MainWindow::createActions()
     m_pickAct->setCheckable(true);
     m_pickAct->setIcon(QIcon(":/icons/color_picker.svg"));
     m_pickAct->setShortcut(QKeySequence("O"));
-
     connect(m_pickAct, &QAction::toggled, this,
             [this](bool on)
             {
@@ -1345,6 +1454,8 @@ void MainWindow::createActions()
     m_colorPickerAct = new QAction(tr("Couleur de remplissage"), this);
     m_colorPickerAct->setStatusTip(tr("Choisir la couleur utilisée par le pot de peinture"));
     m_colorPickerAct->setIcon(QIcon(":/icons/color_picker.svg"));
+    m_colorPickerAct->setShortcut(QKeySequence(QStringLiteral("C")));
+    m_colorPickerAct->setObjectName("colorPickerAct");
     connect(m_colorPickerAct, &QAction::triggered, this,
             [this]()
             {
@@ -1396,36 +1507,44 @@ void MainWindow::createActions()
     m_zoomInAct = new QAction(tr("Zoom &Avant"), this);
     m_zoomInAct->setShortcut(QKeySequence::ZoomIn);
     m_zoomInAct->setStatusTip(tr("Agrandir"));
+    m_zoomInAct->setObjectName("zoomInAct");
     connect(m_zoomInAct, &QAction::triggered, this, &MainWindow::zoomIn);
 
     m_zoomOutAct = new QAction(tr("Zoom A&rrière"), this);
     m_zoomOutAct->setShortcut(QKeySequence::ZoomOut);
     m_zoomOutAct->setStatusTip(tr("Rétrécir"));
+    m_zoomOutAct->setObjectName("zoomOutAct");
     connect(m_zoomOutAct, &QAction::triggered, this, &MainWindow::zoomOut);
 
     m_resetZoomAct = new QAction(tr("&Taille réelle"), this);
     m_resetZoomAct->setShortcut(QKeySequence("Ctrl+0"));
     m_resetZoomAct->setStatusTip(tr("Zoom 100%"));
+    m_resetZoomAct->setObjectName("resetZoomAct");
     connect(m_resetZoomAct, &QAction::triggered, this, &MainWindow::resetZoom);
 
     m_zoom05Act = new QAction(tr("Zoom ×0.5"), this);
     m_zoom05Act->setShortcut(QKeySequence("Ctrl+1"));
+    m_zoom05Act->setObjectName("Zoom05Act");
     connect(m_zoom05Act, &QAction::triggered, this,
             [this]()
             {
                 if (canvas_)
                     canvas_->setScale(0.5);
             });
+
     m_zoom1Act = new QAction(tr("Zoom ×1"), this);
     m_zoom1Act->setShortcut(QKeySequence("Ctrl+2"));
+    m_zoom1Act->setObjectName("zoom1Act");
     connect(m_zoom1Act, &QAction::triggered, this,
             [this]()
             {
                 if (canvas_)
                     canvas_->setScale(1.0);
             });
+
     m_zoom2Act = new QAction(tr("Zoom ×2"), this);
     m_zoom2Act->setShortcut(QKeySequence("Ctrl+3"));
+    m_zoom2Act->setObjectName("zoom2Act");
     connect(m_zoom2Act, &QAction::triggered, this,
             [this]()
             {
@@ -1438,10 +1557,13 @@ void MainWindow::createActions()
     m_selectToggleAct->setCheckable(true);
     connect(m_selectToggleAct, &QAction::toggled, this, &MainWindow::toggleSelectionMode);
     m_selectToggleAct->setObjectName("act.select");
+    m_selectToggleAct->setShortcut(QKeySequence(QStringLiteral("S")));  // mode sélection
 
     m_clearSelectionAct = new QAction(tr("Effacer sélection"), this);
     connect(m_clearSelectionAct, &QAction::triggered, this, &MainWindow::clearSelection);
     m_clearSelectionAct->setObjectName("act.clearSelection");
+    m_clearSelectionAct->setShortcut(QKeySequence(
+        Qt::Key_Escape));  // tu as déjà escClearAct, mais c'est mieux si l’action porte aussi le raccourci
 
     m_bucketAct = new QAction(tr("Pot de peinture"), this);
     m_bucketAct->setCheckable(true);
@@ -1498,6 +1620,125 @@ void MainWindow::createActions()
             });
     m_eraseAct->setObjectName("act.erase");
 
+    m_shortcutsHelpAct = new QAction(tr("Raccourcis clavier"), this);
+    m_shortcutsHelpAct->setShortcuts(
+        {QKeySequence(QStringLiteral("Ctrl+/")), QKeySequence(QStringLiteral("Ctrl+Shift+/")),
+         QKeySequence(QStringLiteral("Ctrl+?")), QKeySequence(Qt::Key_F1)});
+    m_shortcutsHelpAct->setShortcutContext(Qt::ApplicationShortcut);
+    m_shortcutsHelpAct->setStatusTip(tr("Afficher la liste des raccourcis clavier"));
+    connect(m_shortcutsHelpAct, &QAction::triggered, this, &MainWindow::showShortcutHelpDialog);
+    m_shortcutsHelpAct->setObjectName("act.shortcutsHelp");
+
+    // Merge down layer
+    m_layerMergeDownAct = new QAction(tr("Fusionner vers le bas"), this);
+    m_layerMergeDownAct->setShortcut(
+        QKeySequence(QStringLiteral("Ctrl+E")));  // classique "Merge Down" type Photoshop
+    m_layerMergeDownAct->setShortcutContext(Qt::ApplicationShortcut);
+    m_layerMergeDownAct->setObjectName("layerMergeDownAct");
+    connect(m_layerMergeDownAct, &QAction::triggered, this, &MainWindow::onMergeDown);
+    addAction(m_layerMergeDownAct);
+
+    // Delete layer
+    m_layerDeleteAct = new QAction(tr("Supprimer le calque"), this);
+    m_layerDeleteAct->setShortcut(QKeySequence(Qt::Key_Delete));
+    m_layerDeleteAct->setShortcutContext(Qt::ApplicationShortcut);
+    m_layerDeleteAct->setObjectName("layerDeleteAct");
+    connect(m_layerDeleteAct, &QAction::triggered, this,
+            [this]()
+            {
+                if (!app().hasDocument())
+                    return;
+                auto idxOpt = currentLayerIndexFromSelection();
+                if (!idxOpt || *idxOpt == 0)
+                    return;
+                auto layer = app().document().layerAt(*idxOpt);
+                if (!layer || layer->locked())
+                    return;
+                app().removeLayer(*idxOpt);
+            });
+    addAction(m_layerDeleteAct);
+
+    // Rename layer
+    m_layerRenameAct = new QAction(tr("Renommer le calque"), this);
+    m_layerRenameAct->setShortcut(QKeySequence(Qt::Key_F2));
+    m_layerRenameAct->setShortcutContext(Qt::ApplicationShortcut);
+    m_layerRenameAct->setObjectName("layerRenameAct");
+    connect(m_layerRenameAct, &QAction::triggered, this,
+            [this]()
+            {
+                if (!m_layersList)
+                    return;
+                auto* item = m_layersList->currentItem();
+                if (!item)
+                    return;
+                onLayerDoubleClicked(item);
+            });
+    addAction(m_layerRenameAct);
+
+    // Toggle lock layer
+    m_layerToggleLockAct = new QAction(tr("Verrouiller / Déverrouiller"), this);
+    m_layerToggleLockAct->setShortcut(QKeySequence(QStringLiteral("Ctrl+L")));
+    m_layerToggleLockAct->setShortcutContext(Qt::ApplicationShortcut);
+    m_layerToggleLockAct->setObjectName("layerToggleLockAct");
+    connect(m_layerToggleLockAct, &QAction::triggered, this,
+            [this]()
+            {
+                if (!app().hasDocument())
+                    return;
+                auto idxOpt = currentLayerIndexFromSelection();
+                if (!idxOpt || *idxOpt == 0)
+                    return;
+                auto layer = app().document().layerAt(*idxOpt);
+                if (!layer)
+                    return;
+                app().setLayerLocked(*idxOpt, !layer->locked());
+            });
+    addAction(m_layerToggleLockAct);
+
+    // Toggle visibility layer
+    m_layerToggleVisibleAct = new QAction(tr("Afficher / Masquer le calque"), this);
+    m_layerToggleVisibleAct->setShortcut(QKeySequence(QStringLiteral("Ctrl+H")));
+    m_layerToggleVisibleAct->setShortcutContext(Qt::ApplicationShortcut);
+    m_layerToggleVisibleAct->setObjectName("layerToggleVisibleAct");
+    connect(m_layerToggleVisibleAct, &QAction::triggered, this,
+            [this]()
+            {
+                if (!app().hasDocument())
+                    return;
+                auto idxOpt = currentLayerIndexFromSelection();
+                if (!idxOpt)
+                    return;
+                auto layer = app().document().layerAt(*idxOpt);
+                if (!layer)
+                    return;
+                app().setLayerVisible(*idxOpt, !layer->visible());
+            });
+
+    m_focusCanvasAct = new QAction(tr("Focus Canvas"), this);
+    m_focusCanvasAct->setShortcut(QKeySequence(Qt::Key_F6));
+    m_focusCanvasAct->setShortcutContext(Qt::ApplicationShortcut);
+    m_focusCanvasAct->setObjectName("focusCanvasAct");
+    connect(m_focusCanvasAct, &QAction::triggered, this,
+            [this]()
+            {
+                if (canvas_)
+                    canvas_->setFocus();
+            });
+    addAction(m_focusCanvasAct);
+
+    m_focusLayersAct = new QAction(tr("Focus Calques"), this);
+    m_focusLayersAct->setShortcut(QKeySequence(Qt::Key_F7));
+    m_focusLayersAct->setShortcutContext(Qt::ApplicationShortcut);
+    m_focusLayersAct->setObjectName("focusLayersAct");
+    connect(m_focusLayersAct, &QAction::triggered, this,
+            [this]()
+            {
+                if (m_layersList)
+                    m_layersList->setFocus();
+            });
+    addAction(m_focusLayersAct);
+
+    addAction(m_layerToggleVisibleAct);
     auto* escClearAct = new QAction(this);
     escClearAct->setShortcut(QKeySequence(Qt::Key_Escape));
     escClearAct->setShortcutContext(Qt::ApplicationShortcut);
@@ -1511,6 +1752,7 @@ void MainWindow::createActions()
                     canvas_->clearSelectionRect();
             });
     addAction(escClearAct);
+    addAction(m_shortcutsHelpAct);
 }
 
 void MainWindow::createMenus()
@@ -1550,6 +1792,10 @@ void MainWindow::createMenus()
     m_cmdMenu->addSeparator();
     m_cmdMenu->addAction(m_bucketAct);
     m_cmdMenu->addAction(m_colorPickerAct);
+
+    m_helpMenu = menuBar()->addMenu(tr("&Aide"));
+    if (m_shortcutsHelpAct)
+        m_helpMenu->addAction(m_shortcutsHelpAct);
 
     // Undo/Redo
     m_cmdMenu->addSeparator();
@@ -1612,6 +1858,8 @@ void MainWindow::createLayersPanel()
     m_layersList->setSelectionMode(QAbstractItemView::SingleSelection);
     m_layersList->setDragDropMode(QAbstractItemView::NoDragDrop);
     m_layersList->setContextMenuPolicy(Qt::CustomContextMenu);
+    m_layersList->setObjectName("layerList");
+    m_layersList->setFocusPolicy(Qt::StrongFocus);
 
     v->addWidget(header);
     v->addWidget(m_layersList);
@@ -2171,4 +2419,22 @@ void MainWindow::updateColorPickerIcon()
     p.drawRect(0, 0, sz - 1, sz - 1);
     p.end();
     m_colorPickerAct->setIcon(QIcon(pix));
+}
+
+QString MainWindow::formatActionShortcut(const QAction* a) const
+{
+    if (!a)
+        return {};
+    QString t = a->text();
+    t.remove('&');
+
+    const auto scs = a->shortcuts();
+    if (scs.isEmpty())
+        return t;
+
+    QStringList parts;
+    for (const auto& sc : scs)
+        parts << sc.toString(QKeySequence::NativeText);
+
+    return QStringLiteral("%1\t%2").arg(t, parts.join(QStringLiteral(" / ")));
 }
