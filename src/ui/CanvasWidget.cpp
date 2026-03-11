@@ -334,6 +334,36 @@ void CanvasWidget::paintEvent(QPaintEvent*)
 
         p.restore();
     }
+
+    // lasso preview (draw in screen coordinates)
+    if (!lassoPoints_.empty())
+    {
+        p.save();
+        p.setRenderHint(QPainter::Antialiasing, true);
+        QPen pen(QColor(220, 0, 0));
+        pen.setStyle(Qt::DashLine);
+        pen.setWidthF(1.0);
+        pen.setCapStyle(Qt::RoundCap);
+        pen.setJoinStyle(Qt::RoundJoin);
+        p.setPen(pen);
+        p.setBrush(Qt::NoBrush);
+
+        // draw lines between lasso points
+        for (size_t i = 1; i < lassoPoints_.size(); ++i)
+        {
+            QPoint a = docToScreen(lassoPoints_[i - 1]);
+            QPoint b = docToScreen(lassoPoints_[i]);
+            p.drawLine(a, b);
+        }
+        // close shape visually
+        if (lassoPoints_.size() >= 3)
+        {
+            QPoint a = docToScreen(lassoPoints_.back());
+            QPoint b = docToScreen(lassoPoints_.front());
+            p.drawLine(a, b);
+        }
+        p.restore();
+    }
 }
 
 void CanvasWidget::wheelEvent(QWheelEvent* e)
@@ -409,6 +439,17 @@ void CanvasWidget::mousePressEvent(QMouseEvent* e)
     }
     if (selectionEnabled_)
     {
+        // If user holds Shift while starting selection -> lasso selection
+        const bool shift = (e->modifiers() & Qt::ShiftModifier);
+        if (shift)
+        {
+            lassoActive_ = true;
+            lassoPoints_.clear();
+            lassoPoints_.push_back(pDoc);
+            update();
+            e->accept();
+            return;
+        }
         hasSel_ = true;
         selScreen_ = QRect(e->pos(), e->pos());
         update();
@@ -459,6 +500,18 @@ void CanvasWidget::mouseMoveEvent(QMouseEvent* e)
     if (selectionEnabled_ && hasSel_ && (e->buttons() & Qt::LeftButton))
     {
         selScreen_.setBottomRight(cur);
+        update();
+        e->accept();
+        return;
+    }
+
+    if (lassoActive_ && (e->buttons() & Qt::LeftButton))
+    {
+        common::Point pDoc = screenToDoc(cur);
+        // avoid adding duplicate points
+        if (lassoPoints_.empty() || lassoPoints_.back().x != pDoc.x ||
+            lassoPoints_.back().y != pDoc.y)
+            lassoPoints_.push_back(pDoc);
         update();
         e->accept();
         return;
@@ -521,6 +574,20 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* e)
                 emit selectionFinishedDoc((r.w <= 0 || r.h <= 0) ? common::Rect{0, 0, 0, 0} : r);
                 update();
             }
+            e->accept();
+            return;
+        }
+        if (lassoActive_)
+        {
+            // finish lasso
+            lassoActive_ = false;
+            // ensure at least 3 points
+            if (lassoPoints_.size() >= 3)
+            {
+                emit selectionFinishedPoly(lassoPoints_);
+            }
+            lassoPoints_.clear();
+            update();
             e->accept();
             return;
         }

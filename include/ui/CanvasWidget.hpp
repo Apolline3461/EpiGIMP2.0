@@ -65,6 +65,7 @@ class CanvasWidget : public QWidget
    signals:
     void selectionFinishedDoc(common::Rect r);
     void clickedDoc(common::Point p);
+    void selectionFinishedPoly(const std::vector<common::Point>& poly);
 
     void beginDragDoc(common::Point p);
     void dragDoc(common::Point p);
@@ -92,6 +93,9 @@ class CanvasWidget : public QWidget
     bool hasSel_ = false;
     QRect selScreen_;
     bool selectionEnabled_ = false;
+    // lasso selection
+    bool lassoActive_ = false;
+    std::vector<common::Point> lassoPoints_;
 
     //draw
     bool pencilEnabled_ = false;

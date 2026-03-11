@@ -35,6 +35,7 @@
 #include "app/commands/CommandUtils.hpp"
 #include "common/Geometry.hpp"
 #include "core/Document.hpp"
+#include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 #include "ui/CanvasWidget.hpp"
 #include "ui/ImageConversion.hpp"
@@ -60,6 +61,52 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
 
     connect(canvas_, &CanvasWidget::selectionFinishedDoc, this,
             [this](common::Rect r) { app().setSelectionRect(r); });
+
+    connect(canvas_, &CanvasWidget::selectionFinishedPoly, this,
+            [this](const std::vector<common::Point>& poly)
+            {
+                if (!app().hasDocument())
+                    return;
+                if (poly.empty())
+                    return;
+
+                const int w = app().document().width();
+                const int h = app().document().height();
+                auto mask = std::make_shared<ImageBuffer>(w, h);
+                mask->fill(0u);
+
+                // point-in-polygon ray casting
+                auto pointInPoly = [&](double px, double py)
+                {
+                    bool inside = false;
+                    for (size_t i = 0, j = poly.size() - 1; i < poly.size(); j = i++)
+                    {
+                        double xi = poly[i].x;
+                        double yi = poly[i].y;
+                        double xj = poly[j].x;
+                        double yj = poly[j].y;
+
+                        const bool intersect = ((yi > py) != (yj > py)) &&
+                                               (px < (xj - xi) * (py - yi) / (yj - yi + 0.0) + xi);
+                        if (intersect)
+                            inside = !inside;
+                    }
+                    return inside;
+                };
+
+                for (int y = 0; y < h; ++y)
+                {
+                    for (int x = 0; x < w; ++x)
+                    {
+                        // test pixel center
+                        if (pointInPoly(static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5))
+                            mask->setPixel(x, y, 0x000000FFu);
+                    }
+                }
+
+                app().document().selection().setMask(mask);
+                app().documentChanged.notify();
+            });
 
     connect(canvas_, &CanvasWidget::clickedDoc, this,
             [this](common::Point p)
