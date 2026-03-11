@@ -5,7 +5,10 @@ set(EPIGIMP_UI_TEST_SOURCES
         test_ImageConversion.cpp
         test_PanClamp.cpp
         test_ui_main.cpp
+        test_FocusNavigation.cpp
+        test_Shortcuts.cpp
 )
+find_package(Qt6 REQUIRED COMPONENTS Widgets Test)
 
 add_executable(test_ui
         ${EPIGIMP_UI_TEST_SOURCES}
@@ -20,6 +23,7 @@ target_link_libraries(test_ui
         PRIVATE
         epigimp_ui
         Qt6::Widgets
+        Qt6::Test
         GTest::gtest
 )
 
