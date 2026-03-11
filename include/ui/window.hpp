@@ -165,6 +165,7 @@ class MainWindow : public QMainWindow
     QAction* m_moveLayerAct{nullptr};
     QAction* m_layerMergeDownAct{nullptr};
     QAction* m_layerDeleteAct{nullptr};
+    QAction* m_copySelectionAct{nullptr};
     QAction* m_layerRenameAct{nullptr};
     QAction* m_layerToggleLockAct{nullptr};
     QAction* m_layerToggleVisibleAct{nullptr};

@@ -25,6 +25,7 @@
 #include <QPalette>
 #include <QPixmap>
 #include <QPushButton>
+#include <QShortcut>
 #include <QSpinBox>
 #include <QStandardPaths>
 #include <QStatusBar>
@@ -32,7 +33,9 @@
 #include <QToolBar>
 #include <QVBoxLayout>
 
+#include "app/Command.hpp"
 #include "app/commands/CommandUtils.hpp"
+#include "app/commands/PixelCommands.hpp"
 #include "common/Geometry.hpp"
 #include "core/Document.hpp"
 #include "core/ImageBuffer.hpp"
@@ -452,6 +455,9 @@ void MainWindow::toggleSelectionMode(bool enabled)
             m_pencilAct->setChecked(false);
         if (m_eraseAct)
             m_eraseAct->setChecked(false);
+
+        if (m_lassoAct)
+            m_lassoAct->setChecked(false);
 
         m_bucketMode = false;
         m_pickMode = false;
@@ -1503,10 +1509,6 @@ void MainWindow::createActions()
                         m_bucketAct->setChecked(false);
                     if (m_selectToggleAct)
                         m_selectToggleAct->setChecked(false);
-                    if (m_lassoAct)
-                        m_lassoAct->setChecked(false);
-                    if (m_lassoAct)
-                        m_lassoAct->setChecked(false);
                     m_bucketMode = false;
                     if (canvas_)
                         canvas_->setSelectionEnable(false);
@@ -1565,8 +1567,6 @@ void MainWindow::createActions()
                         m_selectToggleAct->setChecked(false);
                     if (m_lassoAct)
                         m_lassoAct->setChecked(false);
-                    if (m_lassoAct)
-                        m_lassoAct->setChecked(false);
                     if (m_eraseAct)
                         m_eraseAct->setChecked(false);
                     if (m_eraseDock)
@@ -1601,8 +1601,6 @@ void MainWindow::createActions()
                         m_moveLayerAct->setChecked(false);
                     if (m_selectToggleAct)
                         m_selectToggleAct->setChecked(false);
-                    if (m_lassoAct)
-                        m_lassoAct->setChecked(false);
                 }
             });
 
@@ -1665,8 +1663,6 @@ void MainWindow::createActions()
     m_clearSelectionAct = new QAction(tr("Effacer sélection"), this);
     connect(m_clearSelectionAct, &QAction::triggered, this, &MainWindow::clearSelection);
     m_clearSelectionAct->setObjectName("act.clearSelection");
-    m_clearSelectionAct->setShortcut(QKeySequence(
-        Qt::Key_Escape));  // tu as déjà escClearAct, mais c'est mieux si l’action porte aussi le raccourci
 
     m_bucketAct = new QAction(tr("Pot de peinture"), this);
     m_bucketAct->setCheckable(true);
@@ -1753,6 +1749,68 @@ void MainWindow::createActions()
             {
                 if (!app().hasDocument())
                     return;
+
+                const auto& sel = app().document().selection();
+                // If there is a selection mask, delete pixels inside it on the active layer
+                if (sel.hasMask() && sel.mask())
+                {
+                    const auto mask = sel.mask();
+                    const std::size_t activeIdx = static_cast<std::size_t>(app().activeLayer());
+                    if (activeIdx == 0)
+                    {
+                        // Do not delete background layer content
+                        return;
+                    }
+                    auto layer = app().document().layerAt(activeIdx);
+                    if (!layer || !layer->image() || layer->locked())
+                        return;
+
+                    auto img = layer->image();
+                    const int lw = img->width();
+                    const int lh = img->height();
+
+                    std::vector<app::PixelChange> changes;
+                    changes.reserve(lw * lh / 4);
+
+                    const int offX = layer->offsetX();
+                    const int offY = layer->offsetY();
+                    for (int y = 0; y < lh; ++y)
+                    {
+                        for (int x = 0; x < lw; ++x)
+                        {
+                            const int dx = x + offX;
+                            const int dy = y + offY;
+                            if (dx < 0 || dy < 0 || dx >= mask->width() || dy >= mask->height())
+                                continue;
+                            if (mask->getPixel(dx, dy) == 0u)
+                                continue;
+
+                            const std::uint32_t before = img->getPixel(x, y);
+                            const std::uint32_t after = common::colors::Transparent;
+                            if (before != after)
+                                changes.push_back(app::PixelChange{x, y, before, after});
+                        }
+                    }
+
+                    if (!changes.empty())
+                    {
+                        // Apply changes directly (no undo support here).
+                        for (const auto& c : changes)
+                        {
+                            img->setPixel(c.x, c.y, c.after);
+                        }
+                        app().documentChanged.notify();
+                    }
+
+                    // Clear selection after deletion
+                    app().clearSelectionRect();
+                    if (canvas_)
+                        canvas_->clearSelectionRect();
+
+                    return;
+                }
+
+                // Otherwise delete the current layer (same behavior as before)
                 auto idxOpt = currentLayerIndexFromSelection();
                 if (!idxOpt || *idxOpt == 0)
                     return;
@@ -1762,6 +1820,58 @@ void MainWindow::createActions()
                 app().removeLayer(*idxOpt);
             });
     addAction(m_layerDeleteAct);
+
+    // Copy selection to new layer (Ctrl+C)
+    m_copySelectionAct = new QAction(tr("Copier la sélection"), this);
+    m_copySelectionAct->setShortcut(QKeySequence::Copy);
+    m_copySelectionAct->setShortcutContext(Qt::ApplicationShortcut);
+    m_copySelectionAct->setObjectName("copySelectionAct");
+    connect(m_copySelectionAct, &QAction::triggered, this,
+            [this]()
+            {
+                if (!app().hasDocument())
+                    return;
+                const auto& sel = app().document().selection();
+                if (!sel.hasMask() || !sel.mask())
+                    return;
+
+                const auto mask = sel.mask();
+                const auto bboxOpt = sel.boundingRect();
+                if (!bboxOpt.has_value())
+                    return;
+                const auto bbox = *bboxOpt;
+                if (bbox.w <= 0 || bbox.h <= 0)
+                    return;
+
+                // Render full document and copy pixels under selection mask, cropped to bounding rect
+                QImage full = Renderer::render(app().document());
+                ImageBuffer fullBuf =
+                    ImageConversion::qImageToImageBuffer(full, full.width(), full.height());
+
+                ImageBuffer out(bbox.w, bbox.h);
+                out.fill(common::colors::Transparent);
+
+                for (int y = 0; y < bbox.h; ++y)
+                {
+                    for (int x = 0; x < bbox.w; ++x)
+                    {
+                        const int gx = bbox.x + x;
+                        const int gy = bbox.y + y;
+                        if (gx < 0 || gy < 0 || gx >= fullBuf.width() || gy >= fullBuf.height())
+                            continue;
+                        const uint32_t mpx = mask->getPixel(gx, gy);
+                        if (static_cast<uint8_t>(mpx & 0xFFu) != 0)
+                        {
+                            out.setPixel(x, y, fullBuf.getPixel(gx, gy));
+                        }
+                    }
+                }
+
+                app().addImageLayer(out, "Copie sélection");
+                if (statusBar())
+                    statusBar()->showMessage(tr("Sélection copiée dans un nouveau calque"), 2000);
+            });
+    addAction(m_copySelectionAct);
 
     // Rename layer
     m_layerRenameAct = new QAction(tr("Renommer le calque"), this);
@@ -2061,7 +2171,6 @@ void MainWindow::createToolBar()
     if (m_lassoAct)
     {
         m_lassoAct->setToolTip(tr("Sélection lasso"));
-        m_toolsGroup->addAction(m_lassoAct);
         m_toolsTb->addAction(m_lassoAct);
     }
 
