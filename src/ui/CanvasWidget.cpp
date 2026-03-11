@@ -10,6 +10,8 @@
 
 #include <algorithm>
 
+#include "core/ImageBuffer.hpp"
+#include "ui/ImageConversion.hpp"
 #include "ui/PanClamp.hpp"
 
 namespace
@@ -93,6 +95,12 @@ void CanvasWidget::setSelectionRectOverlay(std::optional<common::Rect> r)
     update();
 }
 
+void CanvasWidget::setSelectionMaskOverlay(const std::shared_ptr<ImageBuffer>& mask)
+{
+    selectionMaskOverlay_ = mask;
+    update();
+}
+
 void CanvasWidget::setLayerRectOverlay(std::optional<common::Rect> r)
 {
     layerOverlay_ = r;
@@ -146,6 +154,16 @@ void CanvasWidget::clearDragLayerPreview()
 void CanvasWidget::setPencilEnable(bool enable)
 {
     pencilEnabled_ = enable;
+}
+
+void CanvasWidget::setLassoEnable(bool enable)
+{
+    lassoEnabled_ = enable;
+    if (!enable)
+    {
+        lassoActive_ = false;
+        lassoPoints_.clear();
+    }
 }
 
 void CanvasWidget::setPencilSize(int s)
@@ -235,6 +253,52 @@ void CanvasWidget::paintEvent(QPaintEvent*)
 
     // base image
     p.drawImage(0, 0, img_);
+
+    // selection mask overlay (drawn on top of base image if present)
+    if (selectionMaskOverlay_)
+    {
+        // compute outline: pixel is edge if selected and any 8-neighbor is not selected
+        const int iw = img_.width();
+        const int ih = img_.height();
+        QImage overlay(iw, ih, QImage::Format_ARGB32_Premultiplied);
+        overlay.fill(Qt::transparent);
+
+        auto selAt = [&](int sx, int sy) -> bool
+        {
+            if (sx < 0 || sy < 0 || sx >= iw || sy >= ih)
+                return false;
+            const uint32_t px = selectionMaskOverlay_->getPixel(sx, sy);
+            return static_cast<uint8_t>(px & 0xFFu) != 0;
+        };
+
+        for (int y = 0; y < ih; ++y)
+        {
+            for (int x = 0; x < iw; ++x)
+            {
+                if (!selAt(x, y))
+                    continue;
+
+                bool edge = false;
+                for (int oy = -1; oy <= 1 && !edge; ++oy)
+                {
+                    for (int ox = -1; ox <= 1; ++ox)
+                    {
+                        if (ox == 0 && oy == 0)
+                            continue;
+                        if (!selAt(x + ox, y + oy))
+                        {
+                            edge = true;
+                            break;
+                        }
+                    }
+                }
+                if (edge)
+                    overlay.setPixel(x, y, qRgba(220, 0, 0, 255));
+            }
+        }
+
+        p.drawImage(0, 0, overlay);
+    }
 
     // drag preview (drawn on top)
     if (dragLayerPreviewOn_ && !dragLayerImg_.isNull())
@@ -439,9 +503,9 @@ void CanvasWidget::mousePressEvent(QMouseEvent* e)
     }
     if (selectionEnabled_)
     {
-        // If user holds Shift while starting selection -> lasso selection
+        // Lasso if Shift held or lasso mode enabled
         const bool shift = (e->modifiers() & Qt::ShiftModifier);
-        if (shift)
+        if (shift || lassoEnabled_)
         {
             lassoActive_ = true;
             lassoPoints_.clear();

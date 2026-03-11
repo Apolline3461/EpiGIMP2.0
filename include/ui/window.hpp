@@ -153,6 +153,7 @@ class MainWindow : public QMainWindow
 
     QAction* m_clearSelectionAct{nullptr};
     QAction* m_selectToggleAct{nullptr};
+    QAction* m_lassoAct{nullptr};
 
     bool m_bucketMode{false};
     bool m_pickMode{false};

@@ -7,6 +7,7 @@
 #include <QPointF>
 #include <QWidget>
 
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -31,9 +32,12 @@ class CanvasWidget : public QWidget
 
     void setSelectionEnable(bool enable);
     void setSelectionRectOverlay(std::optional<common::Rect> r);
+    void setSelectionMaskOverlay(const std::shared_ptr<class ImageBuffer>& mask);
     void setLayerRectOverlay(std::optional<common::Rect> r);
     void setSelectionRect(const QRect& r);
     void clearSelectionRect();
+
+    void setLassoEnable(bool enable);
 
     void setMoveLayerEnable(bool enable);
 
@@ -93,6 +97,7 @@ class CanvasWidget : public QWidget
     bool hasSel_ = false;
     QRect selScreen_;
     bool selectionEnabled_ = false;
+    bool lassoEnabled_ = false;
     // lasso selection
     bool lassoActive_ = false;
     std::vector<common::Point> lassoPoints_;
@@ -117,6 +122,7 @@ class CanvasWidget : public QWidget
     // overlays
     std::optional<common::Rect> selectionOverlay_;
     std::optional<common::Rect> layerOverlay_;
+    std::shared_ptr<class ImageBuffer> selectionMaskOverlay_;
 
     // drag preview
     bool dragLayerPreviewOn_ = false;
