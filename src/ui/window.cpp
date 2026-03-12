@@ -991,6 +991,7 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
     QAction* renameAct = menu.addAction(tr("Renommer"));
     QAction* resizeAct = menu.addAction(tr("Redimensionner calque"));
     QAction* deleteAct = menu.addAction(tr("Supprimer"));
+    QAction const* dupAct = menu.addAction(tr("Dupliquer"));
 
     const bool isBottomLayer = (idx == 0);
     const bool isLockedLayer = layer ? layer->locked() : false;
@@ -1114,6 +1115,11 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
         moveLayerUp();
     else if (act == downAct)
         moveLayerDown();
+    else if (act == dupAct)
+    {
+        if (idx != 0)
+            app().duplicateLayer(idx);
+    }
 }
 
 void MainWindow::onMergeDown()
@@ -1840,6 +1846,25 @@ void MainWindow::createActions()
                 app().setLayerVisible(*idxOpt, !layer->visible());
             });
 
+    m_layerDuplicateAct = new QAction(tr("Dupliquer le calque"), this);
+    m_layerDuplicateAct->setShortcut(QKeySequence(QStringLiteral("Ctrl+J")));
+    m_layerDuplicateAct->setShortcutContext(Qt::ApplicationShortcut);
+    m_layerDuplicateAct->setObjectName("layerDuplicateAct");
+    connect(m_layerDuplicateAct, &QAction::triggered, this,
+            [this]()
+            {
+                if (!app().hasDocument())
+                    return;
+                auto idxOpt = currentLayerIndexFromSelection();
+                if (!idxOpt)
+                    return;
+                auto layer = app().document().layerAt(*idxOpt);
+                if (!layer || !layer->image())
+                    return;
+                app().duplicateLayer(*idxOpt);
+            });
+    addAction(m_layerDuplicateAct);
+
     m_focusCanvasAct = new QAction(tr("Focus Canvas"), this);
     m_focusCanvasAct->setShortcut(QKeySequence(Qt::Key_F6));
     m_focusCanvasAct->setShortcutContext(Qt::ApplicationShortcut);
@@ -1986,11 +2011,14 @@ void MainWindow::createLayersPanel()
     m_layersList->setContextMenuPolicy(Qt::CustomContextMenu);
     m_layersList->setObjectName("layerList");
     m_layersList->setFocusPolicy(Qt::StrongFocus);
+    m_layersList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
     v->addWidget(header);
     v->addWidget(m_layersList);
 
     m_layersDock->setWidget(root);
+    m_layersDock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable |
+                              QDockWidget::DockWidgetClosable);
     addDockWidget(Qt::RightDockWidgetArea, m_layersDock);
 
     // --- connections ---
@@ -2349,25 +2377,29 @@ void MainWindow::populateLayersList()
         thumb->setFixedSize(48, 48);
         thumb->setAlignment(Qt::AlignCenter);
         thumb->setPixmap(createLayerThumbnail(layer, thumb->size()));
+        thumb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
         auto* nameLbl = new QLabel(row);
         nameLbl->setText(QString::fromStdString(layer->name()));
+        nameLbl->setMinimumWidth(0);
         nameLbl->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+        nameLbl->setWordWrap(false);
 
         auto* opacitySpin = new QSpinBox(row);
         opacitySpin->setRange(0, 100);
         opacitySpin->setValue(static_cast<int>(layer->opacity() * 100.0f));
         opacitySpin->setFixedWidth(55);
+        opacitySpin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         opacitySpin->setEnabled(!isLocked);
 
         h->addWidget(eyeBtn);
         h->addWidget(lockBtn);
-        h->addWidget(nameLbl);
+        h->addWidget(nameLbl, 1);
         h->addWidget(opacitySpin);
         h->addWidget(thumb);
 
         m_layersList->setItemWidget(item, row);
-        item->setSizeHint(row->sizeHint());
+        item->setSizeHint(QSize(0, 56));
 
         connect(eyeBtn, &QPushButton::clicked, this,
                 [this, layerId]()

@@ -200,6 +200,7 @@ class MainWindow : public QMainWindow
     QListWidget* m_layersList{nullptr};
     QAction* m_layerUpAct{nullptr};
     QAction* m_layerDownAct{nullptr};
+    QAction* m_layerDuplicateAct{nullptr};
 
     bool m_dirty{false};
 

@@ -414,6 +414,42 @@ void AppService::resizeLayer(std::size_t idx, int newW, int newH)
     apply(commands::makeResizeLayerCommand(doc_.get(), layer->id(), before, after));
 }
 
+void AppService::duplicateLayer(std::size_t idx)
+{
+    if (!doc_)
+        throw std::runtime_error("duplicateLayer: document is null");
+
+    const std::size_t n = doc_->layerCount();
+    if (idx >= n)
+        throw std::out_of_range("duplicateLayer: index out of range");
+
+    auto src = doc_->layerAt(idx);
+    if (!src || !src->image())
+        throw std::runtime_error("duplicateLayer: invalid layer");
+
+    // deep copy image
+    auto srcImg = src->image();
+    auto copyImg = std::make_shared<ImageBuffer>(srcImg->width(), srcImg->height());
+    for (int y = 0; y < srcImg->height(); ++y)
+        for (int x = 0; x < srcImg->width(); ++x)
+            copyImg->setPixel(x, y, srcImg->getPixel(x, y));
+
+    // name suffix
+    std::string newName = src->name();
+    if (newName.find(" (copy)") == std::string::npos)
+        newName += " (copy)";
+    else
+        newName += " 2";
+
+    auto duplicated = std::make_shared<Layer>(nextLayerId_++, newName, copyImg, src->visible(),
+                                              src->locked(), src->opacity());
+    duplicated->setOffset(src->offsetX(), src->offsetY());
+
+    const std::size_t insertAt = idx + 1;  // juste au-dessus du layer original
+    apply(commands::makeDuplicateLayerCommand(doc_.get(), std::move(duplicated), insertAt,
+                                              &activeLayer_));
+}
+
 void AppService::beginStroke(const ToolParams& params, common::Point pStart)
 {
     if (!doc_)
