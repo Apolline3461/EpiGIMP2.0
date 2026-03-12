@@ -86,6 +86,7 @@ class AppService
     void moveLayer(std::size_t idx, int newOffsetX, int newOffsetY);
 
     void resizeLayer(std::size_t idx, int newW, int newH);  // smooth true = bilinear, nearest
+    void duplicateLayer(std::size_t idx);
 
     void beginStroke(const ToolParams&, common::Point pStart);
     void moveStroke(common::Point p);

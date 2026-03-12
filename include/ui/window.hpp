@@ -51,6 +51,9 @@ class MainWindow : public QMainWindow
 
     // NOLINTNEXTLINE(unknownMacro)
    private slots:
+
+    void showShortcutHelpDialog();
+
     void zoomIn();
     void zoomOut();
     void resetZoom();
@@ -87,6 +90,7 @@ class MainWindow : public QMainWindow
 
     CanvasWidget* canvas_{nullptr};
 
+    void syncStrokeToolState();
     void refreshUIAfterDocChange();
     void updateLayerOverlayFromSelection();
     void clearUiStateOnClose();
@@ -108,11 +112,10 @@ class MainWindow : public QMainWindow
     std::optional<std::size_t> currentLayerIndexFromSelection() const;
     void updateLayerHeaderButtonsEnabled();
 
-    // void keyPressEvent(QKeyEvent* event) override;
-    // void keyReleaseEvent(QKeyEvent* event) override;
-
     void selectLayerInListById(std::uint64_t id);
     void updateColorPickerIcon();
+
+    QString formatActionShortcut(const QAction* a) const;
 
     // Membres internes
     QString m_currentFileName;
@@ -120,6 +123,7 @@ class MainWindow : public QMainWindow
     QMenu* m_fileMenu{nullptr};
     QMenu* m_viewMenu{nullptr};
     QMenu* m_cmdMenu{nullptr};
+    QMenu* m_helpMenu{nullptr};
 
     QToolBar* m_toolsTb = nullptr;
     QToolButton* m_layerAddBtn = nullptr;
@@ -129,6 +133,8 @@ class MainWindow : public QMainWindow
     QToolButton* m_layerMergeDownBtn = nullptr;
 
     QActionGroup* m_toolsGroup = nullptr;
+
+    QAction* m_shortcutsHelpAct{nullptr};
 
     QAction* m_newAct{nullptr};
     QAction* m_openAct{nullptr};
@@ -156,6 +162,12 @@ class MainWindow : public QMainWindow
     QAction* m_pickAct{nullptr};
 
     QAction* m_moveLayerAct{nullptr};
+    QAction* m_layerMergeDownAct{nullptr};
+    QAction* m_layerDeleteAct{nullptr};
+    QAction* m_layerRenameAct{nullptr};
+    QAction* m_layerToggleLockAct{nullptr};
+    QAction* m_layerToggleVisibleAct{nullptr};
+
     bool m_moveLayerMode{false};
     bool m_dragLayerActive{false};
     std::size_t m_dragLayerIdx{0};
@@ -169,6 +181,12 @@ class MainWindow : public QMainWindow
     QAction* m_pencilAct{nullptr};
     QDockWidget* m_pencilDock{nullptr};
     QSpinBox* m_pencilSizeSpin{nullptr};
+    QSpinBox* m_pencilOpacitySpin{nullptr};
+
+    QAction* m_eraseAct{nullptr};
+    QDockWidget* m_eraseDock{nullptr};
+    QSpinBox* m_eraseSizeSpin{nullptr};
+    QSpinBox* m_eraseOpacitySpin{nullptr};
 
     bool m_handMode{false};
     bool m_panningActive{false};
@@ -180,6 +198,7 @@ class MainWindow : public QMainWindow
     QListWidget* m_layersList{nullptr};
     QAction* m_layerUpAct{nullptr};
     QAction* m_layerDownAct{nullptr};
+    QAction* m_layerDuplicateAct{nullptr};
 
     bool m_dirty{false};
 
@@ -189,4 +208,8 @@ class MainWindow : public QMainWindow
     // Historique des commandes (undo/redo)
     QAction* m_undoAct{nullptr};
     QAction* m_redoAct{nullptr};
+
+    // navigation focus
+    QAction* m_focusCanvasAct{nullptr};
+    QAction* m_focusLayersAct{nullptr};
 };
