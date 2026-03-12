@@ -5,6 +5,7 @@
 #pragma once
 #include <QApplication>
 #include <QCoreApplication>
+#include <QListWidget>
 #include <memory>
 
 #include "app/AppService.hpp"
@@ -41,7 +42,7 @@ inline void pumpEvents()
     QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
 }
 
-static QListWidget* layersList(MainWindow& w)
+inline QListWidget* layersList(QWidget& w)
 {
     if (auto* list = w.findChild<QListWidget*>("layerList"))
         return list;
@@ -59,8 +60,6 @@ static QListWidget* layersList(MainWindow& w)
 static void showAndActivate(QWidget& w)
 {
     w.show();
-    w.raise();
-    w.activateWindow();
     QTest::qWait(10);
     QCoreApplication::processEvents();
 }

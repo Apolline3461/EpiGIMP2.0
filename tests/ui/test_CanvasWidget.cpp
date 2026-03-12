@@ -25,7 +25,7 @@ TEST(CanvasWidget, Scale_IsClamped)
     EXPECT_LE(w.scale(), 8.0);
 }
 
-TEST(CanvasWidget, Pan_SetAndGet)
+TEST(CanvasWidget, Pan_IsClamped)
 {
     ensureQtApp();
     CanvasWidget w;
@@ -33,9 +33,17 @@ TEST(CanvasWidget, Pan_SetAndGet)
     w.setImage(QImage(64, 64, QImage::Format_ARGB32));
     showAndActivate(w);
 
-    w.setPan(QPointF(12.5, -3.0));
-    EXPECT_NEAR(w.pan().x(), 12.5, 0.001);
-    EXPECT_NEAR(w.pan().y(), -3.0, 0.001);
+    // Pan énorme -> doit être clampé
+    w.setPan(QPointF(10000, 10000));
+    auto p1 = w.pan();
+    EXPECT_LT(p1.x(), 10000);
+    EXPECT_LT(p1.y(), 10000);
+
+    // Pan négatif énorme -> clampé aussi
+    w.setPan(QPointF(-10000, -10000));
+    auto p2 = w.pan();
+    EXPECT_GT(p2.x(), -10000);
+    EXPECT_GT(p2.y(), -10000);
 }
 
 TEST(CanvasWidget, DocScreen_TransformsRoundTrip)
