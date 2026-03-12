@@ -967,7 +967,7 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
     QAction* renameAct = menu.addAction(tr("Renommer"));
     QAction* resizeAct = menu.addAction(tr("Redimensionner calque"));
     QAction* deleteAct = menu.addAction(tr("Supprimer"));
-    QAction* dupAct = menu.addAction(tr("Dupliquer"));
+    QAction const* dupAct = menu.addAction(tr("Dupliquer"));
 
     const bool isBottomLayer = (idx == 0);
     const bool isLockedLayer = layer ? layer->locked() : false;
