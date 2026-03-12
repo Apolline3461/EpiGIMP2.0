@@ -9,6 +9,7 @@ set(EPIGIMP_APP_TEST_SOURCES
         test_Pencil.cpp
         test_Eraser.cpp
         test_StrokeBehavior.cpp
+        test_DuplicateLayer.cpp
 )
 
 add_executable(test_app

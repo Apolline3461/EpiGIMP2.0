@@ -51,4 +51,6 @@ std::unique_ptr<Command> makeResizeLayerCommand(Document* doc, std::uint64_t lay
                                                 const std::shared_ptr<ImageBuffer>& before,
                                                 const std::shared_ptr<ImageBuffer>& after);
 
+std::unique_ptr<Command> makeDuplicateLayerCommand(Document* doc, std::shared_ptr<Layer> duplicated,
+                                                   std::size_t insertAt, std::size_t* activeLayer);
 }  // namespace app::commands
