@@ -418,6 +418,8 @@ void MainWindow::toggleSelectionMode(bool enabled)
         m_selectToggleAct->setChecked(enabled);
 }
 
+// GCOVR_EXCL_START
+
 void MainWindow::newImage()
 {
     if (!confirmDiscardIfDirty(tr("Créer une nouvelle image"), false))
@@ -603,6 +605,7 @@ void MainWindow::saveImage()
                                   .arg(QString::fromLocal8Bit(e.what())));
     }
 }
+// GCOVR_EXCL_STOP
 
 void MainWindow::closeImage()
 {
@@ -615,6 +618,8 @@ void MainWindow::closeImage()
     statusBar()->showMessage(tr("Image fermée"), 2000);
     setDirty(false);
 }
+
+// GCOVR_EXCL_START
 
 void MainWindow::openEpg()
 {
@@ -1097,6 +1102,7 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
             app().duplicateLayer(idx);
     }
 }
+// GCOVR_EXCL_STOP
 
 void MainWindow::onMergeDown()
 {

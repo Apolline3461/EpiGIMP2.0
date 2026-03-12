@@ -3,6 +3,8 @@
 //
 
 #pragma once
+
+#include <QTest>
 #include <QApplication>
 #include <QCoreApplication>
 #include <QListWidget>

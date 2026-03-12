@@ -98,3 +98,10 @@ pre-commit run --all-files
 
 Les releases sont déclenchées par push d’un tag `v*` (ex: `v1.2.0`).
 Plus d’informations : voir la **[documentation release](./docs/releases.md)**.
+
+
+Maintenant, j'aimerais ajouter les fonctionnalités de transformations d'image c'est a dire, rotation, perspectives miroir ce genre de chose. 
+En suivant les règles de mon architecture en couche, où dois-je mettre chaque élément? comment bien les intégrer ?
+Car j'aimerais avoir, quand on fait un clique droit ou gauche, comme la actuellement, ca affiche les actions possible sur le layer et dans ce menu il apparaisse transformation et c'est un sous menu qui contient les transformations possibles et j'aimerais commencer par rotation puis perspective
+
+Pour rotation je veux un truc simple permettant de tourner au sens horaire et anti horaire avec comme centre le centre de l'image/layer
