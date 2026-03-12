@@ -43,6 +43,8 @@ inline void pumpEvents()
 
 static QListWidget* layersList(MainWindow& w)
 {
+    if (auto* list = w.findChild<QListWidget*>("layerList"))
+        return list;
     if (auto* list = w.findChild<QListWidget*>("layersList"))
         return list;
 
