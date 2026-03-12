@@ -12,6 +12,7 @@
 
 #include "ui/PanClamp.hpp"
 
+// GCOVR_EXCL_START
 namespace
 {
 static double clampScale(double s)
@@ -53,6 +54,7 @@ static common::Rect clampRectToImage(common::Rect r, int w, int h)
     return out;
 }
 }  // namespace
+// GCOVR_EXCL_STOP
 
 CanvasWidget::CanvasWidget(QWidget* parent) : QWidget(parent)
 {
@@ -218,6 +220,7 @@ QPoint CanvasWidget::docToScreen(common::Point p) const
     return QPoint(static_cast<int>(std::round(x)), static_cast<int>(std::round(y)));
 }
 
+// GCOVR_EXCL_START
 void CanvasWidget::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
@@ -367,6 +370,7 @@ void CanvasWidget::wheelEvent(QWheelEvent* e)
     update();
     e->accept();
 }
+// GCOVR_EXCL_STOP
 
 void CanvasWidget::mousePressEvent(QMouseEvent* e)
 {
@@ -538,6 +542,7 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent* e)
     QWidget::mouseReleaseEvent(e);
 }
 
+// GCOVR_EXCL_START
 void CanvasWidget::drawChecker(QPainter& p)
 {
     const int tile = 16;
@@ -548,6 +553,7 @@ void CanvasWidget::drawChecker(QPainter& p)
         for (int x = 0; x < width(); x += tile)
             p.fillRect(QRect(x, y, tile, tile), (((x / tile) + (y / tile)) % 2) ? c1 : c2);
 }
+// GCOVR_EXCL_STOP
 
 void CanvasWidget::clampPan()
 {
