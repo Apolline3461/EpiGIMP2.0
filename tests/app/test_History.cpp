@@ -39,12 +39,11 @@ static void applyToLayer(std::shared_ptr<ImageBuffer> img, const std::vector<app
     }
 }
 
-TEST(HistoryTest, UndoRedoPixels)
+TEST(History, UndoRedoPixels)
 {
     // create image and layer
     auto img = std::make_shared<ImageBuffer>(10, 10);
     img->fill(0x00000000);
-    Layer layer(1, "L", img);
 
     History history(128);
 
@@ -93,7 +92,7 @@ TEST(HistoryTest, UndoRedoPixels)
     EXPECT_EQ(img->getPixel(1, 0) & 0xFF, 1u);
 }
 
-TEST(HistoryTest, PushNullptr_NoEffect)
+TEST(History, PushNullptr_NoEffect)
 {
     History h(10);
     EXPECT_FALSE(h.canUndo());
@@ -105,7 +104,7 @@ TEST(HistoryTest, PushNullptr_NoEffect)
     EXPECT_FALSE(h.canRedo());
 }
 
-TEST(HistoryTest, UndoRedo_WhenEmpty_NoOp)
+TEST(History, UndoRedo_WhenEmpty_NoOp)
 {
     History h(10);
 
@@ -122,7 +121,7 @@ TEST(HistoryTest, UndoRedo_WhenEmpty_NoOp)
     EXPECT_FALSE(h.canRedo());
 }
 
-TEST(HistoryTest, Push_ClearsRedoStack)
+TEST(History, Push_ClearsRedoStack)
 {
     History h(10);
 
@@ -148,7 +147,7 @@ TEST(HistoryTest, Push_ClearsRedoStack)
     EXPECT_FALSE(h.canRedo());
 }
 
-TEST(HistoryTest, Clear_EmptiesUndoAndRedo)
+TEST(History, Clear_EmptiesUndoAndRedo)
 {
     History h(10);
 
@@ -172,7 +171,7 @@ TEST(HistoryTest, Clear_EmptiesUndoAndRedo)
     EXPECT_FALSE(h.canRedo());
 }
 
-TEST(HistoryTest, MaxDepth_DropsOldestCommands)
+TEST(History, MaxDepth_DropsOldestCommands)
 {
     History h(3);
 
@@ -203,4 +202,93 @@ TEST(HistoryTest, MaxDepth_DropsOldestCommands)
     // counts: 5 redo calls done before push, +3 redo from redo() calls
     EXPECT_EQ(r, 5 + 3);
     EXPECT_EQ(u, 3);
+}
+
+TEST(History, Redo_WithoutUndo_NoOp)
+{
+    History h(10);
+
+    int u = 0, r = 0;
+    auto cmd = std::make_unique<CounterCommand>(&u, &r);
+    cmd->redo();
+    h.push(std::move(cmd));
+
+    // no undo happened, redo should do nothing
+    EXPECT_FALSE(h.canRedo());
+    h.redo();
+
+    EXPECT_EQ(u, 0);
+    EXPECT_EQ(r, 1); // only the initial redo()
+}
+
+TEST(History, Undo_PastBeginning_NoOp)
+{
+    History h(10);
+
+    int u = 0, r = 0;
+    auto cmd = std::make_unique<CounterCommand>(&u, &r);
+    cmd->redo();
+    h.push(std::move(cmd));
+
+    EXPECT_TRUE(h.canUndo());
+    h.undo();
+    EXPECT_FALSE(h.canUndo());
+
+    // extra undos should do nothing
+    h.undo();
+    h.undo();
+
+    EXPECT_EQ(u, 1);
+    EXPECT_EQ(r, 1);
+}
+
+TEST(History, Redo_PastEnd_NoOp)
+{
+    History h(10);
+
+    int u = 0, r = 0;
+    auto cmd = std::make_unique<CounterCommand>(&u, &r);
+    cmd->redo();
+    h.push(std::move(cmd));
+
+    h.undo();
+    EXPECT_TRUE(h.canRedo());
+
+    h.redo();
+    EXPECT_FALSE(h.canRedo());
+
+    // extra redos should do nothing
+    h.redo();
+    h.redo();
+
+    EXPECT_EQ(u, 1);
+    EXPECT_EQ(r, 2); // initial redo + redo after undo
+}
+
+TEST(History, PushAfterUndo_ClearsRedoAndOldRedoCannotRun)
+{
+    History h(10);
+
+    int uA = 0, rA = 0;
+    auto a = std::make_unique<CounterCommand>(&uA, &rA);
+    a->redo();
+    h.push(std::move(a));
+
+    h.undo(); // now A is redoable
+    EXPECT_TRUE(h.canRedo());
+
+    int uB = 0, rB = 0;
+    auto b = std::make_unique<CounterCommand>(&uB, &rB);
+    b->redo();
+    h.push(std::move(b));
+
+    // redo must be cleared
+    EXPECT_FALSE(h.canRedo());
+
+    // even calling redo should not affect A
+    h.redo();
+    EXPECT_EQ(rA, 1); // A redo called only once (initial)
+    EXPECT_EQ(uA, 1); // A undone once
+    EXPECT_EQ(rB, 1); // B redo called once (initial)
+    EXPECT_EQ(uB, 0);
 }

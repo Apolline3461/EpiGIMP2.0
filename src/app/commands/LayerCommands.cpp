@@ -461,6 +461,53 @@ class ResizeLayerCommand final : public Command
     std::shared_ptr<ImageBuffer> after_;
 };
 
+class DuplicateLayerCommand final : public Command
+{
+   public:
+    DuplicateLayerCommand(Document* doc, std::shared_ptr<Layer> duplicated, std::size_t insertAt,
+                          std::size_t* activeLayer)
+        : doc_(doc),
+          duplicated_(std::move(duplicated)),
+          insertAt_(insertAt),
+          activeLayer_(activeLayer)
+    {
+    }
+
+    void redo() override
+    {
+        if (!doc_ || !duplicated_)
+            return;
+
+        if (findLayerIndexById(*doc_, duplicated_->id()).has_value())
+            return;
+
+        const std::size_t n = doc_->layerCount();
+        const std::size_t at = (insertAt_ > n) ? n : insertAt_;
+        doc_->addLayer(duplicated_, at);
+
+        if (activeLayer_)
+            *activeLayer_ = at;
+    }
+
+    void undo() override
+    {
+        if (!doc_ || !duplicated_)
+            return;
+
+        auto idx = findLayerIndexById(*doc_, duplicated_->id());
+        if (idx.has_value())
+            doc_->removeLayer(*idx);
+
+        clampActiveLayer(activeLayer_, doc_->layerCount());
+    }
+
+   private:
+    Document* doc_{nullptr};
+    std::shared_ptr<Layer> duplicated_;
+    std::size_t insertAt_{0};
+    std::size_t* activeLayer_{nullptr};
+};
+
 }  // namespace
 
 std::unique_ptr<Command> makeAddLayerCommand(Document* doc, std::shared_ptr<Layer> layer,
@@ -524,6 +571,13 @@ std::unique_ptr<Command> makeResizeLayerCommand(Document* doc, std::uint64_t lay
                                                 const std::shared_ptr<ImageBuffer>& after)
 {
     return std::make_unique<ResizeLayerCommand>(doc, layerId, before, after);
+}
+
+std::unique_ptr<Command> makeDuplicateLayerCommand(Document* doc, std::shared_ptr<Layer> duplicated,
+                                                   std::size_t insertAt, std::size_t* activeLayer)
+{
+    return std::make_unique<DuplicateLayerCommand>(doc, std::move(duplicated), insertAt,
+                                                   activeLayer);
 }
 
 }  // namespace app::commands
