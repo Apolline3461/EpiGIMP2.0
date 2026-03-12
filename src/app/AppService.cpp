@@ -11,9 +11,11 @@
 #include "app/commands/CommandUtils.hpp"
 #include "app/commands/LayerCommands.hpp"
 #include "app/commands/PixelCommands.hpp"
+#include "app/commands/SelectionCommands.hpp"
 #include "app/ToolParams.hpp"
 #include "common/Colors.hpp"
 #include "core/BucketFill.hpp"
+#include "core/Compositor.hpp"
 #include "core/Document.hpp"
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
@@ -515,6 +517,167 @@ void AppService::setSelectionRect(Selection::Rect r)
     }
     doc_->selection().addRect(r, std::make_shared<ImageBuffer>(doc_->width(), doc_->height()));
     documentChanged.notify();
+}
+
+void AppService::setSelectionLasso(const std::vector<common::Point>& poly)
+{
+    if (!doc_)
+        throw std::runtime_error("setSelectionLasso: document is null");
+    if (poly.empty())
+    {
+        // clear selection
+        auto before = doc_->selection().mask();
+        apply(commands::makeSetSelectionMaskCommand(doc_.get(), before, nullptr));
+        return;
+    }
+
+    const int w = doc_->width();
+    const int h = doc_->height();
+    auto mask = std::make_shared<ImageBuffer>(w, h);
+    mask->fill(0u);
+
+    // point-in-polygon ray casting
+    auto pointInPoly = [&](double px, double py)
+    {
+        bool inside = false;
+        for (size_t i = 0, j = poly.size() - 1; i < poly.size(); j = i++)
+        {
+            double xi = poly[i].x;
+            double yi = poly[i].y;
+            double xj = poly[j].x;
+            double yj = poly[j].y;
+
+            const bool intersect =
+                ((yi > py) != (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi + 0.0) + xi);
+            if (intersect)
+                inside = !inside;
+        }
+        return inside;
+    };
+
+    for (int y = 0; y < h; ++y)
+    {
+        for (int x = 0; x < w; ++x)
+        {
+            if (pointInPoly(static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5))
+                mask->setPixel(x, y, 0x000000FFu);
+        }
+    }
+
+    auto before = doc_->selection().mask();
+    apply(commands::makeSetSelectionMaskCommand(doc_.get(), before, mask));
+}
+
+bool AppService::copySelection()
+{
+    if (!doc_)
+        throw std::runtime_error("copySelection: document is null");
+
+    const Selection& sel = doc_->selection();
+    if (!sel.hasMask() || !sel.mask())
+        return false;
+
+    const auto bboxOpt = sel.boundingRect();
+    if (!bboxOpt.has_value())
+        return false;
+    const auto bbox = *bboxOpt;
+    if (bbox.w <= 0 || bbox.h <= 0)
+        return false;
+
+    // compose the document region corresponding to bbox
+    ImageBuffer full(bbox.w, bbox.h);
+    Compositor::composeROI(*doc_, bbox.x, bbox.y, bbox.w, bbox.h, full);
+
+    ImageBuffer out(bbox.w, bbox.h);
+    out.fill(common::colors::Transparent);
+
+    auto mask = sel.mask();
+    for (int y = 0; y < bbox.h; ++y)
+    {
+        for (int x = 0; x < bbox.w; ++x)
+        {
+            const int gx = bbox.x + x;
+            const int gy = bbox.y + y;
+            if (gx < 0 || gy < 0 || gx >= mask->width() || gy >= mask->height())
+                continue;
+            const uint32_t mpx = mask->getPixel(gx, gy);
+            if (static_cast<uint8_t>(mpx & 0xFFu) != 0)
+            {
+                out.setPixel(x, y, full.getPixel(x, y));
+            }
+        }
+    }
+
+    addImageLayer(out, "Copie sélection");
+    return true;
+}
+
+void AppService::deleteSelection()
+{
+    if (!doc_)
+        throw std::runtime_error("deleteSelection: document is null");
+
+    const Selection& sel = doc_->selection();
+    if (sel.hasMask() && sel.mask())
+    {
+        const std::size_t activeIdx = static_cast<std::size_t>(activeLayer_);
+        if (activeIdx == 0)
+        {
+            // do not delete background content
+            return;
+        }
+
+        auto layer = doc_->layerAt(static_cast<int>(activeIdx));
+        if (!layer || !layer->image())
+            return;
+        if (layer->locked())
+            throw std::runtime_error("deleteSelection: layer locked");
+
+        auto img = layer->image();
+        const int lw = img->width();
+        const int lh = img->height();
+
+        std::vector<PixelChange> changes;
+        changes.reserve(lw * lh / 8);
+
+        const int offX = layer->offsetX();
+        const int offY = layer->offsetY();
+        for (int y = 0; y < lh; ++y)
+        {
+            for (int x = 0; x < lw; ++x)
+            {
+                const int dx = x + offX;
+                const int dy = y + offY;
+                if (dx < 0 || dy < 0 || dx >= sel.mask()->width() || dy >= sel.mask()->height())
+                    continue;
+                if (sel.mask()->getPixel(dx, dy) == 0u)
+                    continue;
+
+                const std::uint32_t before = img->getPixel(x, y);
+                const std::uint32_t after = common::colors::Transparent;
+                if (before != after)
+                    changes.push_back(PixelChange{x, y, before, after});
+            }
+        }
+
+        if (!changes.empty())
+        {
+            const std::uint64_t layerId = layer->id();
+            apply(commands::makePixelChangesCommand(doc_.get(), layerId, std::move(changes)));
+        }
+
+        // clear selection (undoable)
+        auto beforeMask = sel.mask();
+        apply(commands::makeSetSelectionMaskCommand(doc_.get(), beforeMask, nullptr));
+        return;
+    }
+
+    // no selection mask -> delete entire layer (uses existing logic),
+    // but do not allow deleting the background layer at index 0.
+    const std::size_t idx = activeLayer_;
+    if (idx == 0)
+        return;
+    removeLayer(idx);
 }
 
 void AppService::clearSelectionRect()

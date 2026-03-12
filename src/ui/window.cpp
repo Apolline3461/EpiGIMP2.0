@@ -26,6 +26,7 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QShortcut>
+#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QStandardPaths>
 #include <QStatusBar>
@@ -70,45 +71,15 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
             {
                 if (!app().hasDocument())
                     return;
-                if (poly.empty())
-                    return;
-
-                const int w = app().document().width();
-                const int h = app().document().height();
-                auto mask = std::make_shared<ImageBuffer>(w, h);
-                mask->fill(0u);
-
-                // point-in-polygon ray casting
-                auto pointInPoly = [&](double px, double py)
+                try
                 {
-                    bool inside = false;
-                    for (size_t i = 0, j = poly.size() - 1; i < poly.size(); j = i++)
-                    {
-                        double xi = poly[i].x;
-                        double yi = poly[i].y;
-                        double xj = poly[j].x;
-                        double yj = poly[j].y;
-
-                        const bool intersect = ((yi > py) != (yj > py)) &&
-                                               (px < (xj - xi) * (py - yi) / (yj - yi + 0.0) + xi);
-                        if (intersect)
-                            inside = !inside;
-                    }
-                    return inside;
-                };
-
-                for (int y = 0; y < h; ++y)
-                {
-                    for (int x = 0; x < w; ++x)
-                    {
-                        // test pixel center
-                        if (pointInPoly(static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5))
-                            mask->setPixel(x, y, 0x000000FFu);
-                    }
+                    app().setSelectionLasso(poly);
                 }
-
-                app().document().selection().setMask(mask);
-                app().documentChanged.notify();
+                catch (const std::exception& e)
+                {
+                    if (statusBar())
+                        statusBar()->showMessage(QString::fromStdString(e.what()), 2000);
+                }
             });
 
     connect(canvas_, &CanvasWidget::clickedDoc, this,
@@ -1594,13 +1565,25 @@ void MainWindow::createActions()
                 if (on)
                 {
                     if (m_bucketAct)
+                    {
+                        QSignalBlocker b(m_bucketAct);
                         m_bucketAct->setChecked(false);
+                    }
                     if (m_pickAct)
+                    {
+                        QSignalBlocker b(m_pickAct);
                         m_pickAct->setChecked(false);
+                    }
                     if (m_moveLayerAct)
+                    {
+                        QSignalBlocker b(m_moveLayerAct);
                         m_moveLayerAct->setChecked(false);
+                    }
                     if (m_selectToggleAct)
+                    {
+                        QSignalBlocker b(m_selectToggleAct);
                         m_selectToggleAct->setChecked(false);
+                    }
                 }
             });
 
@@ -1752,63 +1735,18 @@ void MainWindow::createActions()
 
                 const auto& sel = app().document().selection();
                 // If there is a selection mask, delete pixels inside it on the active layer
-                if (sel.hasMask() && sel.mask())
+                try
                 {
-                    const auto mask = sel.mask();
-                    const std::size_t activeIdx = static_cast<std::size_t>(app().activeLayer());
-                    if (activeIdx == 0)
-                    {
-                        // Do not delete background layer content
-                        return;
-                    }
-                    auto layer = app().document().layerAt(activeIdx);
-                    if (!layer || !layer->image() || layer->locked())
-                        return;
-
-                    auto img = layer->image();
-                    const int lw = img->width();
-                    const int lh = img->height();
-
-                    std::vector<app::PixelChange> changes;
-                    changes.reserve(lw * lh / 4);
-
-                    const int offX = layer->offsetX();
-                    const int offY = layer->offsetY();
-                    for (int y = 0; y < lh; ++y)
-                    {
-                        for (int x = 0; x < lw; ++x)
-                        {
-                            const int dx = x + offX;
-                            const int dy = y + offY;
-                            if (dx < 0 || dy < 0 || dx >= mask->width() || dy >= mask->height())
-                                continue;
-                            if (mask->getPixel(dx, dy) == 0u)
-                                continue;
-
-                            const std::uint32_t before = img->getPixel(x, y);
-                            const std::uint32_t after = common::colors::Transparent;
-                            if (before != after)
-                                changes.push_back(app::PixelChange{x, y, before, after});
-                        }
-                    }
-
-                    if (!changes.empty())
-                    {
-                        // Apply changes directly (no undo support here).
-                        for (const auto& c : changes)
-                        {
-                            img->setPixel(c.x, c.y, c.after);
-                        }
-                        app().documentChanged.notify();
-                    }
-
-                    // Clear selection after deletion
-                    app().clearSelectionRect();
+                    app().deleteSelection();
                     if (canvas_)
                         canvas_->clearSelectionRect();
-
-                    return;
                 }
+                catch (const std::exception& e)
+                {
+                    if (statusBar())
+                        statusBar()->showMessage(QString::fromUtf8(e.what()), 2000);
+                }
+                return;
 
                 // Otherwise delete the current layer (same behavior as before)
                 auto idxOpt = currentLayerIndexFromSelection();
@@ -1831,45 +1769,18 @@ void MainWindow::createActions()
             {
                 if (!app().hasDocument())
                     return;
-                const auto& sel = app().document().selection();
-                if (!sel.hasMask() || !sel.mask())
-                    return;
-
-                const auto mask = sel.mask();
-                const auto bboxOpt = sel.boundingRect();
-                if (!bboxOpt.has_value())
-                    return;
-                const auto bbox = *bboxOpt;
-                if (bbox.w <= 0 || bbox.h <= 0)
-                    return;
-
-                // Render full document and copy pixels under selection mask, cropped to bounding rect
-                QImage full = Renderer::render(app().document());
-                ImageBuffer fullBuf =
-                    ImageConversion::qImageToImageBuffer(full, full.width(), full.height());
-
-                ImageBuffer out(bbox.w, bbox.h);
-                out.fill(common::colors::Transparent);
-
-                for (int y = 0; y < bbox.h; ++y)
+                try
                 {
-                    for (int x = 0; x < bbox.w; ++x)
-                    {
-                        const int gx = bbox.x + x;
-                        const int gy = bbox.y + y;
-                        if (gx < 0 || gy < 0 || gx >= fullBuf.width() || gy >= fullBuf.height())
-                            continue;
-                        const uint32_t mpx = mask->getPixel(gx, gy);
-                        if (static_cast<uint8_t>(mpx & 0xFFu) != 0)
-                        {
-                            out.setPixel(x, y, fullBuf.getPixel(gx, gy));
-                        }
-                    }
+                    const bool copied = app().copySelection();
+                    if (copied && statusBar())
+                        statusBar()->showMessage(tr("Sélection copiée dans un nouveau calque"),
+                                                 2000);
                 }
-
-                app().addImageLayer(out, "Copie sélection");
-                if (statusBar())
-                    statusBar()->showMessage(tr("Sélection copiée dans un nouveau calque"), 2000);
+                catch (const std::exception& e)
+                {
+                    if (statusBar())
+                        statusBar()->showMessage(QString::fromUtf8(e.what()), 2000);
+                }
             });
     addAction(m_copySelectionAct);
 
@@ -2171,6 +2082,8 @@ void MainWindow::createToolBar()
     if (m_lassoAct)
     {
         m_lassoAct->setToolTip(tr("Sélection lasso"));
+        m_lassoAct->setCheckable(true);
+        m_toolsGroup->addAction(m_lassoAct);
         m_toolsTb->addAction(m_lassoAct);
     }
 

@@ -5,6 +5,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "app/History.hpp"
 #include "app/Signal.h"
@@ -94,6 +95,9 @@ class AppService
 
     const Selection& selection() const;
     void setSelectionRect(common::Rect r);
+    void setSelectionLasso(const std::vector<common::Point>& poly);
+    bool copySelection();
+    void deleteSelection();
     void clearSelectionRect();
 
     void bucketFill(common::Point p, std::uint32_t rgba);
