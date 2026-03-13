@@ -5,6 +5,7 @@ set(EPIGIMP_CORE_TEST_SOURCES
         test_Compositor.cpp
         test_BucketFill.cpp
         test_BucketFill_benchmark.cpp
+        test_TransformRotate.cpp
 )
 
 add_executable(test_core

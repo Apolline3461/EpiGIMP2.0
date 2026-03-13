@@ -3,6 +3,7 @@
 #include <QAction>
 #include <QCloseEvent>
 #include <QColor>
+#include <QDial>
 #include <QDockWidget>
 #include <QEvent>
 #include <QImage>
@@ -87,9 +88,6 @@ class MainWindow : public QMainWindow
     {
         return svc_;
     }
-
-    CanvasWidget* canvas_{nullptr};
-
     void syncStrokeToolState();
     void refreshUIAfterDocChange();
     void updateLayerOverlayFromSelection();
@@ -117,7 +115,12 @@ class MainWindow : public QMainWindow
 
     QString formatActionShortcut(const QAction* a) const;
 
+    void showRotateLayerPopup(std::size_t idx, const QPoint& globalPos);
+    void closeRotateLayerPopup();
+
     // Membres internes
+    CanvasWidget* canvas_{nullptr};
+
     QString m_currentFileName;
 
     QMenu* m_fileMenu{nullptr};
@@ -199,6 +202,13 @@ class MainWindow : public QMainWindow
     QAction* m_layerUpAct{nullptr};
     QAction* m_layerDownAct{nullptr};
     QAction* m_layerDuplicateAct{nullptr};
+
+    // tranform
+    QWidget* m_rotatePopup{nullptr};
+    QSpinBox* m_rotateSpin{nullptr};
+    QLabel* m_rotateValueLbl{nullptr};
+    std::optional<std::size_t> m_rotateTargetIdx{};
+    int m_rotateLastDeg{0};
 
     bool m_dirty{false};
 

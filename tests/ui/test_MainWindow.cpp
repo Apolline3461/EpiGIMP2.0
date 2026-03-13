@@ -1,14 +1,17 @@
 #include <QAction>
+#include <QPushButton>
 #include <QTest>
-#include <QToolButton>
+#include <QSpinBox>
+#include <gtest/gtest.h>
+
+#define private public
+#include "ui/window.hpp"
+#undef private
 
 #include "ui/CanvasWidget.hpp"
-#include "ui/window.hpp"
 #include "ui_test_helpers.hpp"
-
 #include <core/ImageBuffer.hpp>
 #include <core/Layer.hpp>
-#include <gtest/gtest.h>
 
 using namespace ui_test;
 
@@ -346,4 +349,98 @@ TEST(UI_Zoom, ResetZoom_SetsScaleTo1)
     pumpEvents();
 
     EXPECT_NEAR(c->scale(), 1.0, 1e-9);
+}
+
+static QWidget* findTopLevelByObjectName(const QString& name)
+{
+    for (QWidget* w : QApplication::topLevelWidgets())
+    {
+        if (!w) continue;
+        if (w->objectName() == name)
+            return w;
+    }
+    return nullptr;
+}
+
+TEST(UI_RotatePopup, OpensAndAppliesRotation)
+{
+    ensureQtApp();
+    auto svc = makeService();
+    MainWindow w(*svc);
+    showAndActivate(w);
+
+    svc->newDocument({32, 32}, 72.f, common::colors::Transparent);
+
+    // Ajoute un layer (idx=1)
+    app::LayerSpec spec{};
+    spec.name = "L1";
+    spec.visible = true;
+    spec.locked = false;
+    spec.opacity = 1.f;
+    spec.color = common::colors::Transparent;
+    svc->addLayer(spec);
+    pumpEvents();
+
+    // Sélectionne L1 dans la liste (row 0 = top = idx 1)
+    auto* list = layersList(w);
+    ASSERT_NE(list, nullptr);
+    list->setCurrentRow(0);
+    pumpEvents();
+
+    // Ouvre popup rotation
+    w.showRotateLayerPopup(1, w.mapToGlobal(QPoint(50, 50)));
+    pumpEvents();
+    // activePopupWidget peut être null selon plateforme, donc on cherche par objectName
+    auto* rotatePopup = findTopLevelByObjectName("popup.rotateLayer");
+    ASSERT_NE(rotatePopup, nullptr);
+
+    auto* spin = rotatePopup->findChild<QSpinBox*>("spin.rotate.deg");
+    ASSERT_NE(spin, nullptr);
+
+    auto* apply = rotatePopup->findChild<QPushButton*>("btn.rotate.apply");
+    ASSERT_NE(apply, nullptr);
+
+    // Change angle + appliquer
+    spin->setValue(45);
+    pumpEvents();
+    QTest::mouseClick(apply, Qt::LeftButton);
+    pumpEvents();
+
+    // Vérifie qu'il y a eu changement (au minimum dirty true)
+    EXPECT_TRUE(svc->isDirty());
+
+    // Ferme popup
+    auto* closeBtn = rotatePopup->findChild<QPushButton*>("btn.rotate.close");
+    ASSERT_NE(closeBtn, nullptr);
+    QTest::mouseClick(closeBtn, Qt::LeftButton);
+    pumpEvents();
+
+    EXPECT_EQ(QApplication::instance()->findChild<QWidget*>("popup.rotateLayer"), nullptr);
+}
+
+TEST(UI_RotatePopup, LockedLayerDoesNotOpen)
+{
+    ensureQtApp();
+    auto svc = makeService();
+    MainWindow w(*svc);
+    showAndActivate(w);
+
+    svc->newDocument({32, 32}, 72.f, common::colors::Transparent);
+
+    app::LayerSpec spec{};
+    spec.name = "L1";
+    spec.locked = false;
+    spec.color = common::colors::Transparent;
+    svc->addLayer(spec);
+    pumpEvents();
+
+    // lock idx=1
+    svc->setLayerLocked(1, true);
+    pumpEvents();
+
+    w.showRotateLayerPopup(1, w.mapToGlobal(QPoint(20, 20)));
+    pumpEvents();
+
+    auto* rotatePopup = findTopLevelByObjectName("popup.rotateLayer");
+    EXPECT_EQ(rotatePopup, nullptr);
 }

@@ -10,6 +10,7 @@ set(EPIGIMP_APP_TEST_SOURCES
         test_Eraser.cpp
         test_StrokeBehavior.cpp
         test_DuplicateLayer.cpp
+        test_RotateLayer.cpp
 )
 
 add_executable(test_app

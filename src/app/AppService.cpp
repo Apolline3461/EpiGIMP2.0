@@ -18,6 +18,8 @@
 #include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 
+#include <core/Transform.hpp>
+
 namespace app
 {
 
@@ -644,6 +646,45 @@ void AppService::bucketFill(common::Point p, std::uint32_t rgba)
 
     const std::uint64_t layerId = layer->id();
     apply(commands::makePixelChangesCommand(doc_.get(), layerId, std::move(changes)));
+}
+
+void AppService::rotateLayer(std::size_t idx, float angle)
+{
+    if (!doc_)
+        throw std::runtime_error("rotateLayer: document is null");
+    const auto n = doc_->layerCount();
+    if (idx >= n)
+        throw std::runtime_error("rotateLayer: index out of range");
+
+    auto layer = doc_->layerAt(idx);
+    if (!layer || !layer->image())
+        throw std::runtime_error("rotateLayer: layer is null");
+    if (layer->locked())
+        throw std::runtime_error("rotateLayer: layer locked");
+
+    const auto layerId = layer->id();
+
+    const int oldW = layer->image()->width();
+    const int oldH = layer->image()->height();
+    const common::Point beforeOff{layer->offsetX(), layer->offsetY()};
+
+    auto before = std::make_shared<ImageBuffer>(*layer->image());
+
+    // IMPORTANT: positif = horaire => on inverse le signe car la rotation math est CCW
+    auto after = core::rotate(*before, -angle, common::colors::Transparent);
+    if (!after)
+        throw std::runtime_error("rotateLayer: rotation failed");
+
+    const int newW = after->width();
+    const int newH = after->height();
+
+    // garder le centre au même endroit
+    const int dx = (oldW - newW) / 2;
+    const int dy = (oldH - newH) / 2;
+    const common::Point afterOff{beforeOff.x + dx, beforeOff.y + dy};
+
+    apply(app::commands::makeRotateLayerCommand(doc_.get(), layerId, before, after, beforeOff,
+                                                afterOff));
 }
 
 void AppService::undo()

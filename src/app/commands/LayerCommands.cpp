@@ -12,7 +12,7 @@
 #include "common/Geometry.hpp"
 #include "core/Document.hpp"
 #include "core/Layer.hpp"
-// #include "core/ImageBuffer.hpp"
+#include "core/Transform.hpp"
 
 namespace app::commands
 {
@@ -508,6 +508,52 @@ class DuplicateLayerCommand final : public Command
     std::size_t* activeLayer_{nullptr};
 };
 
+class RotateLayerCommand final : public Command
+{
+   public:
+    RotateLayerCommand(Document* doc, std::uint64_t layerId, std::shared_ptr<ImageBuffer> before,
+                       std::shared_ptr<ImageBuffer> after, common::Point beforeOffset,
+                       common::Point afterOffset)
+        : doc_(doc),
+          layerId_(layerId),
+          before_(std::move(before)),
+          after_(std::move(after)),
+          beforeOffset_(beforeOffset),
+          afterOffset_(afterOffset)
+    {
+    }
+
+    void redo() override
+    {
+        set(after_, afterOffset_);
+    }
+    void undo() override
+    {
+        set(before_, beforeOffset_);
+    }
+
+   private:
+    void set(const std::shared_ptr<ImageBuffer>& img, common::Point offset) const
+    {
+        if (!doc_ || !img)
+            return;
+        auto idx = findLayerIndexById(*doc_, layerId_);
+        if (!idx)
+            return;
+        auto layer = doc_->layerAt(*idx);
+        if (!layer)
+            return;
+        layer->setImageBuffer(img);
+        layer->setOffset(offset.x, offset.y);
+    }
+    Document* doc_{nullptr};
+    std::uint64_t layerId_{0};
+    std::shared_ptr<ImageBuffer> before_;
+    std::shared_ptr<ImageBuffer> after_;
+    common::Point beforeOffset_;
+    common::Point afterOffset_;
+};
+
 }  // namespace
 
 std::unique_ptr<Command> makeAddLayerCommand(Document* doc, std::shared_ptr<Layer> layer,
@@ -578,6 +624,15 @@ std::unique_ptr<Command> makeDuplicateLayerCommand(Document* doc, std::shared_pt
 {
     return std::make_unique<DuplicateLayerCommand>(doc, std::move(duplicated), insertAt,
                                                    activeLayer);
+}
+std::unique_ptr<Command> makeRotateLayerCommand(Document* doc, std::uint64_t layerId,
+                                                const std::shared_ptr<ImageBuffer>& before,
+                                                const std::shared_ptr<ImageBuffer>& after,
+                                                common::Point beforeOffset,
+                                                common::Point afterOffset)
+{
+    return std::make_unique<RotateLayerCommand>(doc, layerId, before, after, beforeOffset,
+                                                afterOffset);
 }
 
 }  // namespace app::commands
