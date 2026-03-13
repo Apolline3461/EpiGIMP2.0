@@ -26,6 +26,8 @@
 #include <QPalette>
 #include <QPixmap>
 #include <QPushButton>
+#include <QShortcut>
+#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QStandardPaths>
 #include <QStatusBar>
@@ -33,9 +35,12 @@
 #include <QToolBar>
 #include <QVBoxLayout>
 
+#include "app/Command.hpp"
 #include "app/commands/CommandUtils.hpp"
+#include "app/commands/PixelCommands.hpp"
 #include "common/Geometry.hpp"
 #include "core/Document.hpp"
+#include "core/ImageBuffer.hpp"
 #include "core/Layer.hpp"
 #include "ui/CanvasWidget.hpp"
 #include "ui/ImageConversion.hpp"
@@ -61,6 +66,22 @@ MainWindow::MainWindow(app::AppService& svc, QWidget* parent) : QMainWindow(pare
 
     connect(canvas_, &CanvasWidget::selectionFinishedDoc, this,
             [this](common::Rect r) { app().setSelectionRect(r); });
+
+    connect(canvas_, &CanvasWidget::selectionFinishedPoly, this,
+            [this](const std::vector<common::Point>& poly)
+            {
+                if (!app().hasDocument())
+                    return;
+                try
+                {
+                    app().setSelectionLasso(poly);
+                }
+                catch (const std::exception& e)
+                {
+                    if (statusBar())
+                        statusBar()->showMessage(QString::fromStdString(e.what()), 2000);
+                }
+            });
 
     connect(canvas_, &CanvasWidget::clickedDoc, this,
             [this](common::Point p)
@@ -406,6 +427,9 @@ void MainWindow::toggleSelectionMode(bool enabled)
             m_pencilAct->setChecked(false);
         if (m_eraseAct)
             m_eraseAct->setChecked(false);
+
+        if (m_lassoAct)
+            m_lassoAct->setChecked(false);
 
         m_bucketMode = false;
         m_pickMode = false;
@@ -1179,6 +1203,8 @@ void MainWindow::refreshUIAfterDocChange()
         m_pickAct->setEnabled(hasDoc && editable);
     if (m_selectToggleAct)
         m_selectToggleAct->setEnabled(hasDoc && editable);
+    if (m_lassoAct)
+        m_lassoAct->setEnabled(hasDoc && editable);
     if (m_clearSelectionAct)
         m_clearSelectionAct->setEnabled(hasDoc && editable);
     if (m_colorPickerAct)
@@ -1212,6 +1238,8 @@ void MainWindow::refreshUIAfterDocChange()
             m_pickAct->setChecked(false);
         if (m_selectToggleAct)
             m_selectToggleAct->setChecked(false);
+        if (m_lassoAct)
+            m_lassoAct->setChecked(false);
         if (m_eraseAct)
             syncStrokeToolState();
 
@@ -1227,8 +1255,19 @@ void MainWindow::refreshUIAfterDocChange()
         populateLayersList();
 
         const auto& sel = app().document().selection();
-        canvas_->setSelectionRectOverlay(sel.hasMask() ? std::optional(sel.boundingRect())
-                                                       : std::nullopt);
+        if (sel.hasMask())
+        {
+            if (sel.mask())
+                canvas_->setSelectionMaskOverlay(sel.mask());
+            else
+                canvas_->setSelectionMaskOverlay(nullptr);
+            canvas_->setSelectionRectOverlay(std::nullopt);
+        }
+        else
+        {
+            canvas_->setSelectionMaskOverlay(nullptr);
+            canvas_->setSelectionRectOverlay(std::nullopt);
+        }
 
         if (m_pendingSelectLayerId_)
         {
@@ -1311,6 +1350,8 @@ void MainWindow::clearUiStateOnClose()
         m_pickAct->setChecked(false);
     if (m_selectToggleAct)
         m_selectToggleAct->setChecked(false);
+    if (m_lassoAct)
+        m_lassoAct->setChecked(false);
     if (m_moveLayerAct)
         m_moveLayerAct->setChecked(false);
     if (m_pencilAct)
@@ -1436,6 +1477,8 @@ void MainWindow::createActions()
                     m_pickAct->setChecked(false);
                 if (m_selectToggleAct)
                     m_selectToggleAct->setChecked(false);
+                if (m_lassoAct)
+                    m_lassoAct->setChecked(false);
 
                 m_bucketMode = false;
                 m_pickMode = false;
@@ -1516,6 +1559,8 @@ void MainWindow::createActions()
                         m_pickAct->setChecked(false);
                     if (m_selectToggleAct)
                         m_selectToggleAct->setChecked(false);
+                    if (m_lassoAct)
+                        m_lassoAct->setChecked(false);
                     if (m_eraseAct)
                         m_eraseAct->setChecked(false);
                     if (m_eraseDock)
@@ -1525,6 +1570,45 @@ void MainWindow::createActions()
                 }
             });
     m_colorPickerAct->setObjectName("act.colorPick");
+
+    m_lassoAct = new QAction(tr("Lasso"), this);
+    m_lassoAct->setCheckable(true);
+    m_lassoAct->setIcon(QIcon(":/icons/selection.svg"));
+    m_lassoAct->setShortcut(QKeySequence(QStringLiteral("L")));
+    m_lassoAct->setStatusTip(tr("Sélection lasso"));
+    m_lassoAct->setObjectName("act.lasso");
+    connect(m_lassoAct, &QAction::toggled, this,
+            [this](bool on)
+            {
+                if (canvas_)
+                {
+                    canvas_->setSelectionEnable(on);
+                    canvas_->setLassoEnable(on);
+                }
+                if (on)
+                {
+                    if (m_bucketAct)
+                    {
+                        QSignalBlocker b(m_bucketAct);
+                        m_bucketAct->setChecked(false);
+                    }
+                    if (m_pickAct)
+                    {
+                        QSignalBlocker b(m_pickAct);
+                        m_pickAct->setChecked(false);
+                    }
+                    if (m_moveLayerAct)
+                    {
+                        QSignalBlocker b(m_moveLayerAct);
+                        m_moveLayerAct->setChecked(false);
+                    }
+                    if (m_selectToggleAct)
+                    {
+                        QSignalBlocker b(m_selectToggleAct);
+                        m_selectToggleAct->setChecked(false);
+                    }
+                }
+            });
 
     /* Zoom actions */
     m_zoomInAct = new QAction(tr("Zoom &Avant"), this);
@@ -1585,8 +1669,6 @@ void MainWindow::createActions()
     m_clearSelectionAct = new QAction(tr("Effacer sélection"), this);
     connect(m_clearSelectionAct, &QAction::triggered, this, &MainWindow::clearSelection);
     m_clearSelectionAct->setObjectName("act.clearSelection");
-    m_clearSelectionAct->setShortcut(QKeySequence(
-        Qt::Key_Escape));  // tu as déjà escClearAct, mais c'est mieux si l’action porte aussi le raccourci
 
     m_bucketAct = new QAction(tr("Pot de peinture"), this);
     m_bucketAct->setCheckable(true);
@@ -1633,6 +1715,8 @@ void MainWindow::createActions()
                         m_pickAct->setChecked(false);
                     if (m_selectToggleAct)
                         m_selectToggleAct->setChecked(false);
+                    if (m_lassoAct)
+                        m_lassoAct->setChecked(false);
                     if (m_pencilAct)
                         m_pencilAct->setChecked(false);
                     if (m_pencilDock)
@@ -1671,6 +1755,23 @@ void MainWindow::createActions()
             {
                 if (!app().hasDocument())
                     return;
+
+                const auto& sel = app().document().selection();
+                // If there is a selection mask, delete pixels inside it on the active layer
+                try
+                {
+                    app().deleteSelection();
+                    if (canvas_)
+                        canvas_->clearSelectionRect();
+                }
+                catch (const std::exception& e)
+                {
+                    if (statusBar())
+                        statusBar()->showMessage(QString::fromUtf8(e.what()), 2000);
+                }
+                return;
+
+                // Otherwise delete the current layer (same behavior as before)
                 auto idxOpt = currentLayerIndexFromSelection();
                 if (!idxOpt || *idxOpt == 0)
                     return;
@@ -1680,6 +1781,31 @@ void MainWindow::createActions()
                 app().removeLayer(*idxOpt);
             });
     addAction(m_layerDeleteAct);
+
+    // Copy selection to new layer (Ctrl+C)
+    m_copySelectionAct = new QAction(tr("Copier la sélection"), this);
+    m_copySelectionAct->setShortcut(QKeySequence::Copy);
+    m_copySelectionAct->setShortcutContext(Qt::ApplicationShortcut);
+    m_copySelectionAct->setObjectName("copySelectionAct");
+    connect(m_copySelectionAct, &QAction::triggered, this,
+            [this]()
+            {
+                if (!app().hasDocument())
+                    return;
+                try
+                {
+                    const bool copied = app().copySelection();
+                    if (copied && statusBar())
+                        statusBar()->showMessage(tr("Sélection copiée dans un nouveau calque"),
+                                                 2000);
+                }
+                catch (const std::exception& e)
+                {
+                    if (statusBar())
+                        statusBar()->showMessage(QString::fromUtf8(e.what()), 2000);
+                }
+            });
+    addAction(m_copySelectionAct);
 
     // Rename layer
     m_layerRenameAct = new QAction(tr("Renommer le calque"), this);
@@ -1995,6 +2121,15 @@ void MainWindow::createToolBar()
 
         m_toolsGroup->addAction(m_selectToggleAct);
         m_toolsTb->addAction(m_selectToggleAct);
+    }
+
+    // --- Lasso tool
+    if (m_lassoAct)
+    {
+        m_lassoAct->setToolTip(tr("Sélection lasso"));
+        m_lassoAct->setCheckable(true);
+        m_toolsGroup->addAction(m_lassoAct);
+        m_toolsTb->addAction(m_lassoAct);
     }
 
     // --- Clear selection (not a tool)
