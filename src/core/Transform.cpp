@@ -10,7 +10,8 @@ namespace core
 {
 static inline double degToRad(double deg)
 {
-    return deg * M_PI / 180.0;
+    static constexpr double kPi = 3.141592653589793238462643383279502884;
+    return deg * kPi / 180.0;
 }
 
 static inline float normDeg(float deg)
