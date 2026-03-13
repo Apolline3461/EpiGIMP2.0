@@ -18,6 +18,36 @@
 
 using namespace ui_test;
 
+TEST(MainWindow_Shortcuts, CopySelection_AddsLayer_NoPopup)
+{
+    ensureQtApp();
+    auto svc = makeService();
+    MainWindow w(*svc);
+
+    svc->newDocument({32, 32}, 72.f);
+
+    // create a selection
+    svc->setSelectionRect({1, 1, 4, 4});
+
+    auto* actCopy = w.findChild<QAction*>("copySelectionAct");
+    ASSERT_NE(actCopy, nullptr);
+
+    const int before = static_cast<int>(svc->document().layerCount());
+    actCopy->trigger();
+    const int after = static_cast<int>(svc->document().layerCount());
+    EXPECT_EQ(after, before + 1);
+
+    // Ensure no modal QDialog is currently visible
+    const auto widgets = QApplication::topLevelWidgets();
+    for (QWidget* wgt : widgets)
+    {
+        auto* dlg = qobject_cast<QDialog*>(wgt);
+        if (!dlg)
+            continue;
+        EXPECT_FALSE(dlg->isVisible()) << "Unexpected visible dialog opened by shortcut";
+    }
+}
+
 static QAction* findAction(MainWindow& w, const char* name)
 {
     auto* a = w.findChild<QAction*>(name);
@@ -31,17 +61,20 @@ TEST(UI_Shortcuts, CtrlSlash_TriggersHelpDialogAndCloses)
     MainWindow w(*svc);
 
     // Auto-ferme le dialog modal dès qu'il apparaît
-    QTimer::singleShot(0, []() {
-        if (auto* dlg = qobject_cast<QDialog*>(QApplication::activeModalWidget()))
-            dlg->accept();
-    });
+    QTimer::singleShot(
+        0,
+        []()
+        {
+            if (auto* dlg = qobject_cast<QDialog*>(QApplication::activeModalWidget()))
+                dlg->accept();
+        });
 
     auto* helpAct = findAction(w, "act.shortcutsHelp");
     ASSERT_NE(helpAct, nullptr);
 
     // Envoie Ctrl+/ au niveau app (ApplicationShortcut)
-    QTest::keyClick(QApplication::focusWidget() ? QApplication::focusWidget() : &w,
-                    Qt::Key_Slash, Qt::ControlModifier);
+    QTest::keyClick(QApplication::focusWidget() ? QApplication::focusWidget() : &w, Qt::Key_Slash,
+                    Qt::ControlModifier);
 
     pumpEvents();
 
@@ -55,10 +88,13 @@ TEST(UI_Shortcuts, F1_TriggersHelpDialogAndCloses)
     auto svc = makeService();
     MainWindow w(*svc);
 
-    QTimer::singleShot(0, []() {
-        if (auto* dlg = qobject_cast<QDialog*>(QApplication::activeModalWidget()))
-            dlg->accept();
-    });
+    QTimer::singleShot(
+        0,
+        []()
+        {
+            if (auto* dlg = qobject_cast<QDialog*>(QApplication::activeModalWidget()))
+                dlg->accept();
+        });
 
     auto* helpAct = findAction(w, "act.shortcutsHelp");
     ASSERT_NE(helpAct, nullptr);
@@ -86,21 +122,23 @@ TEST(UI_HelpDialog, ContainsSomeKnownShortcuts)
     ASSERT_NE(helpAct, nullptr);
 
     // On ouvre via trigger direct (pas le clavier) pour tester le contenu
-    QTimer::singleShot(0, [](){
-        auto* dlg = qobject_cast<QDialog*>(QApplication::activeModalWidget());
-        ASSERT_NE(dlg, nullptr);
+    QTimer::singleShot(0,
+                       []()
+                       {
+                           auto* dlg = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+                           ASSERT_NE(dlg, nullptr);
 
-        auto* te = dlg->findChild<QTextEdit*>();
-        ASSERT_NE(te, nullptr);
+                           auto* te = dlg->findChild<QTextEdit*>();
+                           ASSERT_NE(te, nullptr);
 
-        const QString txt = te->toPlainText();
+                           const QString txt = te->toPlainText();
 
-        EXPECT_TRUE(txt.contains("FICHIER") || txt.contains("Fichier"));
-        EXPECT_TRUE(txt.contains("Outils") || txt.contains("OUTILS"));
-        EXPECT_TRUE(txt.contains("Pinceau"));
+                           EXPECT_TRUE(txt.contains("FICHIER") || txt.contains("Fichier"));
+                           EXPECT_TRUE(txt.contains("Outils") || txt.contains("OUTILS"));
+                           EXPECT_TRUE(txt.contains("Pinceau"));
 
-        dlg->accept();
-    });
+                           dlg->accept();
+                       });
 
     helpAct->trigger();
     QCoreApplication::processEvents();
@@ -116,7 +154,11 @@ TEST(UI_LayersShortcuts, CtrlL_TogglesLockOnSelectedLayer)
 
     svc->newDocument({64, 64}, 72.f);
     app::LayerSpec spec{};
-    spec.name="L1"; spec.visible=true; spec.locked=false; spec.opacity=1.f; spec.color=0u;
+    spec.name = "L1";
+    spec.visible = true;
+    spec.locked = false;
+    spec.opacity = 1.f;
+    spec.color = 0u;
     svc->addLayer(spec);
     QCoreApplication::processEvents();
 
@@ -145,7 +187,11 @@ TEST(UI_LayersShortcuts, CtrlH_TogglesVisibilityOnSelectedLayer)
 
     svc->newDocument({64, 64}, 72.f);
     app::LayerSpec spec{};
-    spec.name="L1"; spec.visible=true; spec.locked=false; spec.opacity=1.f; spec.color=0u;
+    spec.name = "L1";
+    spec.visible = true;
+    spec.locked = false;
+    spec.opacity = 1.f;
+    spec.color = 0u;
     svc->addLayer(spec);
     QCoreApplication::processEvents();
 
@@ -172,7 +218,11 @@ TEST(UI_LayersShortcuts, Delete_RemovesSelectedLayerIfUnlocked)
 
     svc->newDocument({64, 64}, 72.f);
     app::LayerSpec spec{};
-    spec.name="L1"; spec.visible=true; spec.locked=false; spec.opacity=1.f; spec.color=0u;
+    spec.name = "L1";
+    spec.visible = true;
+    spec.locked = false;
+    spec.opacity = 1.f;
+    spec.color = 0u;
     svc->addLayer(spec);
     QCoreApplication::processEvents();
 
@@ -200,9 +250,13 @@ TEST(UI_LayersShortcuts, CtrlE_MergeDown_ReducesLayerCount)
     svc->newDocument({64, 64}, 72.f);
 
     app::LayerSpec spec{};
-    spec.name="L1"; spec.visible=true; spec.locked=false; spec.opacity=1.f; spec.color=0u;
+    spec.name = "L1";
+    spec.visible = true;
+    spec.locked = false;
+    spec.opacity = 1.f;
+    spec.color = 0u;
     svc->addLayer(spec);
-    spec.name="L2";
+    spec.name = "L2";
     svc->addLayer(spec);
 
     QCoreApplication::processEvents();
@@ -211,7 +265,7 @@ TEST(UI_LayersShortcuts, CtrlE_MergeDown_ReducesLayerCount)
 
     auto* list = layersList(w);
     ASSERT_NE(list, nullptr);
-    list->setCurrentRow(0); // top layer
+    list->setCurrentRow(0);  // top layer
     QCoreApplication::processEvents();
 
     QTest::keyClick(&w, Qt::Key_E, Qt::ControlModifier);

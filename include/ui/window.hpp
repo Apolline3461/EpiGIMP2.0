@@ -153,6 +153,7 @@ class MainWindow : public QMainWindow
 
     QAction* m_clearSelectionAct{nullptr};
     QAction* m_selectToggleAct{nullptr};
+    QAction* m_lassoAct{nullptr};
 
     bool m_bucketMode{false};
     bool m_pickMode{false};
@@ -164,6 +165,7 @@ class MainWindow : public QMainWindow
     QAction* m_moveLayerAct{nullptr};
     QAction* m_layerMergeDownAct{nullptr};
     QAction* m_layerDeleteAct{nullptr};
+    QAction* m_copySelectionAct{nullptr};
     QAction* m_layerRenameAct{nullptr};
     QAction* m_layerToggleLockAct{nullptr};
     QAction* m_layerToggleVisibleAct{nullptr};
