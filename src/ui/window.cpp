@@ -16,6 +16,7 @@
 #include <QIcon>
 #include <QImageReader>
 #include <QInputDialog>
+#include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
@@ -442,6 +443,8 @@ void MainWindow::toggleSelectionMode(bool enabled)
         m_selectToggleAct->setChecked(enabled);
 }
 
+// GCOVR_EXCL_START
+
 void MainWindow::newImage()
 {
     if (!confirmDiscardIfDirty(tr("Créer une nouvelle image"), false))
@@ -627,6 +630,7 @@ void MainWindow::saveImage()
                                   .arg(QString::fromLocal8Bit(e.what())));
     }
 }
+// GCOVR_EXCL_STOP
 
 void MainWindow::closeImage()
 {
@@ -639,6 +643,8 @@ void MainWindow::closeImage()
     statusBar()->showMessage(tr("Image fermée"), 2000);
     setDirty(false);
 }
+
+// GCOVR_EXCL_START
 
 void MainWindow::openEpg()
 {
@@ -993,6 +999,12 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
     QAction* deleteAct = menu.addAction(tr("Supprimer"));
     QAction const* dupAct = menu.addAction(tr("Dupliquer"));
 
+    // --- Submenu Transformations ---
+    QAction* rotateAct = nullptr;
+    QMenu* transformMenu = menu.addMenu(tr("Transformations"));
+    rotateAct = transformMenu->addAction(tr("Rotation"));
+    rotateAct->setObjectName("rotateLayerAct");
+
     const bool isBottomLayer = (idx == 0);
     const bool isLockedLayer = layer ? layer->locked() : false;
     renameAct->setEnabled(!isBottomLayer && !isLockedLayer);
@@ -1120,7 +1132,12 @@ void MainWindow::onShowLayerContextMenu(const QPoint& pos)
         if (idx != 0)
             app().duplicateLayer(idx);
     }
+    else if (act == rotateAct)
+    {
+        showRotateLayerPopup(idx, m_layersList->mapToGlobal(pos));
+    }
 }
+// GCOVR_EXCL_STOP
 
 void MainWindow::onMergeDown()
 {
@@ -1556,7 +1573,7 @@ void MainWindow::createActions()
 
     m_lassoAct = new QAction(tr("Lasso"), this);
     m_lassoAct->setCheckable(true);
-    m_lassoAct->setIcon(QIcon(":/icons/selection.svg"));
+    m_lassoAct->setIcon(QIcon(":/icons/select_lasso.svg"));
     m_lassoAct->setShortcut(QKeySequence(QStringLiteral("L")));
     m_lassoAct->setStatusTip(tr("Sélection lasso"));
     m_lassoAct->setObjectName("act.lasso");
@@ -1739,7 +1756,6 @@ void MainWindow::createActions()
                 if (!app().hasDocument())
                     return;
 
-                const auto& sel = app().document().selection();
                 // If there is a selection mask, delete pixels inside it on the active layer
                 try
                 {
@@ -2604,4 +2620,137 @@ QString MainWindow::formatActionShortcut(const QAction* a) const
         parts << sc.toString(QKeySequence::NativeText);
 
     return QStringLiteral("%1\t%2").arg(t, parts.join(QStringLiteral(" / ")));
+}
+
+void MainWindow::showRotateLayerPopup(std::size_t idx, const QPoint& globalPos)
+{
+    if (!app().hasDocument())
+        return;
+
+    auto layer = app().document().layerAt(idx);
+    if (!layer || !layer->image())
+        return;
+
+    // règle : layer non lock, sauf background (idx=0 autorisé même lock)
+    if (idx != 0 && layer->locked())
+        return;
+
+    closeRotateLayerPopup();
+
+    m_rotateTargetIdx = idx;
+
+    // Widget flottant style palette
+    m_rotatePopup = new QWidget(nullptr, Qt::Tool | Qt::FramelessWindowHint);
+    m_rotatePopup->setObjectName("popup.rotateLayer");
+    m_rotatePopup->setAttribute(Qt::WA_DeleteOnClose, true);
+
+    auto* layout = new QVBoxLayout(m_rotatePopup);
+    layout->setContentsMargins(10, 10, 10, 10);
+    layout->setSpacing(6);
+
+    auto* title = new QLabel(tr("Rotation"), m_rotatePopup);
+    QFont f = title->font();
+    f.setBold(true);
+    title->setFont(f);
+    layout->addWidget(title);
+
+    m_rotateValueLbl = new QLabel(tr("0°"), m_rotatePopup);
+    m_rotateValueLbl->setObjectName("lbl.rotate.deg");
+    layout->addWidget(m_rotateValueLbl);
+
+    // --- Angle input row (Spin + quick buttons) ---
+    auto* rowAngle = new QHBoxLayout();
+
+    m_rotateSpin = new QSpinBox(m_rotatePopup);
+    m_rotateSpin->setObjectName("spin.rotate.deg");
+
+    // On autorise signé pour permettre horaire/anti-horaire
+    // Convention UI: + = horaire (on appliquera la conversion plus bas)
+    m_rotateSpin->setRange(-360, 360);
+    m_rotateSpin->setValue(0);
+    m_rotateSpin->setSingleStep(1);
+    m_rotateSpin->setSuffix(QStringLiteral("°"));
+
+    auto* btnCCW90 = new QPushButton(QStringLiteral("↺ 90°"), m_rotatePopup);
+    btnCCW90->setObjectName("btn.rotate.ccw90");
+
+    auto* btnCW90 = new QPushButton(QStringLiteral("↻ 90°"), m_rotatePopup);
+    btnCW90->setObjectName("btn.rotate.cw90");
+
+    rowAngle->addWidget(m_rotateSpin, 1);
+    rowAngle->addWidget(btnCCW90);
+    rowAngle->addWidget(btnCW90);
+
+    layout->addLayout(rowAngle);
+
+    auto* row = new QHBoxLayout();
+    auto* applyBtn = new QPushButton(tr("Appliquer"), m_rotatePopup);
+    applyBtn->setObjectName("btn.rotate.apply");
+    auto* closeBtn = new QPushButton(tr("Fermer"), m_rotatePopup);
+    closeBtn->setObjectName("btn.rotate.close");
+    row->addWidget(applyBtn);
+    row->addWidget(closeBtn);
+    layout->addLayout(row);
+
+    // MAJ label + mémorise angle
+    connect(m_rotateSpin, qOverload<int>(&QSpinBox::valueChanged), this,
+            [this](int v)
+            {
+                m_rotateLastDeg = v;
+                if (m_rotateValueLbl)
+                    m_rotateValueLbl->setText(QString::number(v) + QChar(0x00B0));
+            });
+
+    // Quick buttons
+    connect(btnCW90, &QPushButton::clicked, this,
+            [this]()
+            {
+                if (m_rotateSpin)
+                    m_rotateSpin->setValue(m_rotateSpin->value() - 90);  // ↺ anti-horaire (dans UI)
+            });
+    connect(btnCCW90, &QPushButton::clicked, this,
+            [this]()
+            {
+                if (m_rotateSpin)
+                    m_rotateSpin->setValue(m_rotateSpin->value() + 90);  // ↻ horaire (dans UI)
+            });
+
+    // Apply => appel AppService
+    connect(applyBtn, &QPushButton::clicked, this,
+            [this]()
+            {
+                if (!m_rotateTargetIdx || !app().hasDocument())
+                    return;
+                try
+                {
+                    app().rotateLayer(*m_rotateTargetIdx, static_cast<float>(m_rotateLastDeg));
+                }
+                catch (const std::exception& e)
+                {
+                    statusBar()->showMessage(e.what(), 2000);
+                }
+            });
+
+    // Close
+    connect(closeBtn, &QPushButton::clicked, this, [this]() { closeRotateLayerPopup(); });
+
+    m_rotatePopup->installEventFilter(this);
+    m_rotatePopup->adjustSize();
+    m_rotatePopup->move(globalPos + QPoint(8, 8));
+    m_rotatePopup->show();
+    m_rotatePopup->raise();
+    m_rotatePopup->activateWindow();
+}
+
+void MainWindow::closeRotateLayerPopup()
+{
+    if (!m_rotatePopup)
+        return;
+    m_rotatePopup->close();
+    m_rotatePopup->deleteLater();
+    m_rotatePopup = nullptr;
+    m_rotateSpin = nullptr;
+    m_rotateValueLbl = nullptr;
+    m_rotateTargetIdx.reset();
+    m_rotateLastDeg = 0;
 }

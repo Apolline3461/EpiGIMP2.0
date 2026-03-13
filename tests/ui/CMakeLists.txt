@@ -7,6 +7,7 @@ set(EPIGIMP_UI_TEST_SOURCES
         test_ui_main.cpp
         test_FocusNavigation.cpp
         test_Shortcuts.cpp
+        test_CanvasWidget.cpp
 )
 find_package(Qt6 REQUIRED COMPONENTS Widgets Test)
 

@@ -103,6 +103,8 @@ class AppService
 
     void bucketFill(common::Point p, std::uint32_t rgba);
 
+    void rotateLayer(std::size_t idx, float angle);
+
     void undo();
     void redo();
     [[nodiscard]] bool canUndo() const noexcept;

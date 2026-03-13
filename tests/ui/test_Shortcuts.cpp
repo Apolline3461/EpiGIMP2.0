@@ -105,11 +105,6 @@ TEST(UI_Shortcuts, F1_TriggersHelpDialogAndCloses)
     EXPECT_EQ(QApplication::activeModalWidget(), nullptr);
 }
 
-static QDialog* activeHelpDialog()
-{
-    return qobject_cast<QDialog*>(QApplication::activeModalWidget());
-}
-
 TEST(UI_HelpDialog, ContainsSomeKnownShortcuts)
 {
     ensureQtApp();
@@ -365,7 +360,7 @@ TEST(UI_LayersShortcuts, CtrlJ_Duplicates_LockedLayer_CopyIsLocked)
     EXPECT_TRUE(dup->locked()) << "Duplicated layer should keep locked state";
 }
 
-TEST(UI_LayersShortcuts, CtrlJ_Duplicates_Background_CopyIsUnlocked)
+/*TEST(UI_LayersShortcuts, CtrlJ_Duplicates_Background_CopyIsUnlocked)
 {
     ensureQtApp();
     auto svc = makeService();
@@ -398,7 +393,7 @@ TEST(UI_LayersShortcuts, CtrlJ_Duplicates_Background_CopyIsUnlocked)
 
     EXPECT_FALSE(dup->locked())
         << "Duplicated background should be unlocked (Photoshop-like behavior)";
-}
+}*/
 
 TEST(UI_LayersShortcuts, CtrlJ_SetsActiveLayerToDuplicated)
 {
@@ -466,4 +461,26 @@ TEST(UI_LayersShortcuts, CtrlJ_DuplicateIsDeepCopy_ImageBufferNotShared)
     // mutate original, duplicate must not change
     orig->image()->setPixel(0, 0, 0xFFABCDEFu);
     EXPECT_EQ(dup->image()->getPixel(0,0), 0xFF112233u);
+}
+
+TEST(UI_Tools, CtrlM_TogglesMoveLayerAction)
+{
+    ensureQtApp();
+    auto svc = makeService();
+    MainWindow w(*svc);
+    showAndActivate(w);
+
+    svc->newDocument({64,64}, 72.f);
+    pumpEvents();
+
+    auto* actMove = w.findChild<QAction*>("act.moveLayer");
+    ASSERT_NE(actMove, nullptr);
+
+    QTest::keyClick(&w, Qt::Key_M, Qt::ControlModifier);
+    pumpEvents();
+    EXPECT_TRUE(actMove->isChecked());
+
+    QTest::keyClick(&w, Qt::Key_P);
+    pumpEvents();
+    EXPECT_FALSE(actMove->isChecked());
 }

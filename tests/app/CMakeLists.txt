@@ -11,6 +11,7 @@ set(EPIGIMP_APP_TEST_SOURCES
         test_StrokeBehavior.cpp
         test_DeleteSelection.cpp
         test_DuplicateLayer.cpp
+        test_RotateLayer.cpp
 )
 
 add_executable(test_app

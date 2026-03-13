@@ -1,74 +1,59 @@
-#include <gtest/gtest.h>
-#include <QApplication>
 #include <QAction>
+#include <QPushButton>
+#include <QTest>
+#include <QSpinBox>
+#include <gtest/gtest.h>
+
+#define private public
 #include "ui/window.hpp"
-#include "io/IStorage.hpp"
+#undef private
+
+#include "ui/CanvasWidget.hpp"
+#include "ui_test_helpers.hpp"
+#include <core/ImageBuffer.hpp>
+#include <core/Layer.hpp>
+
+using namespace ui_test;
 
 namespace
 {
-class DummyStorage final : public IStorage {
-public:
-    io::epg::OpenResult open(const std::string&) override { return {}; }
-    void save(const Document&, const std::string&) override {}
-    void exportImage(const Document&, const std::string&) override {}
-};
-
-static void ensureQtApp()
-{
-    if (QApplication::instance())
-        return;
-
-    int argc = 0;
-    static char arg0[] = "test_ui";
-    static char* argv[] = { arg0, nullptr };
-    static QApplication app(argc, argv);
-}
-
-static QToolButton* btn(MainWindow& w, const char* name)
+QToolButton* btn(QWidget& w, const char* name)
 {
     auto* b = w.findChild<QToolButton*>(name);
     EXPECT_NE(b, nullptr) << "Missing button objectName=" << name;
     return b;
 }
-
-static QListWidget* layersList(MainWindow& w)
-{
-    // si tu as mis un objectName à la list c’est encore mieux,
-    // sinon on la retrouve par type.
-    auto* list = w.findChild<QListWidget*>();
-    EXPECT_NE(list, nullptr) << "Could not find QListWidget (layers list)";
-    return list;
-}
+}  // namespace
 
 TEST(MainWindow_CloseDocument, ResetsToolModesAndActions)
 {
     ensureQtApp();
 
-    auto storage = std::make_unique<DummyStorage>();
-    app::AppService svc(std::move(storage));
-    MainWindow w(svc);
+    auto svc = makeService();
+    MainWindow w(*svc);
 
-    svc.newDocument({64, 64}, 72.f);
+    svc->newDocument({64, 64}, 72.f);
+    pumpEvents();
 
     auto* actBucket = w.findChild<QAction*>("act.bucket");
     auto* actSelect = w.findChild<QAction*>("act.select");
-    auto* actColorPick   = w.findChild<QAction*>("act.colorPick");
-    auto *actClose  = w.findChild<QAction*>("act.close");
+    auto* actColorPick = w.findChild<QAction*>("act.colorPick");
+    auto* actClose = w.findChild<QAction*>("act.close");
     auto* actPicker = w.findChild<QAction*>("act.picker");
-
 
     ASSERT_NE(actBucket, nullptr);
     ASSERT_NE(actSelect, nullptr);
     ASSERT_NE(actColorPick, nullptr);
     ASSERT_NE(actPicker, nullptr);
-
     ASSERT_NE(actClose, nullptr);
 
     actBucket->setChecked(true);
     actSelect->setChecked(true);
     actPicker->setChecked(true);
+    pumpEvents();
 
     actClose->trigger();
+    pumpEvents();
 
     EXPECT_FALSE(actBucket->isChecked());
     EXPECT_FALSE(actSelect->isChecked());
@@ -80,16 +65,15 @@ TEST(LayersPanelButtons, NoDocument_AllDisabled)
 {
     ensureQtApp();
 
-    auto storage = std::make_unique<DummyStorage>();
-    app::AppService svc(std::move(storage));
-    MainWindow w(svc);
+    auto svc = makeService();
+    MainWindow w(*svc);
 
-    // safety: ensure no doc
-    svc.closeDocument();
+    svc->closeDocument();
+    pumpEvents();
 
     auto* add = btn(w, "btn.layer.add");
     auto* del = btn(w, "btn.layer.del");
-    auto* up  = btn(w, "btn.layer.up");
+    auto* up = btn(w, "btn.layer.up");
     auto* down = btn(w, "btn.layer.down");
     auto* merge = btn(w, "btn.layer.mergeDown");
 
@@ -104,22 +88,23 @@ TEST(LayersPanelButtons, BackgroundSelected_DeleteAndMergeDisabled)
 {
     ensureQtApp();
 
-    auto storage = std::make_unique<DummyStorage>();
-    app::AppService svc(std::move(storage));
-    MainWindow w(svc);
+    auto svc = makeService();
+    MainWindow w(*svc);
 
-    svc.newDocument({64, 64}, 72.f);
+    svc->newDocument({64, 64}, 72.f);
+    pumpEvents();
 
-    // force selection of background item in list (background is idx 0, but list is filled from top to bottom)
     auto* list = layersList(w);
+    ASSERT_NE(list, nullptr);
     ASSERT_GT(list->count(), 0);
 
-    // populateLayersList iterates i = count-1 .. 0, so background is last row.
+    // background = dernière ligne (list top->bottom)
     list->setCurrentRow(list->count() - 1);
+    pumpEvents();
 
     auto* add = btn(w, "btn.layer.add");
     auto* del = btn(w, "btn.layer.del");
-    auto* up  = btn(w, "btn.layer.up");
+    auto* up = btn(w, "btn.layer.up");
     auto* down = btn(w, "btn.layer.down");
     auto* merge = btn(w, "btn.layer.mergeDown");
 
@@ -127,7 +112,6 @@ TEST(LayersPanelButtons, BackgroundSelected_DeleteAndMergeDisabled)
     EXPECT_FALSE(del->isEnabled());
     EXPECT_FALSE(merge->isEnabled());
 
-    // only background -> cannot go up (idx + 1 < n is false)
     EXPECT_FALSE(up->isEnabled());
     EXPECT_FALSE(down->isEnabled());
 }
@@ -136,30 +120,30 @@ TEST(LayersPanelButtons, LockedLayerSelected_DeleteAndMergeDisabled)
 {
     ensureQtApp();
 
-    auto storage = std::make_unique<DummyStorage>();
-    app::AppService svc(std::move(storage));
-    MainWindow w(svc);
+    auto svc = makeService();
+    MainWindow w(*svc);
 
-    svc.newDocument({64, 64}, 72.f);
+    svc->newDocument({64, 64}, 72.f);
 
-    // add a layer
     app::LayerSpec spec{};
     spec.name = "L1";
     spec.visible = true;
     spec.locked = false;
     spec.opacity = 1.f;
     spec.color = 0u;
-    svc.addLayer(spec);
+    svc->addLayer(spec);
 
-    // lock it
-    svc.setLayerLocked(1, true);
+    svc->setLayerLocked(1, true);
+    pumpEvents();
 
-    // select it in list:
-    // list order = top is highest index. With 2 layers (0 bg, 1 L1):
-    // row 0 -> layer 1, row 1 -> layer 0
     auto* list = layersList(w);
+    ASSERT_NE(list, nullptr);
     ASSERT_EQ(list->count(), 2);
-    list->setCurrentRow(0); // L1
+
+    // row 0 = layer idx 1
+    list->setCurrentRow(0);
+    pumpEvents();
+
     auto* del = btn(w, "btn.layer.del");
     auto* merge = btn(w, "btn.layer.mergeDown");
 
@@ -167,4 +151,296 @@ TEST(LayersPanelButtons, LockedLayerSelected_DeleteAndMergeDisabled)
     EXPECT_FALSE(merge->isEnabled());
 }
 
+// -----------------------------------------------------------------------------
+// Tests Canvas -> MainWindow connects (coverage window.cpp)
+// -----------------------------------------------------------------------------
+
+TEST(UI_Canvas, SelectionDrag_UpdatesAppSelectionMask)
+{
+    ensureQtApp();
+    auto svc = makeService();
+    MainWindow w(*svc);
+    showAndActivate(w);
+
+    svc->newDocument({64, 64}, 72.f);
+    pumpEvents();
+
+    auto* actSelect = w.findChild<QAction*>("act.select");
+    ASSERT_NE(actSelect, nullptr);
+    actSelect->setChecked(true);
+    pumpEvents();
+
+    auto* canvas = w.findChild<CanvasWidget*>("canvas");
+    ASSERT_NE(canvas, nullptr);
+
+    QTest::mousePress(canvas, Qt::LeftButton, Qt::NoModifier, QPoint(5, 5));
+    QTest::mouseMove(canvas, QPoint(30, 30));
+    QTest::mouseRelease(canvas, Qt::LeftButton, Qt::NoModifier, QPoint(30, 30));
+    pumpEvents();
+
+    EXPECT_TRUE(svc->selection().hasMask());
+    EXPECT_TRUE(svc->selection().boundingRect().has_value());
+}
+
+TEST(UI_Canvas, PickerClick_DisablesPickerAction)
+{
+    ensureQtApp();
+    auto svc = makeService();
+    MainWindow w(*svc);
+    showAndActivate(w);
+
+    svc->newDocument({16, 16}, 72.f, common::colors::Transparent);
+    pumpEvents();
+
+    auto layer = svc->document().layerAt(svc->activeLayer());
+    ASSERT_NE(layer, nullptr);
+    ASSERT_NE(layer->image(), nullptr);
+    layer->image()->setPixel(0, 0, 0xFF112233u);
+
+    auto* actPicker = w.findChild<QAction*>("act.picker");
+    ASSERT_NE(actPicker, nullptr);
+    actPicker->setChecked(true);
+    pumpEvents();
+
+    auto* canvas = w.findChild<CanvasWidget*>("canvas");
+    ASSERT_NE(canvas, nullptr);
+
+    QTest::mouseClick(canvas, Qt::LeftButton, Qt::NoModifier, QPoint(0, 0));
+    pumpEvents();
+
+    EXPECT_FALSE(actPicker->isChecked());
+}
+
+TEST(UI_Canvas, BucketClick_FillsPixel)
+{
+    ensureQtApp();
+    auto svc = makeService();
+    MainWindow w(*svc);
+    showAndActivate(w);
+
+    svc->newDocument({16, 16}, 72.f, common::colors::Transparent);
+    pumpEvents();
+
+    auto* actBucket = w.findChild<QAction*>("act.bucket");
+    ASSERT_NE(actBucket, nullptr);
+    actBucket->setChecked(true);
+    pumpEvents();
+
+    auto* canvas = w.findChild<CanvasWidget*>("canvas");
+    ASSERT_NE(canvas, nullptr);
+
+    QTest::mouseClick(canvas, Qt::LeftButton, Qt::NoModifier, QPoint(5, 5));
+    pumpEvents();
+
+    auto layer = svc->document().layerAt(svc->activeLayer());
+    ASSERT_NE(layer, nullptr);
+    ASSERT_NE(layer->image(), nullptr);
+
+    const auto px = layer->image()->getPixel(5, 5);
+    EXPECT_NE(px, common::colors::Transparent);
+}
+
+static CanvasWidget* canvas(MainWindow& w)
+{
+    auto* c = w.findChild<CanvasWidget*>("canvas");
+    EXPECT_NE(c, nullptr);
+    return c;
+}
+
+TEST(UI_Zoom, ZoomActions_DoNothingWithoutImage)
+{
+    ensureQtApp();
+    auto svc = makeService();
+    MainWindow w(*svc);
+    showAndActivate(w);
+
+    auto* c = canvas(w);
+    ASSERT_NE(c, nullptr);
+
+    // Pas de document => img_ null => hasImage() false
+    const double before = c->scale();
+
+    auto* zoomInAct = w.findChild<QAction*>("zoomInAct");
+    auto* zoomOutAct = w.findChild<QAction*>("zoomOutAct");
+    auto* resetZoomAct = w.findChild<QAction*>("resetZoomAct");
+    ASSERT_NE(zoomInAct, nullptr);
+    ASSERT_NE(zoomOutAct, nullptr);
+    ASSERT_NE(resetZoomAct, nullptr);
+
+    zoomInAct->trigger();
+    zoomOutAct->trigger();
+    resetZoomAct->trigger();
+    pumpEvents();
+
+    EXPECT_DOUBLE_EQ(c->scale(), before);
+}
+
+TEST(UI_Zoom, ZoomIn_IncreasesScale)
+{
+    ensureQtApp();
+    auto svc = makeService();
+    MainWindow w(*svc);
+    showAndActivate(w);
+
+    // Crée un doc => refreshUIAfterDocChange met une image dans le canvas
+    svc->newDocument({64, 64}, 72.f);
+    pumpEvents();
+
+    auto* c = canvas(w);
+    ASSERT_NE(c, nullptr);
+
+    c->setScale(1.0);
+    pumpEvents();
+
+    auto* zoomInAct = w.findChild<QAction*>("zoomInAct");
+    ASSERT_NE(zoomInAct, nullptr);
+
+    zoomInAct->trigger();
+    pumpEvents();
+
+    EXPECT_NEAR(c->scale(), 1.0 * 1.25, 1e-9);
+}
+
+TEST(UI_Zoom, ZoomOut_DecreasesScale)
+{
+    ensureQtApp();
+    auto svc = makeService();
+    MainWindow w(*svc);
+    showAndActivate(w);
+
+    svc->newDocument({64, 64}, 72.f);
+    pumpEvents();
+
+    auto* c = canvas(w);
+    ASSERT_NE(c, nullptr);
+
+    c->setScale(1.0);
+    pumpEvents();
+
+    auto* zoomOutAct = w.findChild<QAction*>("zoomOutAct");
+    ASSERT_NE(zoomOutAct, nullptr);
+
+    zoomOutAct->trigger();
+    pumpEvents();
+
+    EXPECT_NEAR(c->scale(), 1.0 / 1.25, 1e-9);
+}
+
+TEST(UI_Zoom, ResetZoom_SetsScaleTo1)
+{
+    ensureQtApp();
+    auto svc = makeService();
+    MainWindow w(*svc);
+    showAndActivate(w);
+
+    svc->newDocument({64, 64}, 72.f);
+    pumpEvents();
+
+    auto* c = canvas(w);
+    ASSERT_NE(c, nullptr);
+
+    c->setScale(2.5);
+    pumpEvents();
+
+    auto* resetZoomAct = w.findChild<QAction*>("resetZoomAct");
+    ASSERT_NE(resetZoomAct, nullptr);
+
+    resetZoomAct->trigger();
+    pumpEvents();
+
+    EXPECT_NEAR(c->scale(), 1.0, 1e-9);
+}
+
+static QWidget* findTopLevelByObjectName(const QString& name)
+{
+    for (QWidget* w : QApplication::topLevelWidgets())
+    {
+        if (!w) continue;
+        if (w->objectName() == name)
+            return w;
+    }
+    return nullptr;
+}
+
+TEST(UI_RotatePopup, OpensAndAppliesRotation)
+{
+    ensureQtApp();
+    auto svc = makeService();
+    MainWindow w(*svc);
+    showAndActivate(w);
+
+    svc->newDocument({32, 32}, 72.f, common::colors::Transparent);
+
+    // Ajoute un layer (idx=1)
+    app::LayerSpec spec{};
+    spec.name = "L1";
+    spec.visible = true;
+    spec.locked = false;
+    spec.opacity = 1.f;
+    spec.color = common::colors::Transparent;
+    svc->addLayer(spec);
+    pumpEvents();
+
+    // Sélectionne L1 dans la liste (row 0 = top = idx 1)
+    auto* list = layersList(w);
+    ASSERT_NE(list, nullptr);
+    list->setCurrentRow(0);
+    pumpEvents();
+
+    // Ouvre popup rotation
+    w.showRotateLayerPopup(1, w.mapToGlobal(QPoint(50, 50)));
+    pumpEvents();
+    // activePopupWidget peut être null selon plateforme, donc on cherche par objectName
+    auto* rotatePopup = findTopLevelByObjectName("popup.rotateLayer");
+    ASSERT_NE(rotatePopup, nullptr);
+
+    auto* spin = rotatePopup->findChild<QSpinBox*>("spin.rotate.deg");
+    ASSERT_NE(spin, nullptr);
+
+    auto* apply = rotatePopup->findChild<QPushButton*>("btn.rotate.apply");
+    ASSERT_NE(apply, nullptr);
+
+    // Change angle + appliquer
+    spin->setValue(45);
+    pumpEvents();
+    QTest::mouseClick(apply, Qt::LeftButton);
+    pumpEvents();
+
+    // Vérifie qu'il y a eu changement (au minimum dirty true)
+    EXPECT_TRUE(svc->isDirty());
+
+    // Ferme popup
+    auto* closeBtn = rotatePopup->findChild<QPushButton*>("btn.rotate.close");
+    ASSERT_NE(closeBtn, nullptr);
+    QTest::mouseClick(closeBtn, Qt::LeftButton);
+    pumpEvents();
+
+    EXPECT_EQ(QApplication::instance()->findChild<QWidget*>("popup.rotateLayer"), nullptr);
+}
+
+TEST(UI_RotatePopup, LockedLayerDoesNotOpen)
+{
+    ensureQtApp();
+    auto svc = makeService();
+    MainWindow w(*svc);
+    showAndActivate(w);
+
+    svc->newDocument({32, 32}, 72.f, common::colors::Transparent);
+
+    app::LayerSpec spec{};
+    spec.name = "L1";
+    spec.locked = false;
+    spec.color = common::colors::Transparent;
+    svc->addLayer(spec);
+    pumpEvents();
+
+    // lock idx=1
+    svc->setLayerLocked(1, true);
+    pumpEvents();
+
+    w.showRotateLayerPopup(1, w.mapToGlobal(QPoint(20, 20)));
+    pumpEvents();
+
+    auto* rotatePopup = findTopLevelByObjectName("popup.rotateLayer");
+    EXPECT_EQ(rotatePopup, nullptr);
 }
