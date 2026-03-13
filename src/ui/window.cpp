@@ -2622,11 +2622,6 @@ QString MainWindow::formatActionShortcut(const QAction* a) const
     return QStringLiteral("%1\t%2").arg(t, parts.join(QStringLiteral(" / ")));
 }
 
-void MainWindow::showRotateLayerPopup(unsigned long long idx, const QPoint& globalPos)
-{
-    showRotateLayerPopup(static_cast<std::size_t>(idx), globalPos);
-}
-
 void MainWindow::showRotateLayerPopup(std::size_t idx, const QPoint& globalPos)
 {
     if (!app().hasDocument())

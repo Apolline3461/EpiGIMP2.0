@@ -114,7 +114,6 @@ class MainWindow : public QMainWindow
     void updateColorPickerIcon();
 
     QString formatActionShortcut(const QAction* a) const;
-    void showRotateLayerPopup(unsigned long long idx, const QPoint& globalPos);
 
     void showRotateLayerPopup(std::size_t idx, const QPoint& globalPos);
     void closeRotateLayerPopup();
