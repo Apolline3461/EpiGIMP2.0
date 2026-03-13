@@ -113,8 +113,6 @@ std::shared_ptr<ImageBuffer> rotate(const ImageBuffer& src, float degrees, std::
         {
             const std::uint32_t px = src.getPixel(sx, sy);
 
-            // Optionnel: skip si totalement transparent (évite de "peindre" bg)
-            // Si tu veux être strict "pas perdre", tu peux retirer ce skip.
             if (px == bgColor)
                 continue;
 

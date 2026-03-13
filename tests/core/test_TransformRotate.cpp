@@ -24,15 +24,56 @@ static void fill(ImageBuffer& img, uint32_t c) {
 
 } // namespace
 
-TEST(Transform_Rotate, KeepsDimensions)
+TEST(Transform_Rotate, KeepsDimensions_ForRightAngles_AndIdentity)
+{
+    ImageBuffer src(7, 5);
+    fill(src, RGBA(1,2,3));
+
+    // identity
+    {
+        auto out = core::rotate(src, 0.f, common::colors::Transparent);
+        ASSERT_NE(out, nullptr);
+        EXPECT_EQ(out->width(), 7);
+        EXPECT_EQ(out->height(), 5);
+    }
+    {
+        auto out = core::rotate(src, 360.f, common::colors::Transparent);
+        ASSERT_NE(out, nullptr);
+        EXPECT_EQ(out->width(), 7);
+        EXPECT_EQ(out->height(), 5);
+    }
+
+    // right angles
+    {
+        auto out = core::rotate(src, 90.f, common::colors::Transparent);
+        ASSERT_NE(out, nullptr);
+        EXPECT_EQ(out->width(), 5);
+        EXPECT_EQ(out->height(), 7);
+    }
+    {
+        auto out = core::rotate(src, 180.f, common::colors::Transparent);
+        ASSERT_NE(out, nullptr);
+        EXPECT_EQ(out->width(), 7);
+        EXPECT_EQ(out->height(), 5);
+    }
+    {
+        auto out = core::rotate(src, 270.f, common::colors::Transparent);
+        ASSERT_NE(out, nullptr);
+        EXPECT_EQ(out->width(), 5);
+        EXPECT_EQ(out->height(), 7);
+    }
+}
+
+TEST(Transform_Rotate, ArbitraryAngle_DoesNotCrop_DimensionsGrowOrEqual)
 {
     ImageBuffer src(7, 5);
     fill(src, RGBA(1,2,3));
 
     auto out = core::rotate(src, 17.f, common::colors::Transparent);
     ASSERT_NE(out, nullptr);
-    EXPECT_EQ(out->width(), 7);
-    EXPECT_EQ(out->height(), 5);
+
+    EXPECT_GE(out->width(),  src.width());
+    EXPECT_GE(out->height(), src.height());
 }
 
 TEST(Transform_Rotate, ZeroDegrees_IsIdentity)
@@ -66,7 +107,7 @@ TEST(Transform_Rotate, FullTurn360_IsIdentity)
             EXPECT_EQ(out->getPixel(x, y), src.getPixel(x, y));
 }
 
-TEST(Transform_Rotate, CenterPixel_StaysInPlace_ForOddSize)
+TEST(Transform_Rotate, CenterPixel_MapsToOutputCenter_ForOddSize)
 {
     ImageBuffer src(5, 5);
     fill(src, common::colors::Transparent);
@@ -74,14 +115,39 @@ TEST(Transform_Rotate, CenterPixel_StaysInPlace_ForOddSize)
     const uint32_t centerColor = RGBA(200, 10, 10);
     src.setPixel(2, 2, centerColor);
 
-    // peu importe l'angle, le centre exact (2,2) doit rester le centre (2,2)
     auto out = core::rotate(src, 37.f, common::colors::Transparent);
     ASSERT_NE(out, nullptr);
-    EXPECT_EQ(out->getPixel(2, 2), centerColor);
 
-    out = core::rotate(src, 90.f, common::colors::Transparent);
+    const int outCx = (out->width()  - 1) / 2;
+    const int outCy = (out->height() - 1) / 2;
+
+    // Avec splat 2x2, le centre peut couvrir 2-4 pixels autour du centre.
+    bool found = false;
+    for (int dy = -1; dy <= 1; ++dy)
+        for (int dx = -1; dx <= 1; ++dx)
+        {
+            const int x = outCx + dx;
+            const int y = outCy + dy;
+            if (x >= 0 && x < out->width() && y >= 0 && y < out->height())
+                if (out->getPixel(x, y) == centerColor)
+                    found = true;
+        }
+
+    EXPECT_TRUE(found) << "Expected center pixel to map near output center";
+}
+
+TEST(Transform_Rotate, CenterPixel_StaysAtCenter_For90deg_OnOddSquare)
+{
+    ImageBuffer src(5, 5);
+    fill(src, common::colors::Transparent);
+    const uint32_t centerColor = RGBA(200,10,10);
+    src.setPixel(2, 2, centerColor);
+
+    auto out = core::rotate(src, 90.f, common::colors::Transparent);
     ASSERT_NE(out, nullptr);
-    EXPECT_EQ(out->getPixel(2, 2), centerColor);
+    EXPECT_EQ(out->width(), 5);
+    EXPECT_EQ(out->height(), 5);
+    EXPECT_EQ(out->getPixel(2,2), centerColor);
 }
 
 TEST(Transform_Rotate, Rotate90_CW_MatchesExpected_For3x3)

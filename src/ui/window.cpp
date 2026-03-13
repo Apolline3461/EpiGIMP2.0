@@ -2568,13 +2568,13 @@ void MainWindow::showRotateLayerPopup(std::size_t idx, const QPoint& globalPos)
             });
 
     // Quick buttons
-    connect(btnCCW90, &QPushButton::clicked, this,
+    connect(btnCW90, &QPushButton::clicked, this,
             [this]()
             {
                 if (m_rotateSpin)
                     m_rotateSpin->setValue(m_rotateSpin->value() - 90);  // ↺ anti-horaire (dans UI)
             });
-    connect(btnCW90, &QPushButton::clicked, this,
+    connect(btnCCW90, &QPushButton::clicked, this,
             [this]()
             {
                 if (m_rotateSpin)

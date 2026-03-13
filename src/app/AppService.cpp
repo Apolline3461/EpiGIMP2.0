@@ -670,8 +670,7 @@ void AppService::rotateLayer(std::size_t idx, float angle)
 
     auto before = std::make_shared<ImageBuffer>(*layer->image());
 
-    // IMPORTANT: positif = horaire => on inverse le signe car la rotation math est CCW
-    auto after = core::rotate(*before, -angle, common::colors::Transparent);
+    auto after = core::rotate(*before, angle, common::colors::Transparent);
     if (!after)
         throw std::runtime_error("rotateLayer: rotation failed");
 
