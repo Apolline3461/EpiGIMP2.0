@@ -1573,7 +1573,7 @@ void MainWindow::createActions()
 
     m_lassoAct = new QAction(tr("Lasso"), this);
     m_lassoAct->setCheckable(true);
-    m_lassoAct->setIcon(QIcon(":/icons/selection.svg"));
+    m_lassoAct->setIcon(QIcon(":/icons/select_lasso.svg"));
     m_lassoAct->setShortcut(QKeySequence(QStringLiteral("L")));
     m_lassoAct->setStatusTip(tr("Sélection lasso"));
     m_lassoAct->setObjectName("act.lasso");
@@ -1756,7 +1756,6 @@ void MainWindow::createActions()
                 if (!app().hasDocument())
                     return;
 
-                const auto& sel = app().document().selection();
                 // If there is a selection mask, delete pixels inside it on the active layer
                 try
                 {
